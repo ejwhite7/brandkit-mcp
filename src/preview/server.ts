@@ -8,6 +8,7 @@
 import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import ejs from 'ejs';
 import { readFileSync } from 'fs';
 import type { DesignSystemIndex } from '../indexer/types.js';
@@ -17,25 +18,70 @@ import { searchIndex as searchIndexFn } from '../indexer/index.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+/** Mutable reference wrapper so hot-reload can update the live index. */
+export interface IndexRef {
+  current: DesignSystemIndex;
+}
+
+/**
+ * Resolve the preview asset directories. Works in both development
+ * (src/preview/) and production (dist/preview/ or dist/cli/).
+ */
+function resolvePreviewDirs(): { templatesDir: string; staticDir: string } {
+  // Candidate locations in priority order
+  const candidates = [
+    // When running from src/preview/ directly (dev / ts-node)
+    join(__dirname, 'templates'),
+    // When bundled into dist/cli/ and assets copied to dist/preview/
+    join(__dirname, '..', 'preview', 'templates'),
+    // When bundled into dist/ root and assets copied to dist/preview/
+    join(__dirname, 'preview', 'templates'),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      const base = dirname(candidate);
+      return {
+        templatesDir: candidate,
+        staticDir: join(base, 'static'),
+      };
+    }
+  }
+
+  // Fallback -- use __dirname-relative (original behavior)
+  return {
+    templatesDir: join(__dirname, 'templates'),
+    staticDir: join(__dirname, 'static'),
+  };
+}
+
 /**
  * Creates the Express preview server application.
- * @param index - The design system index
+ * Accepts either a plain DesignSystemIndex or an IndexRef so that hot-reload
+ * can swap the underlying index without restarting the server.
+ * @param indexOrRef - The design system index or a mutable ref to one
  * @param config - BrandKit configuration
  * @returns Express application
  */
 export function createPreviewServer(
-  index: DesignSystemIndex,
+  indexOrRef: DesignSystemIndex | IndexRef,
   config: BrandKitConfig,
 ): express.Application {
   const app = express();
-  const templatesDir = join(__dirname, 'templates');
-  const staticDir = join(__dirname, 'static');
+
+  // Normalise to a ref object so route handlers always read the latest index
+  const ref: IndexRef = 'current' in indexOrRef
+    ? indexOrRef as IndexRef
+    : { current: indexOrRef };
+
+  const { templatesDir, staticDir } = resolvePreviewDirs();
 
   // Serve static files
   app.use('/static', express.static(staticDir));
 
   // Template rendering helper
   function renderPage(template: string, data: Record<string, unknown>): string {
+    const index = ref.current;
     const templatePath = join(templatesDir, `${template}.ejs`);
     const layoutPath = join(templatesDir, 'layout.ejs');
 
@@ -60,11 +106,13 @@ export function createPreviewServer(
 
   // Routes
   app.get('/', (_req, res) => {
+    const index = ref.current;
     const inv = index.resolved.all.assetInventory;
     res.send(renderPage('index', { title: `${config.name} Design System`, inventory: inv }));
   });
 
   app.get('/colors', (_req, res) => {
+    const index = ref.current;
     res.send(renderPage('colors', {
       title: 'Colors',
       shared: index.shared.colors,
@@ -75,6 +123,7 @@ export function createPreviewServer(
   });
 
   app.get('/typography', (_req, res) => {
+    const index = ref.current;
     res.send(renderPage('typography', {
       title: 'Typography',
       shared: index.shared.typography,
@@ -85,6 +134,7 @@ export function createPreviewServer(
   });
 
   app.get('/logos', (_req, res) => {
+    const index = ref.current;
     res.send(renderPage('logos', {
       title: 'Logos',
       logos: index.resolved.all.logos,
@@ -92,6 +142,7 @@ export function createPreviewServer(
   });
 
   app.get('/components', (_req, res) => {
+    const index = ref.current;
     res.send(renderPage('components', {
       title: 'Components',
       marketing: index.marketing.components,
@@ -101,6 +152,7 @@ export function createPreviewServer(
   });
 
   app.get('/guidelines', (_req, res) => {
+    const index = ref.current;
     res.send(renderPage('guidelines', {
       title: 'Guidelines',
       guidelines: index.resolved.all.guidelines,
@@ -108,6 +160,7 @@ export function createPreviewServer(
   });
 
   app.get('/tokens', (_req, res) => {
+    const index = ref.current;
     res.send(renderPage('tokens', {
       title: 'Design Tokens',
       colors: index.resolved.all.colors,
@@ -116,6 +169,7 @@ export function createPreviewServer(
   });
 
   app.get('/textures', (_req, res) => {
+    const index = ref.current;
     res.send(renderPage('textures', {
       title: 'Textures',
       textures: index.resolved.all.textures,
@@ -123,6 +177,7 @@ export function createPreviewServer(
   });
 
   app.get('/css', (_req, res) => {
+    const index = ref.current;
     res.send(renderPage('css', {
       title: 'CSS Files',
       cssFiles: index.resolved.all.cssFiles,
@@ -130,6 +185,7 @@ export function createPreviewServer(
   });
 
   app.get('/search', (req, res) => {
+    const index = ref.current;
     const query = (req.query.q as string) ?? '';
     let results: unknown[] = [];
     if (query) {
@@ -140,4 +196,3 @@ export function createPreviewServer(
 
   return app;
 }
-
