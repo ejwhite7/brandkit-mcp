@@ -1,0 +1,40 @@
+<h1>Design Tokens</h1>
+
+<section>
+  <h2>Color Tokens (<%= colors.length %>)</h2>
+  <table class="data-table">
+    <thead>
+      <tr><th>Token</th><th>Value</th><th>Hex</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <% for (const c of colors) { %>
+      <tr>
+        <td><code><%= c.token %></code></td>
+        <td><%= c.value %></td>
+        <td><%= c.hex || '-' %></td>
+        <td><%= c.role || '-' %></td>
+      </tr>
+      <% } %>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Typography Tokens (<%= typography.length %>)</h2>
+  <table class="data-table">
+    <thead>
+      <tr><th>Token</th><th>Font Family</th><th>Size</th><th>Weight</th></tr>
+    </thead>
+    <tbody>
+      <% for (const t of typography) { %>
+      <tr>
+        <td><code><%= t.token || t.name %></code></td>
+        <td><%= t.fontFamily || '-' %></td>
+        <td><%= t.fontSize || '-' %></td>
+        <td><%= t.fontWeight || '-' %></td>
+      </tr>
+      <% } %>
+    </tbody>
+  </table>
+</section>
+

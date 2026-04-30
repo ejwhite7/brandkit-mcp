@@ -1,0 +1,36 @@
+/* Acme Corp -- Shared Color Palette */
+:root {
+  /* Primary */
+  --color-primary: #1a1a2e;
+  --color-primary-light: #16213e;
+  --color-primary-dark: #0f0f1e;
+
+  /* Secondary */
+  --color-secondary: #0f3460;
+  --color-secondary-light: #1a5276;
+  --color-secondary-dark: #0a2647;
+
+  /* Accent */
+  --color-accent: #e94560;
+  --color-accent-light: #ff6b81;
+  --color-accent-dark: #c0392b;
+
+  /* Neutral */
+  --color-neutral-50: #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+
+  /* Semantic */
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+}
+

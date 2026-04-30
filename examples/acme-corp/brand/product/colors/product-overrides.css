@@ -1,0 +1,17 @@
+/* Acme Corp Product -- Color Overrides */
+:root {
+  /* Product uses more subdued accent tones */
+  --color-accent: #6366f1;
+  --color-accent-light: #818cf8;
+  --color-accent-dark: #4f46e5;
+
+  /* Product-specific UI colors */
+  --color-sidebar-bg: #1e1e2e;
+  --color-sidebar-text: #cdd6f4;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f8f9fa;
+  --color-border: #e2e8f0;
+  --color-input-border: #cbd5e1;
+  --color-focus-ring: #6366f1;
+}
+

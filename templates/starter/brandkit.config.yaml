@@ -1,0 +1,24 @@
+# BrandKit MCP Configuration
+# Replace "Your Brand" with your company name
+name: "Your Brand"
+description: "Design system for Your Brand"
+version: "1.0.0"
+
+contexts:
+  marketing:
+    enabled: true
+    label: "Marketing Site"
+    description: "Marketing website design system"
+  product:
+    enabled: true
+    label: "Product App"
+    description: "Product application design system"
+
+preview:
+  port: 3000
+  host: localhost
+
+server:
+  transport: stdio
+  port: 3001
+

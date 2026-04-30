@@ -1,0 +1,16 @@
+/* Acme Corp Marketing -- Color Overrides */
+:root {
+  /* Marketing uses warmer accent tones */
+  --color-accent: #ff6b6b;
+  --color-accent-light: #ff8787;
+  --color-accent-dark: #e63946;
+
+  /* Marketing-specific hero gradient colors */
+  --color-hero-gradient-start: #1a1a2e;
+  --color-hero-gradient-end: #0f3460;
+
+  /* CTA colors */
+  --color-cta-primary: #e94560;
+  --color-cta-hover: #ff6b81;
+}
+

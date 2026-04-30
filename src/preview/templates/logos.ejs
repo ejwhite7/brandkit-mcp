@@ -1,0 +1,41 @@
+<h1>Logo System</h1>
+
+<% if (logos.variants && logos.variants.length > 0) { %>
+<section>
+  <h2>Variants (<%= logos.variants.length %>)</h2>
+  <div class="logo-grid">
+    <% for (const v of logos.variants) { %>
+    <div class="logo-card">
+      <div class="logo-preview">
+        <span class="logo-placeholder"><%= v.name %></span>
+      </div>
+      <div class="logo-info">
+        <strong><%= v.name %></strong>
+        <span>Format: <%= v.format %></span>
+        <% if (v.width && v.height) { %><span>Size: <%= v.width %>x<%= v.height %></span><% } %>
+        <code><%= v.filePath %></code>
+      </div>
+    </div>
+    <% } %>
+  </div>
+</section>
+<% } else { %>
+<p>No logo variants found.</p>
+<% } %>
+
+<% if (logos.usageGuidelines) { %>
+<section>
+  <h2>Usage Guidelines</h2>
+  <div class="guideline-content"><%= logos.usageGuidelines %></div>
+</section>
+<% } %>
+
+<% if (logos.clearSpace) { %><p><strong>Clear Space:</strong> <%= logos.clearSpace %></p><% } %>
+<% if (logos.minimumSize) { %><p><strong>Minimum Size:</strong> <%= logos.minimumSize %></p><% } %>
+<% if (logos.forbiddenUsage && logos.forbiddenUsage.length > 0) { %>
+<section>
+  <h2>Forbidden Usage</h2>
+  <ul><% for (const f of logos.forbiddenUsage) { %><li><%= f %></li><% } %></ul>
+</section>
+<% } %>
+

@@ -1,0 +1,66 @@
+<h1><%= config.name %> Design System</h1>
+<% if (config.description) { %>
+<p class="description"><%= config.description %></p>
+<% } %>
+
+<div class="card-grid">
+  <div class="card">
+    <h3>Colors</h3>
+    <p class="count"><%= inventory.colors %></p>
+    <a href="/colors">View palette</a>
+  </div>
+  <div class="card">
+    <h3>Typography</h3>
+    <p class="count"><%= inventory.typography %></p>
+    <a href="/typography">View type system</a>
+  </div>
+  <div class="card">
+    <h3>Logos</h3>
+    <p class="count"><%= inventory.logos %></p>
+    <a href="/logos">View variants</a>
+  </div>
+  <div class="card">
+    <h3>Components</h3>
+    <p class="count"><%= inventory.components %></p>
+    <a href="/components">View specs</a>
+  </div>
+  <div class="card">
+    <h3>Guidelines</h3>
+    <p class="count"><%= inventory.guidelines %></p>
+    <a href="/guidelines">Read guidelines</a>
+  </div>
+  <div class="card">
+    <h3>Textures</h3>
+    <p class="count"><%= inventory.textures %></p>
+    <a href="/textures">View assets</a>
+  </div>
+  <div class="card">
+    <h3>CSS Files</h3>
+    <p class="count"><%= inventory.cssFiles %></p>
+    <a href="/css">View CSS</a>
+  </div>
+  <div class="card">
+    <h3>Fonts</h3>
+    <p class="count"><%= inventory.fonts %></p>
+    <span class="label">Font files indexed</span>
+  </div>
+</div>
+
+<section class="contexts">
+  <h2>Contexts</h2>
+  <div class="context-grid">
+    <div class="context-card">
+      <h3>Shared</h3>
+      <p>Base tokens and guidelines inherited by all contexts.</p>
+    </div>
+    <div class="context-card">
+      <h3><%= config.contexts.marketing.label %></h3>
+      <p><%= config.contexts.marketing.description || 'Marketing context' %></p>
+    </div>
+    <div class="context-card">
+      <h3><%= config.contexts.product.label %></h3>
+      <p><%= config.contexts.product.description || 'Product context' %></p>
+    </div>
+  </div>
+</section>
+

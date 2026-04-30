@@ -1,0 +1,35 @@
+<h1>Components</h1>
+
+<% const contexts = [
+  { name: 'All (Resolved)', items: all },
+  { name: 'Marketing', items: marketing },
+  { name: 'Product', items: product },
+]; %>
+
+<% for (const ctx of contexts) { %>
+  <% if (ctx.items.length > 0) { %>
+  <section>
+    <h2><%= ctx.name %> (<%= ctx.items.length %>)</h2>
+    <% for (const comp of ctx.items) { %>
+    <div class="component-card">
+      <h3><%= comp.name %> <span class="badge"><%= comp.category %></span></h3>
+      <% if (comp.description) { %><p><%= comp.description %></p><% } %>
+      <% if (comp.variants && comp.variants.length > 0) { %>
+      <div class="variants">
+        <strong>Variants:</strong>
+        <% for (const v of comp.variants) { %><span class="variant-tag"><%= v %></span><% } %>
+      </div>
+      <% } %>
+      <% if (comp.usage) { %><div class="usage-note"><strong>Usage:</strong> <%= comp.usage %></div><% } %>
+      <% if (comp.examples && comp.examples.length > 0) { %>
+      <div class="examples">
+        <strong>Examples:</strong>
+        <% for (const ex of comp.examples) { %><pre><code><%= ex %></code></pre><% } %>
+      </div>
+      <% } %>
+    </div>
+    <% } %>
+  </section>
+  <% } %>
+<% } %>
+

@@ -1,0 +1,14 @@
+<h1>Brand Guidelines</h1>
+
+<% if (guidelines.length === 0) { %>
+<p>No guidelines found.</p>
+<% } else { %>
+  <% for (const g of guidelines) { %>
+  <section class="guideline-section">
+    <h2><%= g.title %> <% if (g.section) { %><span class="badge"><%= g.section %></span><% } %></h2>
+    <% if (g.context) { %><span class="context-badge"><%= g.context %></span><% } %>
+    <div class="guideline-content"><%= g.content %></div>
+  </section>
+  <% } %>
+<% } %>
+

@@ -1,0 +1,20 @@
+<h1>Textures & Patterns</h1>
+
+<% if (textures.length === 0) { %>
+<p>No textures found.</p>
+<% } else { %>
+<div class="texture-grid">
+  <% for (const t of textures) { %>
+  <div class="texture-card">
+    <div class="texture-preview"><span><%= t.name %></span></div>
+    <div class="texture-info">
+      <strong><%= t.name %></strong>
+      <span>Format: <%= t.format %></span>
+      <code><%= t.filePath %></code>
+      <% if (t.usage) { %><p><%= t.usage %></p><% } %>
+    </div>
+  </div>
+  <% } %>
+</div>
+<% } %>
+

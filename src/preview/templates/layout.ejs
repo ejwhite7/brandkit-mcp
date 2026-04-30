@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> | <%= config.name %> Design System</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <h2><%= config.name %></h2>
+      <span class="badge">Design System</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="/">Overview</a></li>
+      <li><a href="/colors">Colors</a></li>
+      <li><a href="/typography">Typography</a></li>
+      <li><a href="/logos">Logos</a></li>
+      <li><a href="/components">Components</a></li>
+      <li><a href="/guidelines">Guidelines</a></li>
+      <li><a href="/tokens">Tokens</a></li>
+      <li><a href="/textures">Textures</a></li>
+      <li><a href="/css">CSS Files</a></li>
+      <li><a href="/search">Search</a></li>
+    </ul>
+  </nav>
+  <main class="content">
+    <%- body %>
+  </main>
+</body>
+</html>
+

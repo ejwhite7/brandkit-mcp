@@ -1,0 +1,31 @@
+<h1>Color Palette</h1>
+
+<% const contexts = [
+  { name: 'All (Resolved)', colors: all },
+  { name: 'Shared', colors: shared },
+  { name: 'Marketing', colors: marketing },
+  { name: 'Product', colors: product },
+]; %>
+
+<% for (const ctx of contexts) { %>
+  <% if (ctx.colors.length > 0) { %>
+  <section>
+    <h2><%= ctx.name %> (<%= ctx.colors.length %>)</h2>
+    <div class="color-grid">
+      <% for (const color of ctx.colors) { %>
+      <div class="color-swatch">
+        <div class="swatch" style="background-color: <%= color.value %>"></div>
+        <div class="color-info">
+          <strong><%= color.name %></strong>
+          <code><%= color.token %></code>
+          <span class="value"><%= color.value %></span>
+          <% if (color.role) { %><span class="role"><%= color.role %></span><% } %>
+          <% if (color.usage) { %><p class="usage"><%= color.usage %></p><% } %>
+        </div>
+      </div>
+      <% } %>
+    </div>
+  </section>
+  <% } %>
+<% } %>
+

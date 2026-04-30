@@ -1,0 +1,28 @@
+/* Your Brand -- Color Tokens
+   Replace these placeholder values with your brand colors.
+   BrandKit MCP will automatically parse and serve these to AI tools. */
+
+:root {
+  /* Primary */
+  --color-primary: #3b82f6;
+  --color-primary-light: #60a5fa;
+  --color-primary-dark: #2563eb;
+
+  /* Secondary */
+  --color-secondary: #8b5cf6;
+
+  /* Accent */
+  --color-accent: #ec4899;
+
+  /* Neutral */
+  --color-neutral-100: #f3f4f6;
+  --color-neutral-500: #6b7280;
+  --color-neutral-900: #111827;
+
+  /* Semantic */
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+}
+

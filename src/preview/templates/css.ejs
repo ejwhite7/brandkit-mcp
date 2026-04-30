@@ -1,0 +1,29 @@
+<h1>CSS Files</h1>
+
+<% if (cssFiles.length === 0) { %>
+<p>No CSS files found.</p>
+<% } else { %>
+  <% for (const f of cssFiles) { %>
+  <section class="css-file">
+    <h2><%= f.filePath %></h2>
+    <% if (f.customProperties && Object.keys(f.customProperties).length > 0) { %>
+    <h3>Custom Properties (<%= Object.keys(f.customProperties).length %>)</h3>
+    <table class="data-table">
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <% for (const [prop, val] of Object.entries(f.customProperties)) { %>
+        <tr><td><code><%= prop %></code></td><td><%= val %></td></tr>
+        <% } %>
+      </tbody>
+    </table>
+    <% } %>
+    <% if (f.classes && f.classes.length > 0) { %>
+    <h3>Classes (<%= f.classes.length %>)</h3>
+    <div class="class-list">
+      <% for (const cls of f.classes) { %><span class="class-tag">.<%= cls %></span><% } %>
+    </div>
+    <% } %>
+  </section>
+  <% } %>
+<% } %>
+

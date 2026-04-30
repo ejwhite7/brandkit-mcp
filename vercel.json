@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/adapters/vercel.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    { "src": "/api/sse", "dest": "src/adapters/vercel.ts" },
+    { "src": "/api/messages", "dest": "src/adapters/vercel.ts" },
+    { "src": "/api/(.*)", "dest": "src/adapters/vercel.ts" }
+  ]
+}
+

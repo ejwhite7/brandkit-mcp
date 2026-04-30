@@ -1,0 +1,22 @@
+<h1>Search Design System</h1>
+
+<form class="search-form" method="GET" action="/search">
+  <input type="text" name="q" value="<%= query %>" placeholder="Search colors, typography, components, guidelines..." autofocus>
+  <button type="submit">Search</button>
+</form>
+
+<% if (query && results.length === 0) { %>
+<p class="no-results">No results found for "<%= query %>".</p>
+<% } else if (results.length > 0) { %>
+<p class="result-count"><%= results.length %> results for "<%= query %>"</p>
+<div class="search-results">
+  <% for (const r of results) { %>
+  <div class="search-result">
+    <h3><%= r.name %> <span class="badge"><%= r.type %></span> <span class="context-badge"><%= r.context %></span></h3>
+    <p class="snippet"><%= r.snippet %></p>
+    <% if (r.source) { %><code class="source"><%= r.source %></code><% } %>
+  </div>
+  <% } %>
+</div>
+<% } %>
+

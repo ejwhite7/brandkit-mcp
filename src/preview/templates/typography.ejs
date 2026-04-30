@@ -1,0 +1,41 @@
+<h1>Typography</h1>
+
+<% const contexts = [
+  { name: 'All (Resolved)', items: all },
+  { name: 'Shared', items: shared },
+  { name: 'Marketing', items: marketing },
+  { name: 'Product', items: product },
+]; %>
+
+<% for (const ctx of contexts) { %>
+  <% if (ctx.items.length > 0) { %>
+  <section>
+    <h2><%= ctx.name %> (<%= ctx.items.length %>)</h2>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Token</th>
+          <th>Font Family</th>
+          <th>Size</th>
+          <th>Weight</th>
+          <th>Line Height</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const t of ctx.items) { %>
+        <tr>
+          <td><strong><%= t.name %></strong></td>
+          <td><code><%= t.token || '-' %></code></td>
+          <td><%= t.fontFamily || '-' %></td>
+          <td><%= t.fontSize || '-' %></td>
+          <td><%= t.fontWeight || '-' %></td>
+          <td><%= t.lineHeight || '-' %></td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </section>
+  <% } %>
+<% } %>
+

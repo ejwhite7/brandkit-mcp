@@ -1,0 +1,23 @@
+# Acme Corp Design System Configuration
+name: "Acme Corp"
+description: "Design system for Acme Corporation -- powering both the marketing website and product application."
+version: "2.0.0"
+
+contexts:
+  marketing:
+    enabled: true
+    label: "Marketing Website"
+    description: "Public-facing marketing website design system (acme.com)"
+  product:
+    enabled: true
+    label: "Product App"
+    description: "SaaS product application design system (app.acme.com)"
+
+preview:
+  port: 3000
+  host: localhost
+
+server:
+  transport: stdio
+  port: 3001
+
