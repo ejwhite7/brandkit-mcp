@@ -2,15 +2,55 @@
  * @file commands/docs.ts
  * @description Implementation of the `brandkit-mcp docs` command.
  * Generates project documentation files: CLAUDE.md, AGENTS.md, SKILLS.md, and DESIGN.md.
+ *
+ * User content outside the branded delimiter block is preserved on
+ * subsequent runs. Only the region between the start and end delimiters
+ * is replaced; if no delimiters exist in an existing file the generated
+ * block is appended so nothing is lost.
  */
 
-import { writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { loadConfig, resolveConfigPaths } from '../../config/loader.js';
 import { buildDesignSystemIndex } from '../../indexer/index.js';
 
-const DELIMITER_START = '<!-- BRANDKIT:AUTO-GENERATED:START -->';
-const DELIMITER_END = '<!-- BRANDKIT:AUTO-GENERATED:END -->';
+const DELIMITER_START = '<!-- brandkit-mcp:start -->';
+const DELIMITER_END = '<!-- brandkit-mcp:end -->';
+
+/**
+ * Write a generated block into a file while preserving any user content
+ * that lives outside the delimiter markers.
+ *
+ * - If the file does not exist: create it with the delimited block.
+ * - If the file exists and contains delimiters: replace only the
+ *   delimited region.
+ * - If the file exists but has no delimiters: append the block so
+ *   existing user content is never overwritten.
+ */
+function updateFileWithDelimiters(filePath: string, generatedBlock: string): void {
+  const wrappedBlock = `${DELIMITER_START}\n${generatedBlock}\n${DELIMITER_END}`;
+
+  if (!existsSync(filePath)) {
+    writeFileSync(filePath, wrappedBlock + '\n', 'utf-8');
+    return;
+  }
+
+  const existing = readFileSync(filePath, 'utf-8');
+  const startIdx = existing.indexOf(DELIMITER_START);
+  const endIdx = existing.indexOf(DELIMITER_END);
+
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    // Replace the existing delimited block only
+    const updated =
+      existing.slice(0, startIdx) +
+      wrappedBlock +
+      existing.slice(endIdx + DELIMITER_END.length);
+    writeFileSync(filePath, updated, 'utf-8');
+  } else {
+    // No delimiters found -- append to preserve existing content
+    writeFileSync(filePath, existing.trimEnd() + '\n\n' + wrappedBlock + '\n', 'utf-8');
+  }
+}
 
 /**
  * Handles the `brandkit-mcp docs` command.
@@ -26,9 +66,7 @@ export async function docsCommand(options: { config?: string; output?: string })
   const outputDir = options.output ?? process.cwd();
 
   // Generate CLAUDE.md
-  const claudeContent = `# ${config.name} Design System
-
-${DELIMITER_START}
+  const claudeBlock = `# ${config.name} Design System
 
 ## Brand Overview
 
@@ -63,17 +101,13 @@ Use these tools to query the design system:
 - \`get_css\` -- Raw CSS files
 - \`search_brand\` -- Full-text search
 - \`get_context_diff\` -- Compare marketing vs product
-- \`validate_usage\` -- Validate brand compliance
+- \`validate_usage\` -- Validate brand compliance`;
 
-${DELIMITER_END}
-`;
-  writeFileSync(join(outputDir, 'CLAUDE.md'), claudeContent);
+  updateFileWithDelimiters(join(outputDir, 'CLAUDE.md'), claudeBlock);
   console.log('[OK] Generated CLAUDE.md');
 
   // Generate AGENTS.md
-  const agentsContent = `# ${config.name} -- Agent Guidelines
-
-${DELIMITER_START}
+  const agentsBlock = `# ${config.name} -- Agent Guidelines
 
 ## Design System Rules
 
@@ -89,17 +123,13 @@ When generating code or content for ${config.name}:
 
 - **Marketing context**: Use marketing-specific colors, typography, and components
 - **Product context**: Use product-specific colors, typography, and components
-- **Shared assets**: Available in both contexts as defaults
+- **Shared assets**: Available in both contexts as defaults`;
 
-${DELIMITER_END}
-`;
-  writeFileSync(join(outputDir, 'AGENTS.md'), agentsContent);
+  updateFileWithDelimiters(join(outputDir, 'AGENTS.md'), agentsBlock);
   console.log('[OK] Generated AGENTS.md');
 
   // Generate SKILLS.md
-  const skillsContent = `# ${config.name} -- Skills Reference
-
-${DELIMITER_START}
+  const skillsBlock = `# ${config.name} -- Skills Reference
 
 ## Design System Query Skills
 
@@ -131,11 +161,9 @@ Args: { "format": "tailwind", "category": "colors" }
 \`\`\`
 Tool: get_context_diff
 Args: { "category": "colors" }
-\`\`\`
+\`\`\``;
 
-${DELIMITER_END}
-`;
-  writeFileSync(join(outputDir, 'SKILLS.md'), skillsContent);
+  updateFileWithDelimiters(join(outputDir, 'SKILLS.md'), skillsBlock);
   console.log('[OK] Generated SKILLS.md');
 
   // Generate DESIGN.md
@@ -151,9 +179,7 @@ ${DELIMITER_END}
     .map((c) => `- **${c.name}** (${c.category}): ${c.description ?? 'No description'}`)
     .join('\n');
 
-  const designContent = `# ${config.name} -- Design System Reference
-
-${DELIMITER_START}
+  const designBlock = `# ${config.name} -- Design System Reference
 
 ## Colors
 
@@ -169,13 +195,10 @@ ${componentSummary || 'No components defined.'}
 
 ## Logo Variants
 
-${index.resolved.all.logos.variants.map((v) => `- **${v.name}** (${v.format})`).join('\n') || 'No logo variants.'}
+${index.resolved.all.logos.variants.map((v) => `- **${v.name}** (${v.format})`).join('\n') || 'No logo variants.'}`;
 
-${DELIMITER_END}
-`;
-  writeFileSync(join(outputDir, 'DESIGN.md'), designContent);
+  updateFileWithDelimiters(join(outputDir, 'DESIGN.md'), designBlock);
   console.log('[OK] Generated DESIGN.md');
 
   console.log('\nAll documentation files generated successfully.');
 }
-
