@@ -188,4 +188,31 @@ function extractSection(content: string, heading: string): string | undefined {
 
 function extractCodeBlocks(content: string): string[] {
   const blocks: string[] = [];
-  const re = /
+  const re = /```[\w]*\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(content)) !== null) {
+    blocks.push(match[1].trim());
+  }
+  return blocks;
+}
+
+function inferCategoryFromName(name: string): string {
+  const lower = name.toLowerCase();
+  if (/button/.test(lower)) return 'actions';
+  if (/input|form|select|checkbox|radio/.test(lower)) return 'forms';
+  if (/card|modal|dialog|drawer/.test(lower)) return 'containers';
+  if (/nav|menu|tab|breadcrumb/.test(lower)) return 'navigation';
+  if (/heading|text|paragraph|label/.test(lower)) return 'typography';
+  if (/icon|avatar|badge|image/.test(lower)) return 'media';
+  return 'general';
+}
+
+function extractVariantsFromContent(content: string): string[] {
+  const variants: string[] = [];
+  const re = /^###\s+(.+)$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(content)) !== null) {
+    variants.push(match[1].trim());
+  }
+  return variants;
+}
