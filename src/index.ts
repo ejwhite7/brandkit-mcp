@@ -15,6 +15,7 @@ import { buildDesignSystemIndex } from './indexer/index.js';
 import { registerAllTools } from './tools/index.js';
 import { watchBrandDirectory } from './indexer/hot-reload.js';
 import type { DesignSystemIndex } from './indexer/types.js';
+import { dirname, resolve } from 'path';
 
 /** Current design system index -- updated on hot-reload. */
 let currentIndex: DesignSystemIndex;
@@ -34,9 +35,14 @@ export async function startServer(options: {
   // Log to stderr (stdout is reserved for MCP protocol in stdio mode)
   console.error('[brandkit-mcp] Starting server...');
 
-  // Load and resolve config
+  // Load and resolve config -- resolve paths relative to the config file's
+  // directory, not cwd, so the server works correctly regardless of where
+  // the user invokes it from.
   const rawConfig = loadConfig(options.configPath);
-  const config = resolveConfigPaths(rawConfig, process.cwd());
+  const configDir = options.configPath
+    ? dirname(resolve(options.configPath))
+    : process.cwd();
+  const config = resolveConfigPaths(rawConfig, configDir);
   console.error(`[brandkit-mcp] Loaded config for "${config.name}"`);
 
   // Build initial design system index
@@ -106,4 +112,3 @@ if (isDirectRun && !process.argv[1]?.includes('cli')) {
     process.exit(1);
   });
 }
-
