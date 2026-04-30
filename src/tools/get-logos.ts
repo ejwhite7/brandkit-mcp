@@ -28,6 +28,7 @@ export const INPUT_SCHEMA = {
  */
 export async function handler(index: DesignSystemIndex, args: GetLogosArgs) {
   const logos = index.resolved.all.logos;
+  const format = args?.format ?? 'metadata';
 
   let variants = logos.variants;
   if (args.variant) {
@@ -38,14 +39,31 @@ export async function handler(index: DesignSystemIndex, args: GetLogosArgs) {
     return [{ type: 'text' as const, text: 'No logo variants found matching the criteria.' }];
   }
 
+  // Build variant data, optionally including base64 data URIs
+  const variantData = await Promise.all(
+    variants.map(async (v) => {
+      const entry: Record<string, unknown> = {
+        name: v.name,
+        format: v.format,
+        width: v.width,
+        height: v.height,
+        filePath: v.filePath,
+      };
+
+      if (format === 'base64' && v.filePath) {
+        try {
+          entry.dataUri = await generateBase64DataURI(v.filePath);
+        } catch {
+          entry.dataUriError = 'Could not encode logo as base64';
+        }
+      }
+
+      return entry;
+    }),
+  );
+
   const result: Record<string, unknown> = {
-    variants: variants.map((v) => ({
-      name: v.name,
-      format: v.format,
-      width: v.width,
-      height: v.height,
-      filePath: v.filePath,
-    })),
+    variants: variantData,
     usageGuidelines: logos.usageGuidelines,
     clearSpace: logos.clearSpace,
     minimumSize: logos.minimumSize,
@@ -54,4 +72,3 @@ export async function handler(index: DesignSystemIndex, args: GetLogosArgs) {
 
   return [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }];
 }
-
