@@ -64,17 +64,20 @@ program
     const { watchBrandDirectory } = await import('../indexer/hot-reload.js');
 
     const config = resolveConfigPaths(loadConfig(options.config), process.cwd());
-    let index = await buildDesignSystemIndex(config);
     const port = parseInt(options.port, 10) || 3000;
 
-    const app = createPreviewServer(index, config);
+    // Use a mutable ref so that createPreviewServer route handlers always
+    // read the latest index after a hot-reload rebuild.
+    const indexRef = { current: await buildDesignSystemIndex(config) };
+
+    const app = createPreviewServer(indexRef, config);
     app.listen(port, () => {
       console.log(`Preview server running at http://localhost:${port}`);
     });
 
     if (options.watch) {
       watchBrandDirectory(config, (newIndex) => {
-        index = newIndex;
+        indexRef.current = newIndex;
         console.log('Design system re-indexed');
       });
     }
@@ -88,4 +91,3 @@ program
   .action(docsCommand);
 
 program.parse();
-
