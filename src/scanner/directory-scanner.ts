@@ -6,8 +6,8 @@
  * their directory location.
  */
 
-import { readdirSync, statSync } from 'fs';
-import { join, extname, relative } from 'path';
+import { readdirSync, statSync, realpathSync } from 'fs';
+import { join, extname, relative, sep } from 'path';
 import type { BrandKitConfig } from '../types/config.js';
 import type { DesignContext } from '../types/design-system.js';
 
@@ -57,8 +57,17 @@ export function scanBrandDirectory(config: BrandKitConfig): DiscoveredFile[] {
   const brandDir = config.paths.brand;
   const files: DiscoveredFile[] = [];
 
+  // Resolve the real brand root once so we can detect symlink escapes
+  let realBrandRoot: string;
   try {
-    walkDirectory(brandDir, brandDir, config, files);
+    realBrandRoot = realpathSync(brandDir);
+  } catch (err) {
+    console.error(`[scanner] Failed to resolve brand directory: ${brandDir}`, err);
+    return files;
+  }
+
+  try {
+    walkDirectory(brandDir, brandDir, config, files, realBrandRoot);
   } catch (err) {
     console.error(`[scanner] Failed to scan brand directory: ${brandDir}`, err);
   }
@@ -106,12 +115,15 @@ export function classifyFileType(filename: string): DiscoveredFile['fileType'] {
 
 /**
  * Recursively walks a directory and collects discovered files.
+ * Includes symlink containment: every entry is resolved via realpathSync
+ * and skipped if it falls outside the real brand root.
  */
 function walkDirectory(
   dir: string,
   brandRoot: string,
   config: BrandKitConfig,
   results: DiscoveredFile[],
+  realBrandRoot: string,
 ): void {
   let entries: string[];
   try {
@@ -124,6 +136,21 @@ function walkDirectory(
     if (entry.startsWith('.')) continue;
 
     const fullPath = join(dir, entry);
+
+    // --- Symlink containment check ---
+    let realEntryPath: string;
+    try {
+      realEntryPath = realpathSync(fullPath);
+    } catch {
+      // Broken symlink -- skip
+      continue;
+    }
+    if (realEntryPath !== realBrandRoot && !realEntryPath.startsWith(realBrandRoot + sep)) {
+      // Symlink escape attempt -- skip silently
+      continue;
+    }
+    // --- End containment check ---
+
     let stat;
     try {
       stat = statSync(fullPath);
@@ -132,7 +159,7 @@ function walkDirectory(
     }
 
     if (stat.isDirectory()) {
-      walkDirectory(fullPath, brandRoot, config, results);
+      walkDirectory(fullPath, brandRoot, config, results, realBrandRoot);
     } else if (stat.isFile()) {
       const ext = extname(entry).toLowerCase();
       const fileType = classifyFileType(entry);
@@ -166,4 +193,3 @@ function inferSubdirectory(relativePath: string): string {
   if (parts.length === 2) return parts[0];
   return '';
 }
-
