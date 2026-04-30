@@ -6,7 +6,6 @@
  */
 
 import matter from 'gray-matter';
-import { marked } from 'marked';
 import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
 import type { DesignGuideline, DesignComponent, DesignColor, DesignContext } from '../types/design-system.js';
@@ -155,6 +154,14 @@ export function inferSectionFromPath(filePath: string): string {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Escape special regex characters in a string so it can be safely
+ * interpolated into a RegExp pattern.
+ */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function extractFirstHeading(content: string): string | undefined {
   const match = content.match(/^#+\s+(.+)$/m);
   return match ? match[1].trim() : undefined;
@@ -181,7 +188,8 @@ function extractDescription(content: string): string {
 }
 
 function extractSection(content: string, heading: string): string | undefined {
-  const re = new RegExp(`^##\\s+${heading}\\b[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|$)`, 'mi');
+  const escaped = escapeRegExp(heading);
+  const re = new RegExp(`^##\\s+${escaped}\\b[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|$)`, 'mi');
   const match = re.exec(content);
   return match ? match[1].trim() : undefined;
 }
