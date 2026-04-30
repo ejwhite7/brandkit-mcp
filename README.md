@@ -24,25 +24,30 @@ BrandKit MCP is an open-source MCP server that makes your design system natively
 ## Quick Start (30 seconds)
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/anthropics/brandkit-mcp.git
+# 1. Clone and install
+git clone https://github.com/ejwhite7/brandkit-mcp
 cd brandkit-mcp
-
-# 2. Install dependencies
 npm install
+npm run build
 
-# 3. Initialize your brand directory with starter files
-npx brandkit-mcp init --name "My Company"
+# 2. Initialize your brand directory
+node dist/cli/index.js init --name "YourBrand"
 
-# 4. Add your design files to the brand/ directory
+# Or install globally with npm link
+npm link
+brandkit-mcp init --name "YourBrand"
+
+# 3. Add your design files to the brand/ directory
 #    Drop CSS files, markdown docs, logos, fonts, PDFs...
 
-# 5. Start the MCP server
-npx brandkit-mcp serve
+# 4. Start the MCP server
+node dist/cli/index.js serve
 
-# 6. Or start the preview server to browse visually
-npx brandkit-mcp preview --open
+# 5. Or start the preview server to browse visually
+node dist/cli/index.js preview --open
 ```
+
+> **Note:** Once the package is published to npm, `npx brandkit-mcp@latest init` will work directly without cloning.
 
 ## Claude Desktop Setup
 
@@ -81,7 +86,7 @@ Add BrandKit MCP to your Claude Desktop configuration file:
 Start the SSE server first:
 
 ```bash
-npx brandkit-mcp serve --transport sse --port 3001
+node dist/cli/index.js serve --transport sse --port 3001
 ```
 
 ## Supported File Types
@@ -334,7 +339,7 @@ module.exports = {
 BrandKit MCP can auto-generate project documentation files that give AI tools persistent context about your design system. Run:
 
 ```bash
-npx brandkit-mcp docs
+node dist/cli/index.js docs
 ```
 
 This generates four files:
@@ -363,7 +368,7 @@ Content outside these delimiters is preserved when you regenerate. This lets you
 The preview server provides a visual browser for your design system at `http://localhost:3000`.
 
 ```bash
-npx brandkit-mcp preview --port 3000 --watch --open
+node dist/cli/index.js preview --port 3000 --watch --open
 ```
 
 ### Pages
@@ -390,7 +395,7 @@ The `--watch` flag enables hot reload: edit a brand file and the preview updates
 The simplest setup. The MCP server communicates over stdin/stdout:
 
 ```bash
-npx brandkit-mcp serve
+node dist/cli/index.js serve
 ```
 
 Configure Claude Desktop to launch the server automatically (see [Claude Desktop Setup](#claude-desktop-setup)).
@@ -400,7 +405,7 @@ Configure Claude Desktop to launch the server automatically (see [Claude Desktop
 Starts an HTTP server with Server-Sent Events transport:
 
 ```bash
-npx brandkit-mcp serve --transport sse --port 3001 --watch
+node dist/cli/index.js serve --transport sse --port 3001 --watch
 ```
 
 Connect any MCP client to `http://localhost:3001/sse`.
@@ -666,7 +671,7 @@ To try it:
 
 ```bash
 cd examples/acme-corp
-npx brandkit-mcp preview --open
+node dist/cli/index.js preview --open
 ```
 
 ### Starter Template
@@ -675,7 +680,7 @@ A minimal starter template is available at `templates/starter/`. Use it as a sta
 
 ```bash
 cp -r templates/starter/* .
-npx brandkit-mcp validate
+node dist/cli/index.js validate
 ```
 
 ## License
