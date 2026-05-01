@@ -1,58 +1,30 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ejwhite7/brandkit-mcp",
-  "description": "Expose a company's complete design system -- colors, typography, logos, components, guidelines, and CSS tokens -- to AI tools via the Model Context Protocol.",
+  "description": "Expose a company's design system to AI tools via MCP: colors, typography, logos, tokens.",
   "version": "0.1.0",
+  "title": "BrandKit MCP",
+  "websiteUrl": "https://github.com/ejwhite7/brandkit-mcp#readme",
   "repository": {
     "url": "https://github.com/ejwhite7/brandkit-mcp",
     "source": "github"
   },
-  "websiteUrl": "https://github.com/ejwhite7/brandkit-mcp#readme",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "brandkit-mcp",
       "version": "0.1.0",
-      "transport": { "type": "stdio" },
       "runtimeHint": "npx",
-      "runtimeArguments": [
-        { "type": "positional", "value": "brandkit-mcp", "isRequired": true, "valueHint": "package" },
-        { "type": "positional", "value": "serve", "isRequired": true, "valueHint": "command" }
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "serve",
+          "valueHint": "command"
+        }
       ]
     }
-  ],
-  "remotes": [],
-  "capabilities": {
-    "tools": [
-      "get_brand_overview",
-      "get_colors",
-      "get_typography",
-      "get_logos",
-      "get_components",
-      "get_guidelines",
-      "get_tokens",
-      "get_textures",
-      "get_css",
-      "search_brand",
-      "get_context_diff",
-      "validate_usage"
-    ],
-    "resources": [
-      "brandkit://overview",
-      "brandkit://tokens/{format}",
-      "brandkit://colors/{context}",
-      "brandkit://typography/{context}",
-      "brandkit://components/{context}",
-      "brandkit://guidelines/{slug}",
-      "brandkit://logos",
-      "brandkit://logo/{variantSlug}",
-      "brandkit://css/all"
-    ],
-    "prompts": [
-      "design-with-brand",
-      "audit-brand-compliance",
-      "generate-tailwind-theme",
-      "explain-brand-decision"
-    ]
-  }
+  ]
 }
