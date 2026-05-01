@@ -11,7 +11,7 @@
  */
 
 import type { BrandKitConfig } from '../types/config.js';
-import type { DesignLogoSystem, DesignLogoVariant, DesignContext } from '../types/design-system.js';
+import type { DesignLogoVariant, DesignContext } from '../types/design-system.js';
 import type { DesignSystemIndex, RawContextData, SearchIndexEntry } from './types.js';
 import { scanBrandDirectory } from '../scanner/directory-scanner.js';
 import type { DiscoveredFile } from '../scanner/directory-scanner.js';
@@ -130,6 +130,7 @@ async function processFile(file: DiscoveredFile, bucket: RawContextData): Promis
           const variant: DesignLogoVariant = {
             name: inferLogoVariantName(file.filename),
             filePath: file.relativePath,
+            source: file.absolutePath,
             format: imageMeta.format as DesignLogoVariant['format'],
             width: imageMeta.width,
             height: imageMeta.height,

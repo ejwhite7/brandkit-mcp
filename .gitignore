@@ -7,3 +7,6 @@ dist/
 coverage/
 .vitest/
 
+__test_fixtures__/
+__test_cli__/
+doc/

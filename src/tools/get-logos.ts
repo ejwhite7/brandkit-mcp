@@ -8,7 +8,8 @@
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { GetLogosArgs } from '../types/mcp.js';
 import { generateBase64DataURI } from '../parsers/image-parser.js';
-import { resolve, dirname } from 'path';
+import { isAbsolute, resolve } from 'path';
+import { existsSync } from 'fs';
 
 export const TOOL_NAME = 'get_logos';
 
@@ -50,11 +51,18 @@ export async function handler(index: DesignSystemIndex, args: GetLogosArgs) {
         filePath: v.filePath,
       };
 
-      if (format === 'base64' && v.filePath) {
-        try {
-          entry.dataUri = await generateBase64DataURI(v.filePath);
-        } catch {
-          entry.dataUriError = 'Could not encode logo as base64';
+      if (format === 'base64') {
+        const abs = v.source
+          ?? (v.filePath && isAbsolute(v.filePath) ? v.filePath : null)
+          ?? (v.filePath ? resolve(process.cwd(), v.filePath) : null);
+        if (abs && existsSync(abs)) {
+          try {
+            entry.dataUri = await generateBase64DataURI(abs);
+          } catch {
+            entry.dataUriError = 'Could not encode logo as base64';
+          }
+        } else {
+          entry.dataUriError = 'Logo source file not found';
         }
       }
 

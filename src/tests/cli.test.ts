@@ -6,7 +6,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { existsSync, mkdirSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
 
 const TEST_DIR = join(process.cwd(), '__test_cli__');
 
@@ -22,13 +21,7 @@ describe('CLI Init Command', () => {
 
   it('should create brand directory structure', async () => {
     const { initCommand } = await import('../cli/commands/init.js');
-    const origCwd = process.cwd();
-    process.chdir(TEST_DIR);
-    try {
-      await initCommand('.', { name: 'Test Brand' });
-    } finally {
-      process.chdir(origCwd);
-    }
+    await initCommand(TEST_DIR, { name: 'Test Brand', force: true });
 
     expect(existsSync(join(TEST_DIR, 'brand'))).toBe(true);
     expect(existsSync(join(TEST_DIR, 'brand/shared/colors'))).toBe(true);

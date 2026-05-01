@@ -13,7 +13,8 @@ BrandKit MCP is an open-source MCP server that makes your design system natively
 
 - **Zero-config ingestion** -- drop in CSS files, markdown docs, PDFs, SVGs, and fonts. No YAML token files to write.
 - **Context-aware** -- separate marketing site and product app design systems in one project, with shared defaults.
-- **12 MCP tools** covering colors, typography, logos, components, guidelines, tokens, textures, CSS, search, context diffs, and usage validation.
+- **Full MCP capability surface** -- 12 tools, 16+ resources (under the `brandkit://` URI scheme), and 4 reusable prompts (`design-with-brand`, `audit-brand-compliance`, `generate-tailwind-theme`, `explain-brand-decision`).
+- **Three transports** -- stdio (Claude Desktop), SSE (legacy HTTP), and Streamable HTTP (current MCP spec).
 - **5 token output formats** -- CSS custom properties, SCSS variables, Tailwind config, W3C Design Tokens, and flat JSON.
 - **Local preview server** -- visual design system browser at localhost:3000.
 - **Multiple deployment options** -- local stdio, SSE over HTTP, Docker, Vercel, Cloudflare Workers.

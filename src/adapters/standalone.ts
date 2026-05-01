@@ -11,7 +11,6 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { loadConfig, resolveConfigPaths } from '../config/loader.js';
 import { buildDesignSystemIndex } from '../indexer/index.js';
 import { registerAllTools } from '../tools/index.js';
-import type { DesignSystemIndex } from '../indexer/types.js';
 
 /**
  * Starts a standalone HTTP server with SSE transport.

@@ -5,7 +5,7 @@
  */
 
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { isAbsolute, join } from 'path';
 
 /**
  * Handles the `brandkit-mcp init [directory]` command.
@@ -13,7 +13,7 @@ import { join } from 'path';
  * @param options - Command options
  */
 export async function initCommand(directory: string, options: { name?: string; force?: boolean }): Promise<void> {
-  const targetDir = join(process.cwd(), directory);
+  const targetDir = isAbsolute(directory) ? directory : join(process.cwd(), directory);
   const brandDir = join(targetDir, 'brand');
 
   if (existsSync(brandDir) && !options.force) {

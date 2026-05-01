@@ -4,13 +4,13 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { parseCSSFile, extractColorsFromCSS, extractTypographyFromCSS } from '../parsers/css-parser.js';
 import { parseGuidelineMarkdown, parseComponentMarkdown, parsePaletteMarkdown } from '../parsers/markdown-parser.js';
 import { parseFontFile, inferFontWeight } from '../parsers/font-parser.js';
 import { inferLogoVariantName } from '../parsers/image-parser.js';
-import { scanBrandDirectory, classifyFileType } from '../scanner/directory-scanner.js';
+import { classifyFileType } from '../scanner/directory-scanner.js';
 
 const TEST_DIR = join(process.cwd(), '__test_fixtures__');
 

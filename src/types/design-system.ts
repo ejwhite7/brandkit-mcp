@@ -119,6 +119,9 @@ export interface DesignLogoVariant {
   /** Base64-encoded data URI for delivering the logo over MCP without file access */
   base64?: string;
 
+  /** Absolute filesystem path to the source file (set by indexer; not persisted in JSON output). */
+  source?: string;
+
   /**
    * Recommended background color for this variant.
    * "light" = use on light backgrounds, "dark" = use on dark backgrounds,

@@ -16,13 +16,6 @@
  */
 
 import type {
-  DesignColor,
-  DesignTypographyItem,
-  DesignComponent,
-  DesignTexture,
-  DesignGuideline,
-  DesignFont,
-  DesignCSSFile,
   DesignLogoSystem,
   DesignContext,
   ResolvedDesignSystem,

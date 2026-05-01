@@ -37,13 +37,13 @@ program
 program
   .command('serve')
   .description('Start the MCP server')
-  .option('--transport <type>', 'Transport type: stdio or sse', 'stdio')
+  .option('--transport <type>', 'Transport type: stdio, sse, or http (Streamable HTTP)', 'stdio')
   .option('--port <number>', 'Port for SSE transport', '3001')
   .option('--config <path>', 'Path to brandkit.config.yaml')
   .option('--watch', 'Enable hot reload on file changes')
   .action(async (options) => {
     await startServer({
-      transport: options.transport as 'stdio' | 'sse',
+      transport: options.transport as 'stdio' | 'sse' | 'http',
       port: parseInt(options.port, 10),
       configPath: options.config,
       watch: options.watch,

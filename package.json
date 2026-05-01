@@ -4,11 +4,19 @@
   "description": "Expose your company's full design system to AI tools via the Model Context Protocol",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "bin": {
     "brandkit-mcp": "dist/cli/index.js"
   },
+  "files": [
+    "dist",
+    "templates",
+    "README.md",
+    "LICENSE",
+    "server.json"
+  ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && chmod +x dist/cli/index.js dist/cli/index.cjs 2>/dev/null || true",
     "dev": "tsup --watch",
     "start": "node dist/index.js",
     "test": "vitest run",
@@ -16,11 +24,39 @@
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "preview": "node dist/cli/index.js preview",
-    "serve": "node dist/cli/index.js serve"
+    "serve": "node dist/cli/index.js serve",
+    "prepublishOnly": "npm run build && npm run test && npm run lint"
   },
-  "keywords": ["mcp", "design-system", "brand-kit", "claude", "ai", "model-context-protocol"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "design-system",
+    "brand-kit",
+    "design-tokens",
+    "claude",
+    "claude-desktop",
+    "ai",
+    "anthropic",
+    "tailwind",
+    "w3c-design-tokens"
+  ],
   "license": "MIT",
-  "engines": { "node": ">=20.0.0" },
+  "author": "ejwhite",
+  "homepage": "https://github.com/ejwhite7/brandkit-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ejwhite7/brandkit-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ejwhite7/brandkit-mcp/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "mcpName": "io.github.ejwhite7/brandkit-mcp",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "commander": "^12.0.0",
@@ -52,4 +88,3 @@
     "vitest": "^1.4.0"
   }
 }
-

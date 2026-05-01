@@ -10,7 +10,7 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { join, resolve, dirname } from 'path';
+import { join, resolve } from 'path';
 import yaml from 'js-yaml';
 import { BrandKitConfigSchema, type BrandKitConfig } from '../types/config.js';
 import { DEFAULT_CONFIG_FILENAMES } from './defaults.js';
