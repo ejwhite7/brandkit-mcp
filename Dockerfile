@@ -25,4 +25,4 @@ ENV NODE_ENV=production
 # SSE/HTTP server instead, override CMD, e.g.:
 #   docker run -p 3001:3001 brandkit-mcp \
 #     node dist/cli/index.js serve --transport sse --port 3001
-CMD ["node", "dist/cli/index.js", "serve", "--transport", "stdio"]
+CMD ["node", "/app/dist/cli/index.js", "serve", "--transport", "stdio"]

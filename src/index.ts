@@ -10,12 +10,12 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadConfig, resolveConfigPaths } from './config/loader.js';
+import { loadConfigWithPath, resolveConfigPaths } from './config/loader.js';
 import { buildDesignSystemIndex } from './indexer/index.js';
 import { registerAllTools } from './tools/index.js';
 import { watchBrandDirectory } from './indexer/hot-reload.js';
 import type { DesignSystemIndex } from './indexer/types.js';
-import { dirname, resolve } from 'path';
+import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 /** Current design system index -- updated on hot-reload. */
@@ -39,12 +39,14 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   // Log to stderr (stdout is reserved for MCP protocol in stdio mode)
   console.error('[brandkit-mcp] Starting server...');
 
-  const rawConfig = loadConfig(options.configPath);
-  const configDir = options.configPath
-    ? dirname(resolve(options.configPath))
-    : process.cwd();
+  const { config: rawConfig, filePath } = loadConfigWithPath(options.configPath);
+  // Always resolve relative paths in the config against the config file's
+  // own directory. This makes the server portable across cwd values --
+  // e.g. when spawned by mcp-proxy, Claude Desktop, or via Glama, which
+  // may set the working directory to something other than the install dir.
+  const configDir = dirname(filePath);
   const config = resolveConfigPaths(rawConfig, configDir);
-  console.error(`[brandkit-mcp] Loaded config for "${config.name}"`);
+  console.error(`[brandkit-mcp] Loaded config for "${config.name}" from ${filePath}`);
 
   console.error('[brandkit-mcp] Building design system index...');
   const startTime = Date.now();
