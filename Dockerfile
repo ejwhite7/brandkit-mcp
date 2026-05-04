@@ -14,8 +14,11 @@ RUN npm install --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/preview/templates ./src/preview/templates
 COPY --from=builder /app/src/preview/static ./src/preview/static
-COPY brand/ ./brand/
-COPY brandkit.config.yaml ./
+# Bundle the acme-corp example as the default demo brand so the container
+# has a working brand directory out of the box (used by Glama for
+# introspection and by `npx brandkit-mcp serve` demos).
+COPY examples/acme-corp/brand/ ./brand/
+COPY examples/acme-corp/brandkit.config.yaml ./
 EXPOSE 3001
 ENV NODE_ENV=production
 CMD ["node", "dist/cli/index.js", "serve", "--transport", "sse", "--port", "3001"]
