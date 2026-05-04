@@ -19,6 +19,10 @@ COPY --from=builder /app/src/preview/static ./src/preview/static
 # introspection and by `npx brandkit-mcp serve` demos).
 COPY examples/acme-corp/brand/ ./brand/
 COPY examples/acme-corp/brandkit.config.yaml ./
-EXPOSE 3001
 ENV NODE_ENV=production
-CMD ["node", "dist/cli/index.js", "serve", "--transport", "sse", "--port", "3001"]
+# Default to stdio transport so the container works out-of-the-box with
+# MCP stdio clients (Claude Desktop, Glama mcp-proxy, etc.). To run as an
+# SSE/HTTP server instead, override CMD, e.g.:
+#   docker run -p 3001:3001 brandkit-mcp \
+#     node dist/cli/index.js serve --transport sse --port 3001
+CMD ["node", "dist/cli/index.js", "serve", "--transport", "stdio"]

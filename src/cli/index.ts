@@ -90,4 +90,19 @@ program
   .option('--output <dir>', 'Output directory for generated docs', '.')
   .action(docsCommand);
 
+// If invoked with no subcommand and no flags, default to `serve` over stdio.
+// This is the behavior MCP clients (Claude Desktop, Glama mcp-proxy, etc.)
+// expect when they spawn `brandkit-mcp` as a child process: a stdio MCP
+// server that speaks JSON-RPC on stdin/stdout. Without this, running
+// `brandkit-mcp` bare prints help and exits, which clients interpret as a
+// connection-closed error.
+const userArgs = process.argv.slice(2);
+const knownCommands = new Set(['init', 'validate', 'serve', 'preview', 'docs', 'help']);
+const isHelpOrVersion = userArgs.some((a) => ['-h', '--help', '-V', '--version'].includes(a));
+const hasSubcommand = userArgs.length > 0 && knownCommands.has(userArgs[0]);
+if (!hasSubcommand && !isHelpOrVersion) {
+  // Inject `serve` so all flags the user passed (e.g. --config) still apply.
+  process.argv.splice(2, 0, 'serve');
+}
+
 program.parse();
