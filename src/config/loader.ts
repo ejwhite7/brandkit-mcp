@@ -44,13 +44,24 @@ function candidateConfigPaths(): string[] {
   }
 
   // Walk up from the running script (e.g. /app/dist/cli/index.js) up to
-  // a few levels, searching each directory for a known config filename.
+  // a few levels. At each level, probe both the directory itself and a
+  // small set of well-known bundled-demo subdirectories. This lets the
+  // server start out-of-the-box when:
+  //   - run from the source repo (Glama auto-build, npm-published package):
+  //     templates/starter/ and examples/acme-corp/ ship a working brand
+  //   - run from our Docker image: brandkit.config.yaml lives at /app
+  //   - run via `npx brandkit-mcp` with no local config: falls back to
+  //     the bundled starter template
+  const BUNDLED_SUBDIRS = ['', 'templates/starter', 'examples/acme-corp'];
   try {
     const scriptDir = dirname(fileURLToPath(import.meta.url));
     let dir = scriptDir;
-    for (let i = 0; i < 5; i++) {
-      for (const name of DEFAULT_CONFIG_FILENAMES) {
-        candidates.push(join(dir, name));
+    for (let i = 0; i < 6; i++) {
+      for (const sub of BUNDLED_SUBDIRS) {
+        const base = sub ? join(dir, sub) : dir;
+        for (const name of DEFAULT_CONFIG_FILENAMES) {
+          candidates.push(join(base, name));
+        }
       }
       const parent = dirname(dir);
       if (parent === dir) break;
