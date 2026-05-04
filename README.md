@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node 20+](https://img.shields.io/badge/Node-20%2B-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org)
+[![ejwhite7/brandkit-mcp MCP server](https://glama.ai/mcp/servers/ejwhite7/brandkit-mcp/badges/score.svg)](https://glama.ai/mcp/servers/ejwhite7/brandkit-mcp)
 
 BrandKit MCP is an open-source MCP server that makes your design system natively accessible to Claude, Cursor, and any MCP-compatible AI tool. Drop your brand files in, connect once, and every AI session has access to your exact colors, typography, components, guidelines, and more.
 
