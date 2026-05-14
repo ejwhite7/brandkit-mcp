@@ -1,0 +1,7 @@
+faces:
+  - family: Your Font Family
+    weight: 400
+    style: normal
+    file: YourFont-Regular.woff2
+    # Replace with your font family name and file references.
+    # Physical font files are optional — metadata-only entries are valid.

@@ -1,0 +1,10 @@
+personas:
+  - id: primary
+    name: Replace with persona name
+    role: Replace with job title / role
+    goals:
+      - Replace with primary goal
+    pain_points:
+      - Replace with primary pain point
+    channels:
+      - Replace with primary channel

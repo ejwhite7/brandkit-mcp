@@ -1,0 +1,18 @@
+{
+  "durations": {
+    "fast": "150ms",
+    "normal": "250ms",
+    "slow": "400ms"
+  },
+  "easings": {
+    "ease-out": "cubic-bezier(0.0, 0.0, 0.2, 1)",
+    "ease-in-out": "cubic-bezier(0.4, 0.0, 0.2, 1)"
+  },
+  "animations": {
+    "fade-in": {
+      "duration": "250ms",
+      "easing": "ease-out",
+      "keyframes": "fadeIn"
+    }
+  }
+}
