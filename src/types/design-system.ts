@@ -351,6 +351,12 @@ export interface ResolvedDesignSystem {
   /** Text content extracted from PDF brand documents */
   pdfTexts: Array<{ filePath: string; content: string; title?: string }>;
 
+  /**
+   * v2 token specimens (from tokens/*.md). Not mapped into colors/typography —
+   * downstream get_tokens tools read directly from the raw index.
+   */
+  tokens: TokenSpecimen[];
+
   /** Summary counts of all discovered assets */
   assetInventory: AssetInventory;
 }
