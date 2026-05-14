@@ -30,6 +30,15 @@ export interface VerbalLayer {
   voice: VerbalDoc | undefined;
 }
 
+export interface SearchIndexEntry {
+  id: string;
+  type: string;
+  name: string;
+  content: string;
+  context?: string;
+  source?: string;
+}
+
 export interface DesignSystemIndex {
   brandName: string;
   brandDescription?: string;
