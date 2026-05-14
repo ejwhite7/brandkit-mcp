@@ -293,13 +293,15 @@ export interface DesignCSSFile {
 // ---------------------------------------------------------------------------
 
 /**
- * The two design contexts BrandKit MCP differentiates between.
- *
- * - "marketing": Styles, tokens, and assets for the public marketing site.
- * - "product": Styles, tokens, and assets for the authenticated product/app UI.
- * - "shared": Design elements common to both contexts.
+ * v2 design contexts.
+ * - "base"    : default layer under agent/visual/ outside artifacts/
+ * - "web"     : override layer under agent/visual/artifacts/web/
+ * - "product" : override layer under agent/visual/artifacts/product/
  */
-export type DesignContext = 'marketing' | 'product' | 'shared';
+export type BrandContext = 'base' | 'web' | 'product';
+
+/** @deprecated Use BrandContext. Retained only to ease migration; remove before release. */
+export type DesignContext = BrandContext;
 
 // ---------------------------------------------------------------------------
 // Resolved Design System
@@ -391,5 +393,74 @@ export interface AssetInventory {
 
   /** Number of PDF documents parsed */
   pdfs: number;
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Verbal documents
+// ---------------------------------------------------------------------------
+
+/** A markdown document under agent/verbal/. */
+export interface VerbalDoc {
+  frontmatter: Record<string, unknown>;
+  body: string;
+  source: string;
+}
+
+/** Freeform audience document parsed from audience.yaml. */
+export interface AudienceDoc {
+  data: unknown;
+  source: string;
+}
+
+/** The human-authored taste primer. */
+export interface MagicTrick {
+  content: string;
+  source: string;
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Motion system
+// ---------------------------------------------------------------------------
+
+/** Combined motion.json (parsed) + motion.css (raw text). */
+export interface MotionSystem {
+  tokens: unknown;
+  css: string;
+  source: string;
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Assets and fonts
+// ---------------------------------------------------------------------------
+
+export interface AssetEntry {
+  id?: string;
+  file: string;
+  purpose?: string;
+  format: string;
+  filePath: string;
+}
+
+export interface FontFace {
+  family: string;
+  weight?: string | number;
+  style?: 'normal' | 'italic';
+  file: string;
+  filePath: string;
+  format: 'otf' | 'ttf' | 'woff' | 'woff2';
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Token specimens
+// ---------------------------------------------------------------------------
+
+export interface TokenSpecimen {
+  name: string;
+  value: string;
+  type: string;
+  role?: string;
+  related?: string[];
+  body: string;
+  source: string;
 }
 
