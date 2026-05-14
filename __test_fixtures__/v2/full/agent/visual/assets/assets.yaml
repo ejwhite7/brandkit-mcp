@@ -1,0 +1,4 @@
+assets:
+  - id: logo-primary
+    file: logo-primary.svg
+    purpose: Default logo
