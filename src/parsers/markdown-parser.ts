@@ -8,7 +8,7 @@
 import matter from 'gray-matter';
 import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
-import type { DesignGuideline, DesignComponent, DesignColor, DesignContext } from '../types/design-system.js';
+import type { DesignGuideline, DesignComponent, DesignColor, DesignContext, TokenSpecimen } from '../types/design-system.js';
 
 /**
  * Parses a markdown file as a design guideline.
@@ -223,4 +223,50 @@ function extractVariantsFromContent(content: string): string[] {
     variants.push(match[1].trim());
   }
   return variants;
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Token specimens
+// ---------------------------------------------------------------------------
+
+export interface TokenSpecimenResult {
+  specimen: TokenSpecimen | null;
+  warnings: string[];
+}
+
+/**
+ * Parse a token specimen markdown file with required frontmatter.
+ * @param filePath - Absolute path to the token specimen markdown file
+ * @returns Parse result with specimen, warnings
+ */
+export function parseTokenSpecimen(filePath: string): TokenSpecimenResult {
+  const warnings: string[] = [];
+  let raw: string;
+  try {
+    raw = readFileSync(filePath, 'utf-8');
+  } catch {
+    return { specimen: null, warnings: [`Could not read ${filePath}`] };
+  }
+  const { data, content } = matter(raw);
+  const name = data.name as string | undefined;
+  const value = data.value as string | undefined;
+  const type = data.type as string | undefined;
+  if (!name || !value || !type) {
+    warnings.push(
+      `Token specimen at ${filePath} missing required frontmatter (name/value/type); skipping`,
+    );
+    return { specimen: null, warnings };
+  }
+  return {
+    specimen: {
+      name,
+      value,
+      type,
+      role: data.role as string | undefined,
+      related: data.related as string[] | undefined,
+      body: content.trim(),
+      source: filePath,
+    },
+    warnings,
+  };
 }
