@@ -13,7 +13,7 @@ import { readFileSync, existsSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
-import { BrandKitConfigSchema, type BrandKitConfig } from '../types/config.js';
+import { BrandKitConfigSchema, BrandkitV1ConfigError, type BrandKitConfig } from '../types/config.js';
 import { DEFAULT_CONFIG_FILENAMES } from './defaults.js';
 
 /**
@@ -75,6 +75,86 @@ function candidateConfigPaths(): string[] {
 }
 
 /**
+ * Detects if a parsed YAML object contains v1 config markers.
+ *
+ * V1 configs have:
+ *   - A top-level `name` field (not nested under `brand`)
+ *   - A top-level `paths` field (v2 nests paths differently)
+ *   - A `contexts` field with `marketing` or `product` as objects (v2 has `contexts` as an array)
+ *
+ * @param parsed - The parsed YAML object
+ * @returns true if v1 markers are detected
+ */
+function isV1Config(parsed: Record<string, unknown>): boolean {
+  // V1 had top-level `name` field
+  if (typeof parsed.name === 'string') {
+    return true;
+  }
+
+  // V1 had top-level `paths` field
+  if (parsed.paths && typeof parsed.paths === 'object') {
+    return true;
+  }
+
+  // V1 had `contexts` as an object with `marketing`/`product` keys
+  if (
+    parsed.contexts &&
+    typeof parsed.contexts === 'object' &&
+    !Array.isArray(parsed.contexts) &&
+    ('marketing' in parsed.contexts || 'product' in parsed.contexts)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Parses YAML text and validates it as a v2 BrandKit config.
+ *
+ * Detects v1 configs and throws BrandkitV1ConfigError with migration guidance.
+ * Otherwise validates against the v2 schema and returns the parsed config.
+ *
+ * @param yamlText - The YAML content to parse
+ * @param sourcePath - The source file path (for error messages)
+ * @returns A validated BrandKitConfig
+ * @throws {BrandkitV1ConfigError} If a v1 config is detected
+ * @throws {Error} If the config is invalid or parsing fails
+ */
+export function loadConfigFromString(yamlText: string, sourcePath: string): BrandKitConfig {
+  let parsed: unknown;
+  try {
+    parsed = yaml.load(yamlText);
+  } catch (err) {
+    throw new Error(`Failed to parse YAML at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`Config at ${sourcePath} must be an object`);
+  }
+
+  const parsedObj = parsed as Record<string, unknown>;
+
+  // Detect v1 config markers
+  if (isV1Config(parsedObj)) {
+    throw new BrandkitV1ConfigError(
+      `v1 config detected at ${sourcePath}. ` +
+        'Migrate to v2: see docs/superpowers/specs/2026-05-14-brand-atomic-system-restructure-design.md',
+    );
+  }
+
+  // Validate against v2 schema
+  const result = BrandKitConfigSchema.safeParse(parsedObj);
+
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
+    throw new Error(`Invalid config in ${sourcePath}:\n${issues}`);
+  }
+
+  return result.data;
+}
+
+/**
  * Like {@link loadConfig} but also returns the absolute path of the
  * config file that was loaded. Useful for callers that need to resolve
  * relative paths in the config against the config's directory rather
@@ -83,15 +163,9 @@ function candidateConfigPaths(): string[] {
 export function loadConfigWithPath(configPath?: string): { config: BrandKitConfig; filePath: string } {
   const filePath = resolveConfigFilePath(configPath);
   const raw = readFileSync(filePath, 'utf-8');
-  const parsed = yaml.load(raw) as Record<string, unknown>;
-  const result = BrandKitConfigSchema.safeParse(parsed);
+  const config = loadConfigFromString(raw, filePath);
 
-  if (!result.success) {
-    const issues = result.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
-    throw new Error(`Invalid config in ${filePath}:\n${issues}`);
-  }
-
-  return { config: result.data, filePath };
+  return { config, filePath };
 }
 
 function resolveConfigFilePath(configPath?: string): string {
@@ -136,12 +210,9 @@ export function loadConfig(configPath?: string): BrandKitConfig {
 export function resolveConfigPaths(config: BrandKitConfig, basePath: string): BrandKitConfig {
   return {
     ...config,
-    paths: {
-      brand: resolve(basePath, config.paths.brand),
-      shared: resolve(basePath, config.paths.shared),
-      marketing: resolve(basePath, config.paths.marketing),
-      product: resolve(basePath, config.paths.product),
+    brand: {
+      ...config.brand,
+      root: resolve(basePath, config.brand.root),
     },
   };
 }
-

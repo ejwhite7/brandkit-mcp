@@ -12,7 +12,7 @@
  * and any code path that needs a config before YAML is loaded.
  */
 
-import type { BrandKitConfig } from '../types/config.js';
+import { BrandKitConfigSchema, type BrandKitConfig } from '../types/config.js';
 
 /**
  * Ordered list of filenames the config loader searches for when no
@@ -39,45 +39,13 @@ export const DEFAULT_CONFIG_FILENAMES: readonly string[] = [
  *   - Fallback values when optional config sections are missing
  *   - Documentation of the "zero-config" baseline
  *
- * The `paths` here are relative strings. In production they are resolved
- * to absolute paths by {@link resolveConfigPaths} in `loader.ts`.
+ * The `brand.root` here is relative. In production it is resolved
+ * to an absolute path by {@link resolveConfigPaths} in `loader.ts`.
  */
-export const DEFAULT_CONFIG: BrandKitConfig = {
-  name: 'Unnamed Brand',
-  description: undefined,
-  version: '1.0.0',
-
-  contexts: {
-    marketing: {
-      enabled: true,
-      label: 'Marketing Site',
-      description: undefined,
-    },
-    product: {
-      enabled: true,
-      label: 'Product App',
-      description: undefined,
-    },
-  },
-
-  paths: {
-    brand: './brand',
-    shared: './brand/shared',
-    marketing: './brand/marketing',
-    product: './brand/product',
-  },
-
-  preview: {
-    port: 3000,
-    host: 'localhost',
-  },
-
-  server: {
-    transport: 'stdio',
-    port: 3001,
-    host: 'localhost',
-  },
-};
+export const DEFAULT_CONFIG: BrandKitConfig = BrandKitConfigSchema.parse({
+  version: 2,
+  brand: { name: 'BrandKit' },
+});
 
 /**
  * Returns a deep copy of the default config, safe for mutation.
@@ -95,8 +63,8 @@ export function getDefaultConfig(): BrandKitConfig {
  * Standard directory names within a brand folder.
  *
  * Parsers use these to auto-discover assets by convention:
- *   brand/
- *     shared/           -- tokens and assets shared across contexts
+ *   brand_atomic_system/
+ *     base/             -- base context (shared assets)
  *       colors/
  *       typography/
  *       logos/
@@ -105,10 +73,10 @@ export function getDefaultConfig(): BrandKitConfig {
  *       guidelines/
  *       fonts/
  *       css/
- *     marketing/        -- marketing-context overrides
+ *     web/              -- web context overrides
  *       colors/
  *       ...
- *     product/          -- product-context overrides
+ *     product/          -- product context overrides
  *       colors/
  *       ...
  */
@@ -154,4 +122,3 @@ export const RECOGNIZED_EXTENSIONS = {
   /** Extensions the component parser can handle */
   components: ['.md', '.yaml', '.yml', '.json'] as const,
 } as const;
-
