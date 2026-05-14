@@ -9,6 +9,7 @@ import type {
   TokenSpecimen,
   MagicTrick,
 } from '../types/design-system.js';
+import type { DesignSystemIndex } from '../indexer/types.js';
 
 describe('v2 types', () => {
   it('BrandContext is base|web|product', () => {
@@ -45,5 +46,21 @@ describe('v2 types', () => {
   });
   it('TokenSpecimen has name, value, type', () => {
     expectTypeOf<TokenSpecimen>().toMatchTypeOf<{ name: string; value: string; type: string }>();
+  });
+});
+
+describe('DesignSystemIndex v2 shape', () => {
+  it('has verbal docs keyed by category', () => {
+    expectTypeOf<DesignSystemIndex['verbal']>().toMatchTypeOf<{
+      positioning: VerbalDoc | undefined;
+      audience: AudienceDoc | undefined;
+      messaging: VerbalDoc | undefined;
+      differentiation: VerbalDoc | undefined;
+      concepts: VerbalDoc | undefined;
+      voice: VerbalDoc | undefined;
+    }>();
+  });
+  it('has magicTrick and motion', () => {
+    expectTypeOf<DesignSystemIndex['magicTrick']>().toMatchTypeOf<MagicTrick | undefined>();
   });
 });
