@@ -8,17 +8,39 @@
  */
 
 import { Command } from 'commander';
+import { readFileSync, existsSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { initCommand } from './commands/init.js';
 import { validateCommand } from './commands/validate.js';
 import { docsCommand } from './commands/docs.js';
 import { startServer } from '../index.js';
+
+function readPackageVersion(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(here, '../../package.json'),
+    join(here, '../../../package.json'),
+    join(here, '../package.json'),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) {
+      try {
+        return JSON.parse(readFileSync(c, 'utf-8')).version as string;
+      } catch {
+        // fall through
+      }
+    }
+  }
+  return '0.0.0';
+}
 
 const program = new Command();
 
 program
   .name('brandkit-mcp')
   .description('Expose your company\'s design system to AI tools via the Model Context Protocol')
-  .version('0.1.0');
+  .version(readPackageVersion());
 
 program
   .command('init')
@@ -52,35 +74,18 @@ program
 
 program
   .command('preview')
-  .description('Start the local preview server to browse the design system visually')
+  .description('Local preview UI (temporarily disabled — being rewritten for v2)')
   .option('--port <number>', 'Port for preview server', '3000')
   .option('--config <path>', 'Path to brandkit.config.yaml')
   .option('--watch', 'Enable hot reload on file changes')
   .option('--open', 'Open browser automatically')
-  .action(async (options) => {
-    const { createPreviewServer } = await import('../preview/server.js');
-    const { loadConfig, resolveConfigPaths } = await import('../config/loader.js');
-    const { buildDesignSystemIndex } = await import('../indexer/index.js');
-    const { watchBrandDirectory } = await import('../indexer/hot-reload.js');
-
-    const config = resolveConfigPaths(loadConfig(options.config), process.cwd());
-    const port = parseInt(options.port, 10) || 3000;
-
-    // Use a mutable ref so that createPreviewServer route handlers always
-    // read the latest index after a hot-reload rebuild.
-    const indexRef = { current: await buildDesignSystemIndex(config) };
-
-    const app = createPreviewServer(indexRef, config);
-    app.listen(port, () => {
-      console.log(`Preview server running at http://localhost:${port}`);
-    });
-
-    if (options.watch) {
-      watchBrandDirectory(config, (newIndex) => {
-        indexRef.current = newIndex;
-        console.log('Design system re-indexed');
-      });
-    }
+  .action(() => {
+    console.error(
+      'The visual preview UI has not been rewritten for the v2 brand atomic system layout.\n' +
+        'The MCP server (`brandkit-mcp serve`) is unaffected and works correctly.\n' +
+        'Track progress: https://github.com/ejwhite7/brandkit-mcp/issues',
+    );
+    process.exit(1);
   });
 
 program

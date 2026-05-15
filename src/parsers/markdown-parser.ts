@@ -143,7 +143,7 @@ export function parsePaletteMarkdown(filePath: string, context: BrandContext): D
 
 /**
  * Infers a guideline section label from a file path.
- * e.g., brand/shared/voice/brand-voice.md -> "brand-voice"
+ * e.g., agent/verbal/voice.md -> "voice"
  */
 export function inferSectionFromPath(filePath: string): string {
   const base = basename(filePath, extname(filePath));

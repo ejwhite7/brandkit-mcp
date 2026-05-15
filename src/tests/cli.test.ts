@@ -1,8 +1,3 @@
-/**
- * @file cli.test.ts
- * @description Unit tests for the BrandKit MCP CLI commands.
- */
-
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { existsSync, mkdirSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -19,43 +14,49 @@ describe('CLI Init Command', () => {
     rmSync(TEST_DIR, { recursive: true, force: true });
   });
 
-  it('should create brand directory structure', async () => {
+  it('creates the brand_atomic_system directory and key v2 files', async () => {
     const { initCommand } = await import('../cli/commands/init.js');
     await initCommand(TEST_DIR, { name: 'Test Brand', force: true });
 
-    expect(existsSync(join(TEST_DIR, 'brand'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'brand/shared/colors'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'brand/shared/typography'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'brand/shared/logos'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'brand/marketing/components'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'brand/product/components'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/magic_trick.md'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/verbal/positioning.md'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/verbal/audience.yaml'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/verbal/voice.md'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/visual/colors_and_type.css'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/visual/components/button.md'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/visual/tokens/color-primary.md'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/visual/motion/motion.json'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/visual/motion/motion.css'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/visual/fonts/fonts.yaml'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/visual/assets/assets.yaml'))).toBe(true);
   });
 
-  it('should create config file', async () => {
+  it('does NOT create the v1 layout', async () => {
+    expect(existsSync(join(TEST_DIR, 'brand/shared'))).toBe(false);
+    expect(existsSync(join(TEST_DIR, 'brand/marketing'))).toBe(false);
+    expect(existsSync(join(TEST_DIR, 'brand/product'))).toBe(false);
+  });
+
+  it('writes a v2 brandkit.config.yaml with the brand name and v2 root', async () => {
     expect(existsSync(join(TEST_DIR, 'brandkit.config.yaml'))).toBe(true);
     const config = readFileSync(join(TEST_DIR, 'brandkit.config.yaml'), 'utf-8');
+    expect(config).toContain('version: 2');
     expect(config).toContain('Test Brand');
-  });
-
-  it('should create starter CSS files', async () => {
-    expect(existsSync(join(TEST_DIR, 'brand/shared/colors/colors.css'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'brand/shared/typography/typography.css'))).toBe(true);
+    expect(config).toContain('brand_atomic_system');
   });
 });
 
 describe('CLI Validate Command', () => {
-  it('should not throw when config is valid', async () => {
+  it('exports a function', async () => {
     const { validateCommand } = await import('../cli/commands/validate.js');
-    // This test just ensures the command doesn't crash
-    // It will exit with process.exit which we can't easily test
     expect(typeof validateCommand).toBe('function');
   });
 });
 
 describe('CLI Docs Command', () => {
-  it('should be a function', async () => {
+  it('exports a function', async () => {
     const { docsCommand } = await import('../cli/commands/docs.js');
     expect(typeof docsCommand).toBe('function');
   });
 });
-

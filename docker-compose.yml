@@ -6,7 +6,7 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./brand:/app/brand:ro
+      - ./brand_atomic_system:/app/brand_atomic_system:ro
       - ./brandkit.config.yaml:/app/brandkit.config.yaml:ro
     environment:
       - NODE_ENV=production
@@ -22,7 +22,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./brand:/app/brand:ro
+      - ./brand_atomic_system:/app/brand_atomic_system:ro
       - ./brandkit.config.yaml:/app/brandkit.config.yaml:ro
     environment:
       - NODE_ENV=production

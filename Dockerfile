@@ -17,7 +17,7 @@ COPY --from=builder /app/src/preview/static ./src/preview/static
 # Bundle the acme-corp example as the default demo brand so the container
 # has a working brand directory out of the box (used by Glama for
 # introspection and by `npx brandkit-mcp serve` demos).
-COPY examples/acme-corp/brand/ ./brand/
+COPY examples/acme-corp/brand_atomic_system/ ./brand_atomic_system/
 COPY examples/acme-corp/brandkit.config.yaml ./
 ENV NODE_ENV=production
 # Default to stdio transport so the container works out-of-the-box with
