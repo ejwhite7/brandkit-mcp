@@ -72,3 +72,29 @@ describe('search_brand', () => {
     expect(parsed._warnings.length).toBe(1);
   });
 });
+
+describe('validate_usage', () => {
+  it('flags a non-token color', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = validate.handler(idx, { snippet: '.btn { color: #abcdef; }', format: 'css' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.violations.some((v: { rule: string }) => v.rule === 'literal-color')).toBe(true);
+  });
+
+  it('accepts a var() reference (no violations)', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = validate.handler(idx, { snippet: '.btn { color: var(--color-primary); }', format: 'css' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.violations).toEqual([]);
+  });
+
+  it('flags unknown data-component (html mode)', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = validate.handler(idx, {
+      snippet: '<div data-component="nonexistent">x</div>',
+      format: 'html',
+    });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.violations.some((v: { rule: string }) => v.rule === 'unknown-component')).toBe(true);
+  });
+});
