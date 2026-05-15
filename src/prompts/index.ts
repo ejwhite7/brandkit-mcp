@@ -21,6 +21,9 @@ interface PromptDescriptor {
   arguments?: PromptArg[];
 }
 
+// v2 prompts: context values are 'base' | 'web' | 'product' (not 'marketing' | 'shared').
+// Tool names updated: get_colors_and_type (replaces get_colors + get_typography),
+// get_assets (replaces get_logos + get_textures), get_voice (replaces get_guidelines section "brand-voice").
 const PROMPTS: PromptDescriptor[] = [
   {
     name: 'design-with-brand',
