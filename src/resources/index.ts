@@ -41,6 +41,7 @@ import * as motion           from '../tools/get-motion.js';
 import * as fonts            from '../tools/get-fonts.js';
 import * as assets           from '../tools/get-assets.js';
 
+/** Canonical list of v2 brand:// resource URIs (14 total). */
 const RESOURCE_DEFS: Array<{ uri: string; name: string; description: string }> = [
   { uri: 'brand://overview',               name: 'Brand overview',  description: 'High-level overview + taste primer' },
   { uri: 'brand://magic_trick',            name: 'Magic trick',     description: 'Human-authored taste primer' },
