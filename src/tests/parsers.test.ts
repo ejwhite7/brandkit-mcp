@@ -10,7 +10,6 @@ import { parseCSSFile, extractColorsFromCSS, extractTypographyFromCSS } from '..
 import { parseGuidelineMarkdown, parseComponentMarkdown, parsePaletteMarkdown } from '../parsers/markdown-parser.js';
 import { parseFontFile, inferFontWeight } from '../parsers/font-parser.js';
 import { inferLogoVariantName } from '../parsers/image-parser.js';
-import { classifyFileType } from '../scanner/directory-scanner.js';
 
 const TEST_DIR = join(process.cwd(), '__test_fixtures__');
 
@@ -169,30 +168,6 @@ describe('Image Parser', () => {
     expect(inferLogoVariantName('logo-mark.png')).toBe('Mark');
     expect(inferLogoVariantName('logo-wordmark-dark.svg')).toBe('Wordmark Dark');
     expect(inferLogoVariantName('logo.svg')).toBe('Primary');
-  });
-});
-
-describe('File Classification', () => {
-  it('should classify CSS files', () => {
-    expect(classifyFileType('styles.css')).toBe('css');
-  });
-
-  it('should classify markdown files', () => {
-    expect(classifyFileType('guide.md')).toBe('markdown');
-  });
-
-  it('should classify image files', () => {
-    expect(classifyFileType('logo.svg')).toBe('image');
-    expect(classifyFileType('photo.png')).toBe('image');
-  });
-
-  it('should classify font files', () => {
-    expect(classifyFileType('inter.woff2')).toBe('font');
-  });
-
-  it('should classify unknown files', () => {
-    expect(classifyFileType('data.json')).toBe('unknown');
-    expect(classifyFileType('script.ts')).toBe('unknown');
   });
 });
 

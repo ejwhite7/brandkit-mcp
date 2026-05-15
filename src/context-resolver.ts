@@ -17,8 +17,8 @@
  * into .colors/.typography. Downstream get_tokens tools read from the raw index.
  * Similarly, motion is not surfaced here — get_motion reads from the raw index.
  *
- * Note: v2 assets (logos, textures, etc.) are folded into .textures. A dedicated
- * get_assets tool in Phase 2 will surface them properly.
+ * Note: v2 assets (logos, textures, etc.) are folded into .textures; get_assets
+ * surfaces them to callers.
  */
 
 import type {
@@ -259,10 +259,9 @@ const EMPTY_LOGO_SYSTEM: DesignLogoSystem = { variants: [] };
  * Converts merged RawContextData into a ResolvedDesignSystem.
  *
  * colorsAndType.customProperties are split into .colors and .typography by
- * token-name heuristics. assets are bridged to .textures until a Phase 2
- * get_assets tool handles them natively. tokens are kept on .tokens but not
- * mapped into colors/typography — downstream tooling reads from the raw index.
- * motion is not surfaced here.
+ * token-name heuristics. assets are bridged to .textures; tokens are kept on
+ * .tokens but not mapped into colors/typography — downstream tooling reads
+ * from the raw index. motion is not surfaced here.
  */
 function materialize(
   raw: RawContextData,
@@ -313,38 +312,3 @@ function materialize(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Legacy exports — retained so v1 consumers still compile during migration.
-// These will be removed once all callers are updated to use resolveAll.
-// ---------------------------------------------------------------------------
-
-export { mergeByKey };
-
-/**
- * @deprecated Use resolveAll. Merges shared + contextData for a single context.
- */
-export function resolveContext(
-  shared: RawContextData,
-  contextData: RawContextData,
-  context: BrandContext | 'all',
-  brandName: string,
-  brandDescription?: string,
-): ResolvedDesignSystem {
-  const merged = mergeContext(shared, contextData);
-  const ctx = context === 'all' ? 'base' : context;
-  return materialize(merged, ctx, { brandName, brandDescription });
-}
-
-/**
- * @deprecated Use resolveAll. Merges all three contexts into an "all" view.
- */
-export function mergeAllContexts(
-  shared: RawContextData,
-  marketing: RawContextData,
-  product: RawContextData,
-  brandName: string,
-  brandDescription?: string,
-): ResolvedDesignSystem {
-  const merged = mergeContext(mergeContext(shared, marketing), product);
-  return materialize(merged, 'base', { brandName, brandDescription });
-}
