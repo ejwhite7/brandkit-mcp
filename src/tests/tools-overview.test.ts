@@ -88,6 +88,14 @@ describe('validate_usage', () => {
     expect(parsed.violations).toEqual([]);
   });
 
+  it('does not flag a hex value that matches a canonical token', () => {
+    const idx = buildFixtureIndex('v2/full');
+    // The fixture's color-primary token value is #1a1a2e.
+    const [result] = validate.handler(idx, { snippet: '.x { color: #1a1a2e; }', format: 'css' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.violations.some((v: { rule: string }) => v.rule === 'literal-color')).toBe(false);
+  });
+
   it('flags unknown data-component (html mode)', () => {
     const idx = buildFixtureIndex('v2/full');
     const [result] = validate.handler(idx, {

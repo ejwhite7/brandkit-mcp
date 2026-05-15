@@ -34,20 +34,22 @@ export function handler(
   const colorTokens = index.base.tokens.filter((t) => t.type === 'color');
   const knownColorValues = new Set(colorTokens.map((t) => t.value.toLowerCase()));
 
-  // Rule 1: literal hex colors that aren't already a token value should still be flagged
-  // (any literal hex/rgb/hsl in a snippet should be a var(--…) reference instead).
+  // Rule 1: flag literal hex colors that do not correspond to a known canonical token value.
+  // If the hex IS a canonical token value, skip the violation (the author used the right
+  // value but may not know the token name — not an error).
   const hexRe = /#([0-9a-f]{3,8})\b/gi;
   for (const m of args.snippet.matchAll(hexRe)) {
     const literal = `#${m[1]}`.toLowerCase();
-    // Skip if the snippet is inside a var() reference's fallback; cheap heuristic only.
-    const suggestion = colorTokens.find((t) => t.value.toLowerCase() === literal)?.name;
+    if (knownColorValues.has(literal)) {
+      // Canonical value — not a violation.
+      continue;
+    }
     violations.push({
       rule: 'literal-color',
       match: m[0],
-      suggestion: suggestion ? `Use var(--${suggestion}) instead` : 'Replace with a brand token',
+      suggestion: 'Replace with a brand token',
     });
   }
-  void knownColorValues;
 
   // Rule 2: HTML data-component values reference known components (HTML mode only)
   if (args.format === 'html') {
