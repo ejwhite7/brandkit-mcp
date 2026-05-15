@@ -8,7 +8,7 @@
 import matter from 'gray-matter';
 import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
-import type { DesignGuideline, DesignComponent, DesignColor, DesignContext, TokenSpecimen } from '../types/design-system.js';
+import type { DesignGuideline, DesignComponent, DesignColor, BrandContext, TokenSpecimen } from '../types/design-system.js';
 
 /**
  * Parses a markdown file as a design guideline.
@@ -16,7 +16,7 @@ import type { DesignGuideline, DesignComponent, DesignColor, DesignContext, Toke
  * @param context - Design context
  * @returns Parsed guideline with title, content, and section metadata
  */
-export function parseGuidelineMarkdown(filePath: string, context: DesignContext): DesignGuideline {
+export function parseGuidelineMarkdown(filePath: string, context: BrandContext): DesignGuideline {
   let raw: string;
   try {
     raw = readFileSync(filePath, 'utf-8');
@@ -51,7 +51,7 @@ export function parseGuidelineMarkdown(filePath: string, context: DesignContext)
  * @param context - Design context
  * @returns Array of parsed components
  */
-export function parseComponentMarkdown(filePath: string, context: DesignContext): DesignComponent[] {
+export function parseComponentMarkdown(filePath: string, context: BrandContext): DesignComponent[] {
   let raw: string;
   try {
     raw = readFileSync(filePath, 'utf-8');
@@ -92,7 +92,7 @@ export function parseComponentMarkdown(filePath: string, context: DesignContext)
  * @param context - Design context
  * @returns Array of DesignColor objects
  */
-export function parsePaletteMarkdown(filePath: string, context: DesignContext): DesignColor[] {
+export function parsePaletteMarkdown(filePath: string, context: BrandContext): DesignColor[] {
   let raw: string;
   try {
     raw = readFileSync(filePath, 'utf-8');

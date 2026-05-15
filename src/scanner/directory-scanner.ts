@@ -34,7 +34,6 @@ import { parseTokenSpecimen } from '../parsers/markdown-parser.js';
 import { parseComponentMarkdown } from '../parsers/markdown-parser.js';
 import { parseCSSFile } from '../parsers/css-parser.js';
 import { parseFontFile } from '../parsers/font-parser.js';
-import type { BrandKitConfig } from '../types/config.js';
 
 // ---------------------------------------------------------------------------
 // Public types

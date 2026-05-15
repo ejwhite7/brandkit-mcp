@@ -93,7 +93,7 @@ export function searchIndex(
   const results: Array<SearchIndexEntry & { score: number; snippet: string }> = [];
 
   for (const entry of entries) {
-    if (context && context !== 'all' && entry.context !== context) continue;
+    if (context && entry.context !== context) continue;
 
     const contentLower = entry.content.toLowerCase();
     let score = 0;

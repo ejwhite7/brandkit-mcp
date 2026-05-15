@@ -7,7 +7,7 @@
 import pdfParse from 'pdf-parse';
 import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
-import type { DesignGuideline, DesignContext } from '../types/design-system.js';
+import type { DesignGuideline, BrandContext } from '../types/design-system.js';
 
 /**
  * Extracts all text content from a PDF file.
@@ -50,7 +50,7 @@ export async function parsePDFFile(filePath: string): Promise<{
 export function extractGuidelinesFromPDF(
   pdfText: string,
   filePath: string,
-  context: DesignContext,
+  context: BrandContext,
 ): DesignGuideline[] {
   if (!pdfText.trim()) return [];
 

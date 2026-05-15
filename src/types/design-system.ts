@@ -42,7 +42,7 @@ export interface DesignColor {
   role?: string;
 
   /** Which design context this color belongs to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** Absolute or config-relative file path this color was parsed from */
   source?: string;
@@ -84,7 +84,7 @@ export interface DesignTypographyItem {
   usage?: string;
 
   /** Which design context this style belongs to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** File path this was parsed from */
   source?: string;
@@ -183,7 +183,7 @@ export interface DesignComponent {
   examples?: string[];
 
   /** Which design context this component belongs to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** File path this was parsed from */
   source?: string;
@@ -210,7 +210,7 @@ export interface DesignTexture {
   usage?: string;
 
   /** Which design context this texture belongs to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** File path this was parsed from */
   source?: string;
@@ -261,7 +261,7 @@ export interface DesignGuideline {
   section?: string;
 
   /** Which design context this guideline applies to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** File path this was parsed from */
   source?: string;
@@ -300,8 +300,6 @@ export interface DesignCSSFile {
  */
 export type BrandContext = 'base' | 'web' | 'product';
 
-/** @deprecated Use BrandContext. Retained only to ease migration; remove before release. */
-export type DesignContext = BrandContext;
 
 // ---------------------------------------------------------------------------
 // Resolved Design System
@@ -321,8 +319,8 @@ export interface ResolvedDesignSystem {
   /** Optional brand description */
   description?: string;
 
-  /** The context this resolution represents, or "all" for the full merge */
-  context: DesignContext | 'all';
+  /** The context this resolution represents */
+  context: BrandContext;
 
   /** All resolved color tokens */
   colors: DesignColor[];
