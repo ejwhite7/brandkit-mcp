@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ejwhite7/brandkit-mcp",
-  "description": "Expose a company's design system to AI tools via MCP: colors, typography, logos, tokens.",
-  "version": "0.1.0",
+  "description": "Brand atomic system over MCP: verbal, visual, motion, tokens, and a magic_trick taste primer.",
+  "version": "2.0.0",
   "title": "BrandKit MCP",
   "websiteUrl": "https://github.com/ejwhite7/brandkit-mcp#readme",
   "repository": {
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "brandkit-mcp",
-      "version": "0.1.0",
+      "version": "2.0.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
