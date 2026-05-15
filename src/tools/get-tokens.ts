@@ -1,66 +1,101 @@
 /**
  * @file get-tokens.ts
  * @description MCP tool: get_tokens
- * Exports design tokens in a specific format: CSS custom properties, SCSS
- * variables, Tailwind config, W3C Design Tokens format, or JSON.
+ * Returns design tokens from agent/visual/tokens/ specimens.
+ * Supports output formats: json, css, scss, tailwind, w3c.
  */
 
 import type { DesignSystemIndex } from '../indexer/types.js';
-import type { GetTokensArgs } from '../types/mcp.js';
-import { toCSSFormat } from '../formatters/css.js';
-import { toSCSSFormat } from '../formatters/scss.js';
-import { toTailwindFormat } from '../formatters/tailwind.js';
-import { toW3CFormat } from '../formatters/w3c-tokens.js';
-import { toJSONFormat } from '../formatters/json-tokens.js';
+import type { BrandContext, TokenSpecimen } from '../types/design-system.js';
 
 export const TOOL_NAME = 'get_tokens';
 
 export const TOOL_DESCRIPTION =
-  'Export design tokens in a specific format: CSS custom properties, SCSS variables, Tailwind config, W3C Design Tokens format, or JSON.';
+  'Return design tokens from agent/visual/tokens/ specimens. Optional context (base|web|product) and output format (json|css|scss|tailwind|w3c).';
 
 export const INPUT_SCHEMA = {
   type: 'object' as const,
   properties: {
-    context: { type: 'string', enum: ['marketing', 'product', 'shared', 'all'], default: 'all', description: 'Design context to query' },
-    format: { type: 'string', enum: ['css', 'scss', 'tailwind', 'w3c', 'json'], description: 'Output format (required)' },
-    category: { type: 'string', enum: ['colors', 'typography', 'all'], default: 'all', description: 'Token category to export' },
+    context: { type: 'string', enum: ['base', 'web', 'product'], default: 'base' },
+    format: {
+      type: 'string',
+      enum: ['json', 'css', 'scss', 'tailwind', 'w3c'],
+      default: 'json',
+    },
+    type: { type: 'string', description: 'Filter by token type (color, font, radius, spacing, etc.)' },
   },
-  required: ['format'],
 };
+
+function toCSS(tokens: TokenSpecimen[]): string {
+  const lines = tokens.map((t) => `  --${t.name}: ${t.value};`);
+  return `:root {\n${lines.join('\n')}\n}\n`;
+}
+
+function toSCSS(tokens: TokenSpecimen[]): string {
+  return tokens.map((t) => `$${t.name}: ${t.value};`).join('\n') + '\n';
+}
+
+function toTailwind(tokens: TokenSpecimen[]): string {
+  const byType: Record<string, Record<string, string>> = {};
+  for (const t of tokens) {
+    byType[t.type] ??= {};
+    byType[t.type][t.name] = t.value;
+  }
+  return JSON.stringify({ theme: { extend: byType } }, null, 2);
+}
+
+function toW3C(tokens: TokenSpecimen[]): string {
+  const out: Record<string, { $value: string; $type: string; $description?: string }> = {};
+  for (const t of tokens) {
+    out[t.name] = { $value: t.value, $type: t.type, $description: t.role };
+  }
+  return JSON.stringify(out, null, 2);
+}
 
 /**
  * Handles the get_tokens tool call.
  */
-export function handler(index: DesignSystemIndex, args: GetTokensArgs) {
-  const ctx = args.context ?? 'all';
-  const resolved = ctx === 'all' ? index.resolved.all :
-    ctx === 'marketing' ? index.resolved.marketing :
-    ctx === 'product' ? index.resolved.product :
-    index.resolved.all;
+export function handler(
+  index: DesignSystemIndex,
+  args: {
+    context?: BrandContext;
+    format?: 'json' | 'css' | 'scss' | 'tailwind' | 'w3c';
+    type?: string;
+  },
+) {
+  const ctx = args.context ?? 'base';
+  const format = args.format ?? 'json';
+  const warnings: string[] = [];
 
-  const colors = args.category === 'typography' ? [] : resolved.colors;
-  const typography = args.category === 'colors' ? [] : resolved.typography;
+  let tokens = index[ctx].tokens.length ? index[ctx].tokens : index.base.tokens;
+  if (args.type) {
+    tokens = tokens.filter((t) => t.type === args.type);
+  }
+  if (tokens.length === 0) warnings.push('No token specimens found');
 
-  let output: string;
-  switch (args.format) {
+  let text: string;
+  switch (format) {
     case 'css':
-      output = toCSSFormat(colors, typography);
+      text = toCSS(tokens);
       break;
     case 'scss':
-      output = toSCSSFormat(colors, typography);
+      text = toSCSS(tokens);
       break;
     case 'tailwind':
-      output = toTailwindFormat(colors, typography);
+      text = toTailwind(tokens);
       break;
     case 'w3c':
-      output = toW3CFormat(colors, typography);
+      text = toW3C(tokens);
       break;
-    case 'json':
     default:
-      output = toJSONFormat(colors, typography);
-      break;
+      text = JSON.stringify({ context: ctx, tokens, _warnings: warnings }, null, 2);
   }
 
-  return [{ type: 'text' as const, text: output }];
+  // For non-json formats, append warnings as a CSS/SCSS comment so they're discoverable.
+  if (format !== 'json' && warnings.length > 0) {
+    text = `/* warnings: ${warnings.join('; ')} */\n${text}`;
+  }
+
+  return [{ type: 'text' as const, text }];
 }
 
