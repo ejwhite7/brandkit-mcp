@@ -8,7 +8,7 @@
 import matter from 'gray-matter';
 import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
-import type { DesignGuideline, DesignComponent, DesignColor, DesignContext } from '../types/design-system.js';
+import type { DesignGuideline, DesignComponent, DesignColor, BrandContext, TokenSpecimen } from '../types/design-system.js';
 
 /**
  * Parses a markdown file as a design guideline.
@@ -16,7 +16,7 @@ import type { DesignGuideline, DesignComponent, DesignColor, DesignContext } fro
  * @param context - Design context
  * @returns Parsed guideline with title, content, and section metadata
  */
-export function parseGuidelineMarkdown(filePath: string, context: DesignContext): DesignGuideline {
+export function parseGuidelineMarkdown(filePath: string, context: BrandContext): DesignGuideline {
   let raw: string;
   try {
     raw = readFileSync(filePath, 'utf-8');
@@ -51,7 +51,7 @@ export function parseGuidelineMarkdown(filePath: string, context: DesignContext)
  * @param context - Design context
  * @returns Array of parsed components
  */
-export function parseComponentMarkdown(filePath: string, context: DesignContext): DesignComponent[] {
+export function parseComponentMarkdown(filePath: string, context: BrandContext): DesignComponent[] {
   let raw: string;
   try {
     raw = readFileSync(filePath, 'utf-8');
@@ -92,7 +92,7 @@ export function parseComponentMarkdown(filePath: string, context: DesignContext)
  * @param context - Design context
  * @returns Array of DesignColor objects
  */
-export function parsePaletteMarkdown(filePath: string, context: DesignContext): DesignColor[] {
+export function parsePaletteMarkdown(filePath: string, context: BrandContext): DesignColor[] {
   let raw: string;
   try {
     raw = readFileSync(filePath, 'utf-8');
@@ -223,4 +223,50 @@ function extractVariantsFromContent(content: string): string[] {
     variants.push(match[1].trim());
   }
   return variants;
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Token specimens
+// ---------------------------------------------------------------------------
+
+export interface TokenSpecimenResult {
+  specimen: TokenSpecimen | null;
+  warnings: string[];
+}
+
+/**
+ * Parse a token specimen markdown file with required frontmatter.
+ * @param filePath - Absolute path to the token specimen markdown file
+ * @returns Parse result with specimen, warnings
+ */
+export function parseTokenSpecimen(filePath: string): TokenSpecimenResult {
+  const warnings: string[] = [];
+  let raw: string;
+  try {
+    raw = readFileSync(filePath, 'utf-8');
+  } catch {
+    return { specimen: null, warnings: [`Could not read ${filePath}`] };
+  }
+  const { data, content } = matter(raw);
+  const name = data.name as string | undefined;
+  const value = data.value as string | undefined;
+  const type = data.type as string | undefined;
+  if (!name || !value || !type) {
+    warnings.push(
+      `Token specimen at ${filePath} missing required frontmatter (name/value/type); skipping`,
+    );
+    return { specimen: null, warnings };
+  }
+  return {
+    specimen: {
+      name,
+      value,
+      type,
+      role: data.role as string | undefined,
+      related: data.related as string[] | undefined,
+      body: content.trim(),
+      source: filePath,
+    },
+    warnings,
+  };
 }

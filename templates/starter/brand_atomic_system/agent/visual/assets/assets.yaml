@@ -1,0 +1,5 @@
+assets:
+  - id: logo-primary
+    file: logo-primary.svg
+    purpose: Replace with logo usage guidance.
+    # Add your logo and other asset files to this directory, then list them here.

@@ -1,0 +1,74 @@
+/**
+ * Acme Corp Design Tokens — Base
+ * Colors and typography for both web and product contexts.
+ * Overrides live in agent/visual/artifacts/web/ and agent/visual/artifacts/product/.
+ */
+
+:root {
+  /* --- Color Palette --- */
+
+  /* Primary: Acme Blue — actions, links, interactive elements */
+  --color-primary: #1a56db;
+  --color-primary-hover: #1649c0;
+  --color-primary-subtle: #e8f0fe;
+
+  /* Neutral: Background and surface */
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f8f9fb;
+  --color-surface: #ffffff;
+  --color-border: #e2e6ec;
+
+  /* Text */
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-disabled: #9ca3af;
+
+  /* Semantic */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #0284c7;
+
+  /* --- Typography --- */
+
+  /* Display / heading font */
+  --font-display: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Body / prose font */
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Monospace / code font */
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+  /* Type scale */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+
+  /* Font weights */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Line heights */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Letter spacing */
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0em;
+  --letter-spacing-wide: 0.05em;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-default: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+}

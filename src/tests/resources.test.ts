@@ -1,104 +1,62 @@
 /**
  * @file resources.test.ts
- * @description Smoke tests for MCP resources and prompts modules.
+ * @description Smoke tests for MCP resources and prompts modules (v2).
  */
 
 import { describe, it, expect } from 'vitest';
+import { buildFixtureIndex } from './helpers.js';
 import { listResources, readResource } from '../resources/index.js';
 import { listPrompts, getPrompt } from '../prompts/index.js';
-import type { DesignSystemIndex } from '../indexer/types.js';
-import type { ResolvedDesignSystem } from '../types/design-system.js';
 
-function makeIndex(): DesignSystemIndex {
-  const emptyResolved: ResolvedDesignSystem = {
-    name: 'Test Brand',
-    description: 'A test brand',
-    context: 'all',
-    colors: [
-      { name: 'Primary', token: '--color-primary', value: '#1a1a2e', hex: '#1a1a2e', role: 'primary', context: 'shared' },
-    ],
-    typography: [
-      { name: 'Body', token: '--font-family-body', fontFamily: 'Inter, sans-serif', context: 'shared' },
-    ],
-    logos: { variants: [] },
-    components: [],
-    textures: [],
-    guidelines: [
-      { title: 'Brand Voice', section: 'voice', content: 'Be confident.', context: 'shared' },
-    ],
-    fonts: [],
-    cssFiles: [],
-    pdfTexts: [],
-    assetInventory: { totalFiles: 2, colors: 1, typography: 1, logos: 0, components: 0, textures: 0, guidelines: 1, cssFiles: 0, fonts: 0, pdfs: 0 },
-  };
-  const empty = { colors: [], typography: [], logos: { variants: [] }, components: [], textures: [], guidelines: [], fonts: [], cssFiles: [], pdfTexts: [] };
-  return {
-    shared: empty,
-    marketing: empty,
-    product: empty,
-    resolved: { marketing: emptyResolved, product: emptyResolved, all: emptyResolved },
-    searchIndex: [],
-    lastIndexed: new Date(),
-  };
-}
-
-describe('Resources', () => {
-  const idx = makeIndex();
-
-  it('lists static and dynamic resources', () => {
-    const list = listResources(idx);
-    const uris = list.map((r) => r.uri);
-    expect(uris).toContain('brandkit://overview');
-    expect(uris).toContain('brandkit://tokens/css');
-    expect(uris).toContain('brandkit://guidelines/brand-voice');
+describe('resources v2', () => {
+  it('lists 14 brand:// URIs', () => {
+    const idx = buildFixtureIndex('v2/full');
+    expect(listResources(idx)).toHaveLength(14);
   });
 
-  it('reads the overview resource as JSON', () => {
-    const result = readResource('brandkit://overview', idx);
-    expect(result.contents[0]).toMatchObject({ mimeType: 'application/json' });
-    const c = result.contents[0] as { text: string };
-    const json = JSON.parse(c.text);
-    expect(json.name).toBe('Test Brand');
+  it('reads brand://magic_trick', async () => {
+    const idx = buildFixtureIndex('v2/full');
+    const res = await readResource('brand://magic_trick', idx);
+    expect(res.contents[0].text).toContain('Specificity');
   });
 
-  it('reads tokens in CSS format', () => {
-    const result = readResource('brandkit://tokens/css', idx);
-    const c = result.contents[0] as { text: string; mimeType?: string };
-    expect(c.mimeType).toBe('text/css');
-    expect(c.text).toContain('--color-primary');
+  it('reads brand://verbal/positioning', async () => {
+    const idx = buildFixtureIndex('v2/full');
+    const res = await readResource('brand://verbal/positioning', idx);
+    expect(res.contents[0].text).toContain('solo founders');
   });
 
-  it('reads guidelines by slug', () => {
-    const result = readResource('brandkit://guidelines/brand-voice', idx);
-    const c = result.contents[0] as { text: string };
-    expect(c.text).toContain('# Brand Voice');
-    expect(c.text).toContain('Be confident.');
+  it('reads brand://visual/colors_and_type', async () => {
+    const idx = buildFixtureIndex('v2/full');
+    const res = await readResource('brand://visual/colors_and_type', idx);
+    expect(res.contents[0].text).toContain('--color-primary');
   });
 
-  it('throws on unknown URI', () => {
-    expect(() => readResource('brandkit://nope', idx)).toThrow();
+  it('returns unknown for invalid uri', async () => {
+    const idx = buildFixtureIndex('v2/full');
+    const res = await readResource('brand://nope', idx);
+    expect(res.contents[0].text).toContain('Unknown');
   });
 });
 
-describe('Prompts', () => {
-  const idx = makeIndex();
-
+describe('Prompts v2', () => {
   it('lists prompts with arguments', () => {
     const list = listPrompts();
     expect(list.length).toBeGreaterThanOrEqual(4);
     expect(list.find((p) => p.name === 'design-with-brand')).toBeDefined();
   });
 
-  it('renders the design-with-brand prompt with brand context', () => {
-    const out = getPrompt('design-with-brand', { feature: 'pricing hero', context: 'marketing' }, idx);
+  it('renders the design-with-brand prompt', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const out = getPrompt('design-with-brand', { feature: 'pricing hero', context: 'web' }, idx);
     expect(out.messages).toHaveLength(1);
     const text = (out.messages[0].content as { text: string }).text;
     expect(text).toContain('pricing hero');
     expect(text).toContain('Test Brand');
-    expect(text).toContain('--color-primary');
   });
 
   it('throws on unknown prompt', () => {
+    const idx = buildFixtureIndex('v2/full');
     expect(() => getPrompt('nope', {}, idx)).toThrow();
   });
 });

@@ -42,7 +42,7 @@ export interface DesignColor {
   role?: string;
 
   /** Which design context this color belongs to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** Absolute or config-relative file path this color was parsed from */
   source?: string;
@@ -84,7 +84,7 @@ export interface DesignTypographyItem {
   usage?: string;
 
   /** Which design context this style belongs to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** File path this was parsed from */
   source?: string;
@@ -183,7 +183,7 @@ export interface DesignComponent {
   examples?: string[];
 
   /** Which design context this component belongs to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** File path this was parsed from */
   source?: string;
@@ -210,7 +210,7 @@ export interface DesignTexture {
   usage?: string;
 
   /** Which design context this texture belongs to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** File path this was parsed from */
   source?: string;
@@ -261,7 +261,7 @@ export interface DesignGuideline {
   section?: string;
 
   /** Which design context this guideline applies to */
-  context?: DesignContext;
+  context?: BrandContext;
 
   /** File path this was parsed from */
   source?: string;
@@ -293,13 +293,13 @@ export interface DesignCSSFile {
 // ---------------------------------------------------------------------------
 
 /**
- * The two design contexts BrandKit MCP differentiates between.
- *
- * - "marketing": Styles, tokens, and assets for the public marketing site.
- * - "product": Styles, tokens, and assets for the authenticated product/app UI.
- * - "shared": Design elements common to both contexts.
+ * v2 design contexts.
+ * - "base"    : default layer under agent/visual/ outside artifacts/
+ * - "web"     : override layer under agent/visual/artifacts/web/
+ * - "product" : override layer under agent/visual/artifacts/product/
  */
-export type DesignContext = 'marketing' | 'product' | 'shared';
+export type BrandContext = 'base' | 'web' | 'product';
+
 
 // ---------------------------------------------------------------------------
 // Resolved Design System
@@ -319,8 +319,8 @@ export interface ResolvedDesignSystem {
   /** Optional brand description */
   description?: string;
 
-  /** The context this resolution represents, or "all" for the full merge */
-  context: DesignContext | 'all';
+  /** The context this resolution represents */
+  context: BrandContext;
 
   /** All resolved color tokens */
   colors: DesignColor[];
@@ -348,6 +348,12 @@ export interface ResolvedDesignSystem {
 
   /** Text content extracted from PDF brand documents */
   pdfTexts: Array<{ filePath: string; content: string; title?: string }>;
+
+  /**
+   * v2 token specimens (from tokens/*.md). Not mapped into colors/typography —
+   * downstream get_tokens tools read directly from the raw index.
+   */
+  tokens: TokenSpecimen[];
 
   /** Summary counts of all discovered assets */
   assetInventory: AssetInventory;
@@ -391,5 +397,74 @@ export interface AssetInventory {
 
   /** Number of PDF documents parsed */
   pdfs: number;
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Verbal documents
+// ---------------------------------------------------------------------------
+
+/** A markdown document under agent/verbal/. */
+export interface VerbalDoc {
+  frontmatter: Record<string, unknown>;
+  body: string;
+  source: string;
+}
+
+/** Freeform audience document parsed from audience.yaml. */
+export interface AudienceDoc {
+  data: unknown;
+  source: string;
+}
+
+/** The human-authored taste primer. */
+export interface MagicTrick {
+  content: string;
+  source: string;
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Motion system
+// ---------------------------------------------------------------------------
+
+/** Combined motion.json (parsed) + motion.css (raw text). */
+export interface MotionSystem {
+  tokens: unknown;
+  css: string;
+  source: string;
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Assets and fonts
+// ---------------------------------------------------------------------------
+
+export interface AssetEntry {
+  id?: string;
+  file: string;
+  purpose?: string;
+  format: string;
+  filePath: string;
+}
+
+export interface FontFace {
+  family: string;
+  weight?: string | number;
+  style?: 'normal' | 'italic';
+  file: string;
+  filePath: string;
+  format: 'otf' | 'ttf' | 'woff' | 'woff2';
+}
+
+// ---------------------------------------------------------------------------
+// v2 — Token specimens
+// ---------------------------------------------------------------------------
+
+export interface TokenSpecimen {
+  name: string;
+  value: string;
+  type: string;
+  role?: string;
+  related?: string[];
+  body: string;
+  source: string;
 }
 

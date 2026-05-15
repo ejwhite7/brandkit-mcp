@@ -1,0 +1,17 @@
+/**
+ * Your Brand Design Tokens — Base
+ * Replace the placeholder values below with your brand's colors and typography.
+ */
+
+:root {
+  /* --- Colors --- */
+  --color-primary: #000000;      /* Replace: primary brand color */
+  --color-bg: #ffffff;           /* Replace: page background */
+  --color-text-primary: #111827; /* Replace: primary text color */
+
+  /* --- Typography --- */
+  --font-display: system-ui, sans-serif; /* Replace: heading font */
+  --font-body: system-ui, sans-serif;    /* Replace: body font */
+
+  /* Add your color and type tokens here */
+}

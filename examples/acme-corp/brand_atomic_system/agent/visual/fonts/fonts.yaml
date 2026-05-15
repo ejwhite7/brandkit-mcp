@@ -1,0 +1,31 @@
+faces:
+  - family: Inter
+    weight: 400
+    style: normal
+    file: Inter-Regular.woff2
+    source: https://rsms.me/inter/
+  - family: Inter
+    weight: 500
+    style: normal
+    file: Inter-Medium.woff2
+    source: https://rsms.me/inter/
+  - family: Inter
+    weight: 600
+    style: normal
+    file: Inter-SemiBold.woff2
+    source: https://rsms.me/inter/
+  - family: Inter
+    weight: 700
+    style: normal
+    file: Inter-Bold.woff2
+    source: https://rsms.me/inter/
+  - family: JetBrains Mono
+    weight: 400
+    style: normal
+    file: JetBrainsMono-Regular.woff2
+    source: https://www.jetbrains.com/lp/mono/
+  - family: JetBrains Mono
+    weight: 500
+    style: normal
+    file: JetBrainsMono-Medium.woff2
+    source: https://www.jetbrains.com/lp/mono/

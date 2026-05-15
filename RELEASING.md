@@ -1,5 +1,19 @@
 # Releasing
 
+## 2.0.0 (breaking)
+
+- **Layout:** `brand/{shared,marketing,product}/...` replaced with `<brand-root>/{human,agent/{verbal,visual}}/...`
+- **Context vocabulary:** `shared|marketing|product` → `base|web|product`
+- **Tool surface:** v1 (13 tools) → v2 (18 tools).
+  - Removed: `get_colors`, `get_typography`, `get_logos`, `get_textures`, `get_guidelines`
+  - Added: `get_magic_trick`, `get_positioning`, `get_audience`, `get_messaging`, `get_differentiation`, `get_concepts`, `get_voice`, `get_colors_and_type`, `get_assets`, `get_fonts`, `get_motion`
+- **Resources:** 14 new `brand://` URIs replacing the v1 scheme.
+- **Config:** `version: 2` required. v1 configs throw `BrandkitV1ConfigError` at startup.
+- **Taste primer:** 7 creative/verbal tools inject `magic_trick.md` contents as a `_taste_primer` field on their responses; `get_magic_trick` returns it verbatim.
+- **No automated migration:** Manual migration table is in `README.md`.
+
+---
+
 Releases are automated by `.github/workflows/publish.yml`, which fires on
 any tag matching `v*` and publishes to **npm** and the **MCP Registry**
 in one go.

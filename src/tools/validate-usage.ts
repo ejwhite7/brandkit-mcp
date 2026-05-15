@@ -1,110 +1,77 @@
 /**
  * @file validate-usage.ts
  * @description MCP tool: validate_usage
- * Validates whether a specific color, font, or logo usage complies with
- * the brand guidelines. Returns pass/fail with specific guidance.
+ * Validates whether an HTML/CSS snippet uses brand tokens rather than literal
+ * values, and references known components.
  */
 
 import type { DesignSystemIndex } from '../indexer/types.js';
-import type { ValidateUsageArgs } from '../types/mcp.js';
 
 export const TOOL_NAME = 'validate_usage';
 
 export const TOOL_DESCRIPTION =
-  'Validate whether a specific color, font, or logo usage complies with the brand guidelines. Returns pass/fail with specific guidance.';
+  'Validate that an HTML/CSS snippet uses brand tokens (rather than literal values) and references known components.';
 
 export const INPUT_SCHEMA = {
   type: 'object' as const,
   properties: {
-    type: { type: 'string', enum: ['color', 'font', 'logo'], description: 'What to validate' },
-    value: { type: 'string', description: 'The color hex/name, font name, or logo variant to validate' },
-    context: { type: 'string', enum: ['marketing', 'product'], description: 'Context to validate against' },
-    useCase: { type: 'string', description: "Description of how it's being used" },
+    snippet: { type: 'string', description: 'HTML or CSS snippet to validate' },
+    format: { type: 'string', enum: ['html', 'css'], default: 'css' },
   },
-  required: ['type', 'value'],
+  required: ['snippet'],
 };
 
-/**
- * Handles the validate_usage tool call.
- */
-export function handler(index: DesignSystemIndex, args: ValidateUsageArgs) {
-  const resolved = args.context === 'marketing' ? index.resolved.marketing :
-    args.context === 'product' ? index.resolved.product :
-    index.resolved.all;
+interface Violation { rule: string; match: string; suggestion?: string }
 
-  const result: { valid: boolean; messages: string[] } = { valid: true, messages: [] };
+export function handler(
+  index: DesignSystemIndex,
+  args: { snippet: string; format?: 'html' | 'css' },
+) {
+  const warnings: string[] = [];
+  const violations: Violation[] = [];
 
-  switch (args.type) {
-    case 'color': {
-      const valueLower = args.value.toLowerCase();
-      const match = resolved.colors.find(
-        (c) => c.value.toLowerCase() === valueLower ||
-               c.hex?.toLowerCase() === valueLower ||
-               c.name.toLowerCase() === valueLower ||
-               c.token.toLowerCase() === valueLower,
-      );
+  // Collect canonical color values from v2 tokens
+  const colorTokens = index.base.tokens.filter((t) => t.type === 'color');
+  const knownColorValues = new Set(colorTokens.map((t) => t.value.toLowerCase()));
 
-      if (match) {
-        result.messages.push(`Color "${args.value}" matches brand color: ${match.name} (${match.token}: ${match.value})`);
-        if (match.role) result.messages.push(`Semantic role: ${match.role}`);
-        if (match.usage) result.messages.push(`Usage: ${match.usage}`);
-      } else {
-        result.valid = false;
-        result.messages.push(`Color "${args.value}" is not part of the brand palette.`);
-        result.messages.push('Approved brand colors:');
-        for (const c of resolved.colors.slice(0, 10)) {
-          result.messages.push(`  - ${c.name}: ${c.value} (${c.token})`);
-        }
-      }
-      break;
+  // Rule 1: flag literal hex colors that do not correspond to a known canonical token value.
+  // If the hex IS a canonical token value, skip the violation (the author used the right
+  // value but may not know the token name — not an error).
+  const hexRe = /#([0-9a-f]{3,8})\b/gi;
+  for (const m of args.snippet.matchAll(hexRe)) {
+    const literal = `#${m[1]}`.toLowerCase();
+    if (knownColorValues.has(literal)) {
+      // Canonical value — not a violation.
+      continue;
     }
+    violations.push({
+      rule: 'literal-color',
+      match: m[0],
+      suggestion: 'Replace with a brand token',
+    });
+  }
 
-    case 'font': {
-      const valueLower = args.value.toLowerCase();
-      const familyMatch = resolved.typography.find(
-        (t) => t.fontFamily?.toLowerCase().includes(valueLower),
-      );
-      const fontMatch = resolved.fonts.find(
-        (f) => f.family.toLowerCase().includes(valueLower),
-      );
-
-      if (familyMatch || fontMatch) {
-        result.messages.push(`Font "${args.value}" is approved for use in the brand.`);
-        if (familyMatch?.usage) result.messages.push(`Usage: ${familyMatch.usage}`);
-      } else {
-        result.valid = false;
-        result.messages.push(`Font "${args.value}" is not part of the brand type system.`);
-        const families = [...new Set(resolved.typography.filter((t) => t.fontFamily).map((t) => t.fontFamily))];
-        if (families.length > 0) {
-          result.messages.push('Approved font families: ' + families.join(', '));
-        }
+  // Rule 2: HTML data-component values reference known components (HTML mode only)
+  if (args.format === 'html') {
+    const knownComponents = new Set(index.base.components.map((c) => c.name.toLowerCase()));
+    const dataRe = /data-component=["']([^"']+)["']/g;
+    for (const m of args.snippet.matchAll(dataRe)) {
+      if (!knownComponents.has(m[1].toLowerCase())) {
+        violations.push({ rule: 'unknown-component', match: m[0], suggestion: `No component named "${m[1]}"` });
       }
-      break;
-    }
-
-    case 'logo': {
-      const valueLower = args.value.toLowerCase();
-      const variant = resolved.logos.variants.find(
-        (v) => v.name.toLowerCase().includes(valueLower),
-      );
-
-      if (variant) {
-        result.messages.push(`Logo variant "${variant.name}" exists (${variant.format}, ${variant.width ?? '?'}x${variant.height ?? '?'}px).`);
-        if (resolved.logos.minimumSize) result.messages.push(`Minimum size: ${resolved.logos.minimumSize}`);
-        if (resolved.logos.clearSpace) result.messages.push(`Clear space: ${resolved.logos.clearSpace}`);
-        if (resolved.logos.forbiddenUsage?.length) {
-          result.messages.push('Forbidden usage: ' + resolved.logos.forbiddenUsage.join('; '));
-        }
-      } else {
-        result.valid = false;
-        result.messages.push(`Logo variant "${args.value}" not found.`);
-        const available = resolved.logos.variants.map((v) => v.name);
-        result.messages.push('Available variants: ' + (available.length > 0 ? available.join(', ') : 'none'));
-      }
-      break;
     }
   }
 
-  return [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }];
-}
+  if (index.base.tokens.length === 0) warnings.push('No tokens indexed; color validation degraded.');
 
+  return [
+    {
+      type: 'text' as const,
+      text: JSON.stringify(
+        { violations, _warnings: warnings },
+        null,
+        2,
+      ),
+    },
+  ];
+}

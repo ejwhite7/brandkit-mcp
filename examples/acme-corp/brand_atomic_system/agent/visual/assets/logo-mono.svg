@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
+  <!-- Acme Corp monochrome logo placeholder -->
+  <rect x="0" y="12" width="24" height="24" rx="4" fill="currentColor"/>
+  <text x="32" y="32" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="700" fill="currentColor">Acme Corp</text>
+</svg>

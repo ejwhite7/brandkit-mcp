@@ -1,0 +1,21 @@
+/**
+ * Acme Corp Design Tokens — Web (Marketing Site) Overrides
+ *
+ * Applied on top of the base tokens for acme.com.
+ * The marketing site uses a slightly brighter primary and a warmer
+ * background tint to feel more approachable than the product UI.
+ */
+
+:root {
+  /* Brighter primary blue for marketing CTAs */
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
+
+  /* Warmer off-white background for editorial pages */
+  --color-bg: #fafafa;
+  --color-bg-subtle: #f3f4f6;
+
+  /* Larger default radius for marketing UI components */
+  --radius-default: 10px;
+  --radius-lg: 16px;
+}

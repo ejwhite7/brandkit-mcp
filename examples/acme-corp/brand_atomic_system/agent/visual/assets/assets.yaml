@@ -1,0 +1,7 @@
+assets:
+  - id: logo-primary
+    file: logo-primary.svg
+    purpose: Primary full-color logo. Use on white and light backgrounds.
+  - id: logo-mono
+    file: logo-mono.svg
+    purpose: Monochrome logo for dark backgrounds, single-color print, and embossed applications.

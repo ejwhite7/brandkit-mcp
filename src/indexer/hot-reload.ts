@@ -25,7 +25,7 @@ export function watchBrandDirectory(
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   const DEBOUNCE_MS = 300;
 
-  const watcher = chokidar.watch(config.paths.brand, {
+  const watcher = chokidar.watch(config.brand.root, {
     persistent: true,
     ignoreInitial: true,
     ignored: [

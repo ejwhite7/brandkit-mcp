@@ -1,0 +1,5 @@
+personas:
+  - id: founder-marketer
+    name: Solo founder doing marketing
+    pain_points:
+      - Reinventing layouts for every page

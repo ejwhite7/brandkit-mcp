@@ -1,0 +1,50 @@
+personas:
+  - id: indie-dev
+    name: Maya
+    role: Solo founder / full-stack developer
+    goals:
+      - Ship a working product fast without a dedicated ops person
+      - Keep monthly infrastructure costs predictable
+      - Avoid waking up at 3am for infra fires
+    pain_points:
+      - Reinventing retry logic and idempotency in every project
+      - Evaluating too many overlapping tools (queues, webhooks, events)
+      - Documentation that assumes an SRE background
+    channels:
+      - Hacker News
+      - Twitter/X
+      - Dev.to
+      - Word of mouth from builder communities
+
+  - id: team-lead
+    name: Carlos
+    role: Engineering lead at a Series A startup (8-person team)
+    goals:
+      - Free senior engineers from low-value plumbing work
+      - Maintain reliability SLAs as the team scales
+      - Keep the codebase simple enough for new hires to ramp fast
+    pain_points:
+      - Technical debt from ad-hoc queue implementations
+      - Debugging webhook delivery failures in production
+      - Vendor lock-in from opinionated platforms
+    channels:
+      - Engineering blogs (Substack, personal blogs)
+      - Slack communities (Software Architecture, Indie Hackers)
+      - LinkedIn
+      - Conference talks (Rails World, Node Congress)
+
+  - id: platform-engineer
+    name: Priya
+    role: Platform / DevEx engineer at a mid-market company (50+ engineers)
+    goals:
+      - Standardize event-driven patterns across multiple teams
+      - Provide internal customers with a reliable, self-serve integration layer
+      - Reduce oncall burden for infrastructure
+    pain_points:
+      - Inconsistent error handling across microservices
+      - Teams building their own bespoke solutions to the same problems
+      - Difficulty auditing event flows across services
+    channels:
+      - Internal engineering docs and RFCs
+      - PlatformCon, KubeCon
+      - CNCF Slack

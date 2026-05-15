@@ -1,0 +1,32 @@
+{
+  "durations": {
+    "instant": "50ms",
+    "fast": "120ms",
+    "normal": "200ms",
+    "slow": "350ms",
+    "deliberate": "500ms"
+  },
+  "easings": {
+    "ease-out": "cubic-bezier(0.0, 0.0, 0.2, 1)",
+    "ease-in": "cubic-bezier(0.4, 0.0, 1, 1)",
+    "ease-in-out": "cubic-bezier(0.4, 0.0, 0.2, 1)",
+    "spring": "cubic-bezier(0.34, 1.56, 0.64, 1)"
+  },
+  "animations": {
+    "fade-in": {
+      "duration": "200ms",
+      "easing": "ease-out",
+      "keyframes": "fadeIn"
+    },
+    "slide-up": {
+      "duration": "200ms",
+      "easing": "ease-out",
+      "keyframes": "slideUp"
+    },
+    "modal-open": {
+      "duration": "120ms",
+      "easing": "ease-out",
+      "keyframes": "modalOpen"
+    }
+  }
+}
