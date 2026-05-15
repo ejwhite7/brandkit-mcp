@@ -4,6 +4,9 @@ import * as cat from '../tools/get-colors-and-type.js';
 import * as assets from '../tools/get-assets.js';
 import * as fonts from '../tools/get-fonts.js';
 import * as motion from '../tools/get-motion.js';
+import * as components from '../tools/get-components.js';
+import * as tokens from '../tools/get-tokens.js';
+import * as css from '../tools/get-css.js';
 
 describe('get_colors_and_type', () => {
   it('returns base custom properties', () => {
@@ -67,6 +70,74 @@ describe('get_motion', () => {
     const [result] = motion.handler(idx, {});
     const parsed = JSON.parse(result.text);
     expect(parsed.tokens).toBeNull();
+    expect(parsed._warnings.length).toBeGreaterThan(0);
+  });
+});
+
+describe('get_components', () => {
+  it('returns base button', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = components.handler(idx, { context: 'base' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.components.find((c: { name: string }) => c.name === 'button')).toBeTruthy();
+  });
+
+  it('applies product override (button comes from artifacts/product/)', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = components.handler(idx, { context: 'product' });
+    const parsed = JSON.parse(result.text);
+    const btn = parsed.components.find((c: { name: string }) => c.name === 'button');
+    expect(btn).toBeDefined();
+    // Source path includes "artifacts/product" since the override exists for button.
+    expect(btn.source).toContain('artifacts/product');
+  });
+
+  it('filters by name', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = components.handler(idx, { context: 'base', name: 'button' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.components).toHaveLength(1);
+  });
+});
+
+describe('get_tokens', () => {
+  it('aggregates token specimens (json default)', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = tokens.handler(idx, { context: 'base' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.tokens.find((t: { name: string }) => t.name === 'color-primary')?.value).toBe(
+      '#1a1a2e',
+    );
+  });
+
+  it('formats as css', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = tokens.handler(idx, { context: 'base', format: 'css' });
+    expect(result.text).toContain('--color-primary: #1a1a2e');
+    expect(result.text).toMatch(/^:root \{/);
+  });
+
+  it('filters by type', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = tokens.handler(idx, { context: 'base', type: 'color' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.tokens.every((t: { type: string }) => t.type === 'color')).toBe(true);
+  });
+});
+
+describe('get_css', () => {
+  it('returns colors_and_type + motion text', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = css.handler(idx, { context: 'base' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.colors_and_type).toContain('--color-primary');
+    expect(parsed.motion).toContain('@keyframes fade-in');
+  });
+
+  it('returns warnings when files missing', () => {
+    const idx = buildFixtureIndex('v2/empty');
+    const [result] = css.handler(idx, { context: 'base' });
+    const parsed = JSON.parse(result.text);
     expect(parsed._warnings.length).toBeGreaterThan(0);
   });
 });

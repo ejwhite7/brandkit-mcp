@@ -1,52 +1,56 @@
 /**
  * @file get-components.ts
  * @description MCP tool: get_components
- * Returns component specifications, variants, CSS properties, and usage guidelines.
- * Supports filtering by context, category, or name.
+ * Returns component specifications from agent/visual/components/.
+ * Supports filtering by context (base | web | product) and name.
  */
 
 import type { DesignSystemIndex } from '../indexer/types.js';
-import type { GetComponentsArgs } from '../types/mcp.js';
+import type { BrandContext } from '../types/design-system.js';
 
 export const TOOL_NAME = 'get_components';
 
 export const TOOL_DESCRIPTION =
-  'Get component specifications, variants, CSS properties, and usage guidelines. Filter by context (marketing vs product) or category.';
+  'Return UI component specifications from agent/visual/components/. Optionally filtered by context (base | web | product).';
 
 export const INPUT_SCHEMA = {
   type: 'object' as const,
   properties: {
-    context: { type: 'string', enum: ['marketing', 'product', 'shared', 'all'], default: 'all', description: 'Design context to query' },
-    category: { type: 'string', description: 'Filter by category: button, form, navigation, layout, card, modal, etc.' },
-    name: { type: 'string', description: 'Search by component name (partial match, case-insensitive)' },
+    context: { type: 'string', enum: ['base', 'web', 'product'], default: 'base' },
+    name: { type: 'string', description: 'Filter to a single component by name' },
   },
 };
 
 /**
  * Handles the get_components tool call.
  */
-export function handler(index: DesignSystemIndex, args: GetComponentsArgs) {
-  const ctx = args.context ?? 'all';
-  const resolved = ctx === 'all' ? index.resolved.all :
-    ctx === 'marketing' ? index.resolved.marketing :
-    ctx === 'product' ? index.resolved.product :
-    index.resolved.all;
+export function handler(
+  index: DesignSystemIndex,
+  args: { context?: BrandContext; name?: string },
+) {
+  const ctx = args.context ?? 'base';
+  const warnings: string[] = [];
 
-  let components = resolved.components;
+  // Use override layer if it has components; otherwise fall through to base.
+  const list = index[ctx].components.length ? index[ctx].components : index.base.components;
 
-  if (args.category) {
-    components = components.filter((c) => c.category.toLowerCase() === args.category!.toLowerCase());
-  }
-
+  let filtered = list;
   if (args.name) {
-    const query = args.name.toLowerCase();
-    components = components.filter((c) => c.name.toLowerCase().includes(query));
+    filtered = filtered.filter((c) => c.name.toLowerCase() === args.name!.toLowerCase());
+    if (filtered.length === 0) warnings.push(`No component named "${args.name}" in ${ctx} context`);
+  } else if (filtered.length === 0) {
+    warnings.push('No components found');
   }
 
-  if (components.length === 0) {
-    return [{ type: 'text' as const, text: `No components found matching the criteria in ${ctx} context.` }];
-  }
-
-  return [{ type: 'text' as const, text: JSON.stringify(components, null, 2) }];
+  return [
+    {
+      type: 'text' as const,
+      text: JSON.stringify(
+        { context: ctx, components: filtered, _warnings: warnings },
+        null,
+        2,
+      ),
+    },
+  ];
 }
 
