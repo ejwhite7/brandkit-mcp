@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { buildFixtureIndex } from './helpers.js';
 import * as overview from '../tools/get-brand-overview.js';
+import * as search from '../tools/search-brand.js';
+import * as validate from '../tools/validate-usage.js';
+import * as diff from '../tools/get-context-diff.js';
 
 describe('get_brand_overview', () => {
   it('lists 18 tools', () => {
@@ -43,5 +46,29 @@ describe('get_brand_overview', () => {
     expect(parsed.inventory.tokens).toBe(0);
     expect(parsed.inventory.magicTrick).toBe(false);
     expect(parsed._taste_primer).toBeNull();
+  });
+});
+
+describe('search_brand', () => {
+  it('finds matches in verbal positioning', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = search.handler(idx, { query: 'solo founders' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.results.some((r: { source?: string }) => r.source?.includes('positioning.md'))).toBe(true);
+  });
+
+  it('finds matches in tokens', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = search.handler(idx, { query: 'color-primary' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.results.some((r: { kind: string }) => r.kind === 'token')).toBe(true);
+  });
+
+  it('returns warning when no matches', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = search.handler(idx, { query: 'xyzzy-no-match-string' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.results).toEqual([]);
+    expect(parsed._warnings.length).toBe(1);
   });
 });
