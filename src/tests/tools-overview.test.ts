@@ -98,3 +98,21 @@ describe('validate_usage', () => {
     expect(parsed.violations.some((v: { rule: string }) => v.rule === 'unknown-component')).toBe(true);
   });
 });
+
+describe('get_context_diff', () => {
+  it('diffs web vs product (web override changes --color-bg)', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = diff.handler(idx, { a: 'web', b: 'product' });
+    const parsed = JSON.parse(result.text);
+    // web: --color-bg = #fafafa; product: falls through to base = #ffffff
+    expect(parsed.customProperties.changed.find((c: { name: string }) => c.name === '--color-bg')).toBeTruthy();
+  });
+
+  it('defaults to a=web b=product', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = diff.handler(idx, {});
+    const parsed = JSON.parse(result.text);
+    expect(parsed.a).toBe('web');
+    expect(parsed.b).toBe('product');
+  });
+});

@@ -1,76 +1,75 @@
 /**
  * @file get-context-diff.ts
  * @description MCP tool: get_context_diff
- * Compares marketing site vs product app design systems side-by-side,
- * highlighting differences in colors, typography, and components.
+ * Diffs two contexts (base | web | product) across colors_and_type custom
+ * properties, components, and tokens.
  */
 
 import type { DesignSystemIndex } from '../indexer/types.js';
-import type { GetContextDiffArgs } from '../types/mcp.js';
+import type { BrandContext } from '../types/design-system.js';
 
 export const TOOL_NAME = 'get_context_diff';
 
 export const TOOL_DESCRIPTION =
-  'Compare marketing site vs product app design systems side-by-side, highlighting differences in colors, typography, and components.';
+  'Diff two contexts (base | web | product) across colors_and_type custom properties, components, and tokens.';
 
 export const INPUT_SCHEMA = {
   type: 'object' as const,
   properties: {
-    category: { type: 'string', enum: ['colors', 'typography', 'components', 'all'], default: 'all', description: 'Category to compare' },
+    a: { type: 'string', enum: ['base', 'web', 'product'], default: 'web' },
+    b: { type: 'string', enum: ['base', 'web', 'product'], default: 'product' },
   },
 };
 
-/**
- * Handles the get_context_diff tool call.
- */
-export function handler(index: DesignSystemIndex, args: GetContextDiffArgs) {
-  const category = args.category ?? 'all';
-  const mkt = index.resolved.marketing;
-  const prod = index.resolved.product;
-  const diff: Record<string, unknown> = {};
+interface DiffEntry { name: string; a?: string; b?: string }
 
-  if (category === 'colors' || category === 'all') {
-    const mktTokens = new Set(mkt.colors.map((c) => c.token));
-    const prodTokens = new Set(prod.colors.map((c) => c.token));
+export function handler(
+  index: DesignSystemIndex,
+  args: { a?: BrandContext; b?: BrandContext },
+) {
+  const a = args.a ?? 'web';
+  const b = args.b ?? 'product';
 
-    diff.colors = {
-      marketingOnly: mkt.colors.filter((c) => !prodTokens.has(c.token)).map((c) => ({ name: c.name, token: c.token, value: c.value })),
-      productOnly: prod.colors.filter((c) => !mktTokens.has(c.token)).map((c) => ({ name: c.name, token: c.token, value: c.value })),
-      shared: mkt.colors
-        .filter((c) => prodTokens.has(c.token))
-        .map((mc) => {
-          const pc = prod.colors.find((c) => c.token === mc.token);
-          return {
-            token: mc.token,
-            marketing: mc.value,
-            product: pc?.value,
-            differs: mc.value !== pc?.value,
-          };
-        }),
-    };
+  // Custom properties (colors_and_type)
+  const propsA = index[a].colorsAndType?.customProperties ?? index.base.colorsAndType?.customProperties ?? {};
+  const propsB = index[b].colorsAndType?.customProperties ?? index.base.colorsAndType?.customProperties ?? {};
+  const allKeys = new Set([...Object.keys(propsA), ...Object.keys(propsB)]);
+  const changed: DiffEntry[] = [];
+  const onlyInA: DiffEntry[] = [];
+  const onlyInB: DiffEntry[] = [];
+  for (const k of allKeys) {
+    if (propsA[k] === undefined) onlyInB.push({ name: k, b: propsB[k] });
+    else if (propsB[k] === undefined) onlyInA.push({ name: k, a: propsA[k] });
+    else if (propsA[k] !== propsB[k]) changed.push({ name: k, a: propsA[k], b: propsB[k] });
   }
 
-  if (category === 'typography' || category === 'all') {
-    const mktNames = new Set(mkt.typography.map((t) => t.token ?? t.name));
-    const prodNames = new Set(prod.typography.map((t) => t.token ?? t.name));
+  // Components (override-aware: fall through to base if empty)
+  const compsA = (index[a].components.length ? index[a].components : index.base.components).map((c) => c.name);
+  const compsB = (index[b].components.length ? index[b].components : index.base.components).map((c) => c.name);
+  const compsAOnly = compsA.filter((n) => !compsB.includes(n));
+  const compsBOnly = compsB.filter((n) => !compsA.includes(n));
 
-    diff.typography = {
-      marketingOnly: mkt.typography.filter((t) => !prodNames.has(t.token ?? t.name)).map((t) => ({ name: t.name, fontSize: t.fontSize })),
-      productOnly: prod.typography.filter((t) => !mktNames.has(t.token ?? t.name)).map((t) => ({ name: t.name, fontSize: t.fontSize })),
-    };
-  }
+  // Tokens
+  const tokensA = (index[a].tokens.length ? index[a].tokens : index.base.tokens).map((t) => t.name);
+  const tokensB = (index[b].tokens.length ? index[b].tokens : index.base.tokens).map((t) => t.name);
+  const tokensAOnly = tokensA.filter((n) => !tokensB.includes(n));
+  const tokensBOnly = tokensB.filter((n) => !tokensA.includes(n));
 
-  if (category === 'components' || category === 'all') {
-    const mktNames = new Set(mkt.components.map((c) => c.name));
-    const prodNames = new Set(prod.components.map((c) => c.name));
-
-    diff.components = {
-      marketingOnly: mkt.components.filter((c) => !prodNames.has(c.name)).map((c) => ({ name: c.name, category: c.category })),
-      productOnly: prod.components.filter((c) => !mktNames.has(c.name)).map((c) => ({ name: c.name, category: c.category })),
-      both: mkt.components.filter((c) => prodNames.has(c.name)).map((c) => c.name),
-    };
-  }
-
-  return [{ type: 'text' as const, text: JSON.stringify(diff, null, 2) }];
+  return [
+    {
+      type: 'text' as const,
+      text: JSON.stringify(
+        {
+          a,
+          b,
+          customProperties: { changed, onlyInA, onlyInB },
+          components: { onlyInA: compsAOnly, onlyInB: compsBOnly },
+          tokens: { onlyInA: tokensAOnly, onlyInB: tokensBOnly },
+          _warnings: [],
+        },
+        null,
+        2,
+      ),
+    },
+  ];
 }
-
