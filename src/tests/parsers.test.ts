@@ -31,15 +31,15 @@ describe('CSS Parser', () => {
   });
 
   it('should parse CSS custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'shared');
+    const result = parseCSSFile(cssFilePath, 'base');
     expect(result.customProperties['--color-primary']).toBe('#1a1a2e');
     expect(result.customProperties['--color-secondary']).toBe('#16213e');
     expect(result.customProperties['--color-accent']).toBe('#e94560');
   });
 
   it('should extract colors from custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'shared');
-    const colors = extractColorsFromCSS(result.customProperties, 'shared', cssFilePath);
+    const result = parseCSSFile(cssFilePath, 'base');
+    const colors = extractColorsFromCSS(result.customProperties, 'base', cssFilePath);
     expect(colors.length).toBeGreaterThanOrEqual(3);
     const primary = colors.find((c) => c.token === '--color-primary');
     expect(primary).toBeDefined();
@@ -48,14 +48,14 @@ describe('CSS Parser', () => {
   });
 
   it('should extract typography from custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'shared');
-    const typo = extractTypographyFromCSS(result.customProperties, 'shared', cssFilePath);
+    const result = parseCSSFile(cssFilePath, 'base');
+    const typo = extractTypographyFromCSS(result.customProperties, 'base', cssFilePath);
     expect(typo.length).toBeGreaterThanOrEqual(1);
   });
 
   it('should not extract non-color properties as colors', () => {
-    const result = parseCSSFile(cssFilePath, 'shared');
-    const colors = extractColorsFromCSS(result.customProperties, 'shared', cssFilePath);
+    const result = parseCSSFile(cssFilePath, 'base');
+    const colors = extractColorsFromCSS(result.customProperties, 'base', cssFilePath);
     const spacing = colors.find((c) => c.token === '--spacing-sm');
     expect(spacing).toBeUndefined();
   });
@@ -117,14 +117,14 @@ For secondary actions.
   });
 
   it('should parse guideline markdown with frontmatter', () => {
-    const result = parseGuidelineMarkdown(guidelinePath, 'shared');
+    const result = parseGuidelineMarkdown(guidelinePath, 'base');
     expect(result.title).toBe('Brand Voice');
     expect(result.section).toBe('brand-voice');
     expect(result.content).toContain('confident, clear, and approachable');
   });
 
   it('should parse component markdown', () => {
-    const results = parseComponentMarkdown(componentPath, 'shared');
+    const results = parseComponentMarkdown(componentPath, 'base');
     expect(results.length).toBe(1);
     expect(results[0].name).toBe('Button');
     expect(results[0].category).toBe('button');
@@ -132,7 +132,7 @@ For secondary actions.
   });
 
   it('should parse palette markdown tables', () => {
-    const colors = parsePaletteMarkdown(palettePath, 'shared');
+    const colors = parsePaletteMarkdown(palettePath, 'base');
     expect(colors.length).toBe(2);
     expect(colors[0].name).toBe('Ocean Blue');
     expect(colors[0].hex).toBe('#0077b6');

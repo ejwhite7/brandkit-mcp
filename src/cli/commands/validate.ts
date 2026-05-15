@@ -20,7 +20,7 @@ export async function validateCommand(configPath?: string): Promise<void> {
     const rawConfig = loadConfig(configPath);
     config = resolveConfigPaths(rawConfig, process.cwd());
     console.log('[OK] Configuration loaded successfully');
-    console.log(`     Brand name: ${config.name}`);
+    console.log(`     Brand name: ${config.brand.name}`);
   } catch (err) {
     console.error('[ERROR] Failed to load configuration:', err instanceof Error ? err.message : err);
     process.exit(1);
@@ -28,10 +28,7 @@ export async function validateCommand(configPath?: string): Promise<void> {
 
   // Check directory structure
   const dirs = [
-    { path: config.paths.brand, label: 'Brand directory' },
-    { path: config.paths.shared, label: 'Shared directory' },
-    { path: config.paths.marketing, label: 'Marketing directory' },
-    { path: config.paths.product, label: 'Product directory' },
+    { path: config.brand.root, label: 'Brand root directory' },
   ];
 
   let hasErrors = false;
@@ -47,27 +44,33 @@ export async function validateCommand(configPath?: string): Promise<void> {
   try {
     console.log('\nScanning design system files...\n');
     const index = await buildDesignSystemIndex(config);
-    const inv = index.resolved.all.assetInventory;
 
-    console.log('Asset Inventory:');
-    console.log(`  Colors:      ${inv.colors}`);
-    console.log(`  Typography:  ${inv.typography}`);
-    console.log(`  Logos:       ${inv.logos}`);
-    console.log(`  Components:  ${inv.components}`);
-    console.log(`  Guidelines:  ${inv.guidelines}`);
-    console.log(`  Textures:    ${inv.textures}`);
-    console.log(`  CSS Files:   ${inv.cssFiles}`);
-    console.log(`  Fonts:       ${inv.fonts}`);
-    console.log(`  PDFs:        ${inv.pdfs}`);
-    console.log(`  Total:       ${inv.totalFiles}`);
+    console.log('Asset Inventory (base context):');
+    console.log(`  Tokens:      ${index.base.tokens.length}`);
+    console.log(`  Components:  ${index.base.components.length}`);
+    console.log(`  Fonts:       ${index.base.fonts.length}`);
+    console.log(`  Assets:      ${index.base.assets.length}`);
+    console.log(`  Motion:      ${index.base.motion != null ? 'yes' : 'no'}`);
 
-    console.log('\nContexts:');
-    console.log(`  Shared:    ${index.shared.colors.length} colors, ${index.shared.typography.length} typography, ${index.shared.components.length} components`);
-    console.log(`  Marketing: ${index.marketing.colors.length} colors, ${index.marketing.typography.length} typography, ${index.marketing.components.length} components`);
-    console.log(`  Product:   ${index.product.colors.length} colors, ${index.product.typography.length} typography, ${index.product.components.length} components`);
+    console.log('\nVerbal Layer:');
+    console.log(`  Positioning: ${index.verbal.positioning != null ? 'yes' : 'no'}`);
+    console.log(`  Audience:    ${index.verbal.audience != null ? 'yes' : 'no'}`);
+    console.log(`  Messaging:   ${index.verbal.messaging != null ? 'yes' : 'no'}`);
+    console.log(`  Differentiation: ${index.verbal.differentiation != null ? 'yes' : 'no'}`);
+    console.log(`  Concepts:    ${index.verbal.concepts != null ? 'yes' : 'no'}`);
+    console.log(`  Voice:       ${index.verbal.voice != null ? 'yes' : 'no'}`);
+    console.log(`  Magic Trick: ${index.magicTrick != null ? 'yes' : 'no'}`);
 
-    if (inv.totalFiles === 0) {
-      console.log('\n[WARN] No design system files found. Add files to the brand/ directory.');
+    if (index.warnings.length > 0) {
+      console.log('\nWarnings:');
+      for (const w of index.warnings) {
+        console.log(`  [WARN] ${w}`);
+      }
+    }
+
+    const totalAssets = index.base.tokens.length + index.base.components.length + index.base.assets.length;
+    if (totalAssets === 0) {
+      console.log('\n[WARN] No design system files found. Add files to the brand root directory.');
       hasErrors = true;
     } else {
       console.log('\n[OK] Validation passed.');
@@ -79,4 +82,3 @@ export async function validateCommand(configPath?: string): Promise<void> {
 
   process.exit(hasErrors ? 1 : 0);
 }
-

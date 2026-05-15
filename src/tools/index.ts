@@ -16,36 +16,48 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { DesignSystemIndex } from '../indexer/types.js';
 
-import * as brandOverview from './get-brand-overview.js';
-import * as colors from './get-colors.js';
-import * as typography from './get-typography.js';
-import * as logos from './get-logos.js';
-import * as components from './get-components.js';
-import * as guidelines from './get-guidelines.js';
-import * as tokens from './get-tokens.js';
-import * as textures from './get-textures.js';
-import * as css from './get-css.js';
-import * as searchBrand from './search-brand.js';
-import * as contextDiff from './get-context-diff.js';
-import * as validateUsage from './validate-usage.js';
+import * as brandOverview    from './get-brand-overview.js';
+import * as magicTrick       from './get-magic-trick.js';
+import * as positioning      from './get-positioning.js';
+import * as audience         from './get-audience.js';
+import * as messaging        from './get-messaging.js';
+import * as differentiation  from './get-differentiation.js';
+import * as concepts         from './get-concepts.js';
+import * as voice            from './get-voice.js';
+import * as colorsAndType    from './get-colors-and-type.js';
+import * as assets           from './get-assets.js';
+import * as fonts            from './get-fonts.js';
+import * as components       from './get-components.js';
+import * as tokens           from './get-tokens.js';
+import * as motion           from './get-motion.js';
+import * as css              from './get-css.js';
+import * as searchBrand      from './search-brand.js';
+import * as validateUsage    from './validate-usage.js';
+import * as contextDiff      from './get-context-diff.js';
 
 import { listResources, readResource } from '../resources/index.js';
 import { listPrompts, getPrompt } from '../prompts/index.js';
 
-/** All tool modules in registration order. */
+/** All tool modules in registration order (v2 surface, 18 tools). */
 const ALL_TOOLS = [
   brandOverview,
-  colors,
-  typography,
-  logos,
+  magicTrick,
+  positioning,
+  audience,
+  messaging,
+  differentiation,
+  concepts,
+  voice,
+  colorsAndType,
+  assets,
+  fonts,
   components,
-  guidelines,
   tokens,
-  textures,
+  motion,
   css,
   searchBrand,
-  contextDiff,
   validateUsage,
+  contextDiff,
 ] as const;
 
 /**
@@ -75,30 +87,24 @@ export function registerAllTools(
 
     try {
       switch (name) {
-        case brandOverview.TOOL_NAME:
-          return { content: brandOverview.handler(index) };
-        case colors.TOOL_NAME:
-          return { content: colors.handler(index, args as never) };
-        case typography.TOOL_NAME:
-          return { content: typography.handler(index, args as never) };
-        case logos.TOOL_NAME:
-          return { content: await logos.handler(index, args as never) };
-        case components.TOOL_NAME:
-          return { content: components.handler(index, args as never) };
-        case guidelines.TOOL_NAME:
-          return { content: guidelines.handler(index, args as never) };
-        case tokens.TOOL_NAME:
-          return { content: tokens.handler(index, args as never) };
-        case textures.TOOL_NAME:
-          return { content: textures.handler(index, args as never) };
-        case css.TOOL_NAME:
-          return { content: css.handler(index, args as never) };
-        case searchBrand.TOOL_NAME:
-          return { content: searchBrand.handler(index, args as never) };
-        case contextDiff.TOOL_NAME:
-          return { content: contextDiff.handler(index, args as never) };
-        case validateUsage.TOOL_NAME:
-          return { content: validateUsage.handler(index, args as never) };
+        case brandOverview.TOOL_NAME:    return { content: brandOverview.handler(index) };
+        case magicTrick.TOOL_NAME:       return { content: magicTrick.handler(index) };
+        case positioning.TOOL_NAME:      return { content: positioning.handler(index) };
+        case audience.TOOL_NAME:         return { content: audience.handler(index) };
+        case messaging.TOOL_NAME:        return { content: messaging.handler(index) };
+        case differentiation.TOOL_NAME:  return { content: differentiation.handler(index) };
+        case concepts.TOOL_NAME:         return { content: concepts.handler(index) };
+        case voice.TOOL_NAME:            return { content: voice.handler(index) };
+        case colorsAndType.TOOL_NAME:    return { content: colorsAndType.handler(index, args as never) };
+        case assets.TOOL_NAME:           return { content: assets.handler(index, args as never) };
+        case fonts.TOOL_NAME:            return { content: fonts.handler(index, args as never) };
+        case components.TOOL_NAME:       return { content: components.handler(index, args as never) };
+        case tokens.TOOL_NAME:           return { content: tokens.handler(index, args as never) };
+        case motion.TOOL_NAME:           return { content: motion.handler(index, args as never) };
+        case css.TOOL_NAME:              return { content: css.handler(index, args as never) };
+        case searchBrand.TOOL_NAME:      return { content: searchBrand.handler(index, args as never) };
+        case validateUsage.TOOL_NAME:    return { content: validateUsage.handler(index, args as never) };
+        case contextDiff.TOOL_NAME:      return { content: contextDiff.handler(index, args as never) };
         default:
           return {
             content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],

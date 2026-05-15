@@ -46,13 +46,13 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   // may set the working directory to something other than the install dir.
   const configDir = dirname(filePath);
   const config = resolveConfigPaths(rawConfig, configDir);
-  console.error(`[brandkit-mcp] Loaded config for "${config.name}" from ${filePath}`);
+  console.error(`[brandkit-mcp] Loaded config for "${config.brand.name}" from ${filePath}`);
 
   console.error('[brandkit-mcp] Building design system index...');
   const startTime = Date.now();
   currentIndex = await buildDesignSystemIndex(config);
   const elapsed = Date.now() - startTime;
-  console.error(`[brandkit-mcp] Indexed ${currentIndex.resolved.all.assetInventory.totalFiles} assets in ${elapsed}ms`);
+  console.error(`[brandkit-mcp] Indexed ${currentIndex.base.tokens.length + currentIndex.base.components.length + currentIndex.base.assets.length} assets in ${elapsed}ms`);
 
   const server = new Server(
     { name: 'brandkit-mcp', version: '0.1.0' },
@@ -65,7 +65,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     console.error('[brandkit-mcp] File watching enabled');
     watchBrandDirectory(config, (newIndex) => {
       currentIndex = newIndex;
-      console.error(`[brandkit-mcp] Index updated: ${newIndex.resolved.all.assetInventory.totalFiles} assets`);
+      console.error(`[brandkit-mcp] Index updated: ${newIndex.base.tokens.length + newIndex.base.components.length + newIndex.base.assets.length} assets`);
     });
   }
 

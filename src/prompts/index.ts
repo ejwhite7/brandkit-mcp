@@ -27,22 +27,22 @@ const PROMPTS: PromptDescriptor[] = [
     description: 'Build a UI feature using the brand design system. Auto-injects colors, typography, and component conventions for the given context.',
     arguments: [
       { name: 'feature', description: 'What you want to build (e.g. "pricing page hero")', required: true },
-      { name: 'context', description: 'marketing | product | shared', required: false },
+      { name: 'context', description: 'base | web | product', required: false },
     ],
   },
   {
     name: 'audit-brand-compliance',
-    description: 'Audit a snippet of CSS/HTML/JSX for brand compliance. Flags non-brand colors, fonts, and unapproved logo usage.',
+    description: 'Audit a snippet of CSS/HTML/JSX for brand compliance. Flags non-brand colors, fonts, and unapproved asset usage.',
     arguments: [
       { name: 'snippet', description: 'The code to audit', required: true },
-      { name: 'context', description: 'marketing | product', required: false },
+      { name: 'context', description: 'base | web | product', required: false },
     ],
   },
   {
     name: 'generate-tailwind-theme',
     description: 'Generate a Tailwind v3 / v4 theme extension that mirrors the current brand tokens.',
     arguments: [
-      { name: 'context', description: 'marketing | product | shared | all', required: false },
+      { name: 'context', description: 'base | web | product', required: false },
     ],
   },
   {
@@ -63,46 +63,48 @@ export function getPrompt(
   args: Record<string, string>,
   index: DesignSystemIndex,
 ): { description?: string; messages: Array<{ role: 'user' | 'assistant'; content: { type: 'text'; text: string } }> } {
-  const ctx = (args.context as 'marketing' | 'product' | 'shared' | 'all') ?? 'all';
-  const ds = ctx === 'marketing' ? index.resolved.marketing
-           : ctx === 'product' ? index.resolved.product
-           : index.resolved.all;
+  const ctx = args.context ?? 'base';
+  const brandName = index.brandName;
 
-  const colorList = ds.colors.slice(0, 20).map((c) => `- ${c.name} (${c.token}): ${c.value}${c.role ? ` [${c.role}]` : ''}`).join('\n') || '(none)';
-  const fontFamilies = [...new Set(ds.typography.map((t) => t.fontFamily).filter(Boolean))].join(', ') || '(none)';
+  // Get color custom properties from the appropriate context for hints
+  const ctxData = ctx === 'web' ? index.web
+                : ctx === 'product' ? index.product
+                : index.base;
+  const customProps = ctxData.colorsAndType?.customProperties ?? index.base.colorsAndType?.customProperties ?? {};
+  const colorHints = Object.entries(customProps)
+    .filter(([k]) => k.startsWith('--color'))
+    .slice(0, 20)
+    .map(([k, v]) => `- ${k}: ${v}`)
+    .join('\n') || '(none)';
 
   switch (name) {
     case 'design-with-brand': {
       const feature = args.feature ?? 'a new UI feature';
-      const text = `You are designing **${feature}** using the ${index.resolved.all.name} brand system (context: ${ctx}).
+      const text = `You are designing **${feature}** using the ${brandName} brand system (context: ${ctx}).
 
-Use the get_colors, get_typography, get_components, and get_guidelines tools as needed.
+Use the get_colors_and_type, get_components, get_voice, and get_tokens tools as needed.
 
-Approved palette (top 20):
-${colorList}
-
-Approved font families: ${fontFamilies}
+Color custom properties (top 20):
+${colorHints}
 
 Constraints:
 - Use only brand-approved colors, fonts, and component patterns.
-- Match the tone defined by the brand voice guidelines.
-- Call validate_usage to confirm any color/font/logo before finalizing.
+- Match the tone defined by the brand voice (get_voice).
+- Call validate_usage to confirm any color/font/asset before finalizing.
 
 Now produce the implementation (HTML + CSS or JSX + Tailwind) for: ${feature}.`;
       return {
-        description: `Design ${feature} with the ${index.resolved.all.name} brand system`,
+        description: `Design ${feature} with the ${brandName} brand system`,
         messages: [{ role: 'user', content: { type: 'text', text } }],
       };
     }
 
     case 'audit-brand-compliance': {
       const snippet = args.snippet ?? '';
-      const text = `Audit the following code for brand compliance against the ${index.resolved.all.name} design system (context: ${ctx}).
+      const text = `Audit the following code for brand compliance against the ${brandName} design system (context: ${ctx}).
 
-Approved palette (top 20):
-${colorList}
-
-Approved font families: ${fontFamilies}
+Color custom properties (top 20):
+${colorHints}
 
 For each issue found, report:
 1. The offending line/value
@@ -120,7 +122,7 @@ ${snippet}
     }
 
     case 'generate-tailwind-theme': {
-      const text = `Use the get_tokens tool with format="tailwind" and context="${ctx}" to retrieve the current ${index.resolved.all.name} tokens, then format them as a complete Tailwind v3 theme extension and a Tailwind v4 \`@theme\` block. Include both color and typography tokens.`;
+      const text = `Use the get_tokens tool with context="${ctx}" to retrieve the current ${brandName} token specimens, then format them as a complete Tailwind v3 theme extension and a Tailwind v4 \`@theme\` block. Also call get_colors_and_type with context="${ctx}" for the CSS custom properties.`;
       return {
         description: 'Generate Tailwind theme from brand tokens',
         messages: [{ role: 'user', content: { type: 'text', text } }],
@@ -129,9 +131,9 @@ ${snippet}
 
     case 'explain-brand-decision': {
       const topic = args.topic ?? 'general usage';
-      const text = `Using the get_guidelines and search_brand tools, explain how the ${index.resolved.all.name} brand system handles: **${topic}**.
+      const text = `Using the get_voice, get_positioning, and search_brand tools, explain how the ${brandName} brand system handles: **${topic}**.
 
-Cite the specific guideline(s) you reference, summarize the rule in one sentence, then give a worked example.`;
+Cite the specific document(s) you reference, summarize the rule in one sentence, then give a worked example.`;
       return {
         description: `Explain brand decision: ${topic}`,
         messages: [{ role: 'user', content: { type: 'text', text } }],

@@ -13,7 +13,6 @@ import ejs from 'ejs';
 import { readFileSync } from 'fs';
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandKitConfig } from '../types/config.js';
-import { searchIndex as searchIndexFn } from '../indexer/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -101,24 +100,29 @@ export function createPreviewServer(
       return body;
     }
 
-    return ejs.render(layoutContent, { body, title: data.title ?? config.name, config });
+    return ejs.render(layoutContent, { body, title: data.title ?? config.brand.name, config });
   }
 
   // Routes
   app.get('/', (_req, res) => {
     const index = ref.current;
-    const inv = index.resolved.all.assetInventory;
-    res.send(renderPage('index', { title: `${config.name} Design System`, inventory: inv }));
+    const inventory = {
+      tokens: index.base.tokens.length,
+      components: index.base.components.length,
+      fonts: index.base.fonts.length,
+      assets: index.base.assets.length,
+      motion: index.base.motion != null,
+    };
+    res.send(renderPage('index', { title: `${config.brand.name} Design System`, inventory }));
   });
 
   app.get('/colors', (_req, res) => {
     const index = ref.current;
     res.send(renderPage('colors', {
-      title: 'Colors',
-      shared: index.shared.colors,
-      marketing: index.marketing.colors,
-      product: index.product.colors,
-      all: index.resolved.all.colors,
+      title: 'Colors and Typography',
+      base: index.base.colorsAndType,
+      web: index.web.colorsAndType,
+      product: index.product.colorsAndType,
     }));
   });
 
@@ -126,18 +130,15 @@ export function createPreviewServer(
     const index = ref.current;
     res.send(renderPage('typography', {
       title: 'Typography',
-      shared: index.shared.typography,
-      marketing: index.marketing.typography,
-      product: index.product.typography,
-      all: index.resolved.all.typography,
+      base: index.base.colorsAndType,
     }));
   });
 
-  app.get('/logos', (_req, res) => {
+  app.get('/assets', (_req, res) => {
     const index = ref.current;
-    res.send(renderPage('logos', {
-      title: 'Logos',
-      logos: index.resolved.all.logos,
+    res.send(renderPage('assets', {
+      title: 'Assets',
+      assets: index.base.assets,
     }));
   });
 
@@ -145,17 +146,9 @@ export function createPreviewServer(
     const index = ref.current;
     res.send(renderPage('components', {
       title: 'Components',
-      marketing: index.marketing.components,
+      base: index.base.components,
+      web: index.web.components,
       product: index.product.components,
-      all: index.resolved.all.components,
-    }));
-  });
-
-  app.get('/guidelines', (_req, res) => {
-    const index = ref.current;
-    res.send(renderPage('guidelines', {
-      title: 'Guidelines',
-      guidelines: index.resolved.all.guidelines,
     }));
   });
 
@@ -163,34 +156,38 @@ export function createPreviewServer(
     const index = ref.current;
     res.send(renderPage('tokens', {
       title: 'Design Tokens',
-      colors: index.resolved.all.colors,
-      typography: index.resolved.all.typography,
+      tokens: index.base.tokens,
     }));
   });
 
-  app.get('/textures', (_req, res) => {
+  app.get('/motion', (_req, res) => {
     const index = ref.current;
-    res.send(renderPage('textures', {
-      title: 'Textures',
-      textures: index.resolved.all.textures,
+    res.send(renderPage('motion', {
+      title: 'Motion',
+      motion: index.base.motion,
     }));
   });
 
-  app.get('/css', (_req, res) => {
+  app.get('/fonts', (_req, res) => {
     const index = ref.current;
-    res.send(renderPage('css', {
-      title: 'CSS Files',
-      cssFiles: index.resolved.all.cssFiles,
+    res.send(renderPage('fonts', {
+      title: 'Fonts',
+      fonts: index.base.fonts,
+    }));
+  });
+
+  app.get('/verbal', (_req, res) => {
+    const index = ref.current;
+    res.send(renderPage('verbal', {
+      title: 'Verbal Layer',
+      verbal: index.verbal,
+      magicTrick: index.magicTrick,
     }));
   });
 
   app.get('/search', (req, res) => {
-    const index = ref.current;
     const query = (req.query.q as string) ?? '';
-    let results: unknown[] = [];
-    if (query) {
-      results = searchIndexFn(query, index.searchIndex, 20);
-    }
+    const results: unknown[] = [];
     res.send(renderPage('search', { title: 'Search', query, results }));
   });
 

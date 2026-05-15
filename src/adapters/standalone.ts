@@ -35,7 +35,7 @@ export async function startStandaloneServer(port: number = 3001, configPath?: st
 
     if (url.pathname === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', assets: index.resolved.all.assetInventory.totalFiles }));
+      res.end(JSON.stringify({ status: 'ok', assets: index.base.tokens.length + index.base.components.length + index.base.assets.length }));
       return;
     }
 

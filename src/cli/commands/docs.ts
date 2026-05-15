@@ -62,140 +62,139 @@ export async function docsCommand(options: { config?: string; output?: string })
   const rawConfig = loadConfig(options.config);
   const config = resolveConfigPaths(rawConfig, process.cwd());
   const index = await buildDesignSystemIndex(config);
-  const inv = index.resolved.all.assetInventory;
   const outputDir = options.output ?? process.cwd();
 
+  const brandName = config.brand.name;
+  const brandDescription = config.brand.description ?? 'N/A';
+
   // Generate CLAUDE.md
-  const claudeBlock = `# ${config.name} Design System
+  const claudeBlock = `# ${brandName} Design System
 
 ## Brand Overview
 
-- **Name**: ${config.name}
-- **Description**: ${config.description ?? 'N/A'}
-- **Contexts**: Marketing (${config.contexts.marketing.label}), Product (${config.contexts.product.label})
+- **Name**: ${brandName}
+- **Description**: ${brandDescription}
+- **Brand Root**: ${config.brand.root}
 
-## Asset Inventory
+## Asset Inventory (base context)
 
 | Category | Count |
 |---|---|
-| Colors | ${inv.colors} |
-| Typography | ${inv.typography} |
-| Logo Variants | ${inv.logos} |
-| Components | ${inv.components} |
-| Guidelines | ${inv.guidelines} |
-| Textures | ${inv.textures} |
-| CSS Files | ${inv.cssFiles} |
-| Fonts | ${inv.fonts} |
+| Tokens | ${index.base.tokens.length} |
+| Components | ${index.base.components.length} |
+| Fonts | ${index.base.fonts.length} |
+| Assets | ${index.base.assets.length} |
+| Motion | ${index.base.motion != null ? 'yes' : 'no'} |
 
-## Available MCP Tools
+## Available MCP Tools (v2 surface)
 
 Use these tools to query the design system:
-- \`get_brand_overview\` -- High-level overview
-- \`get_colors\` -- Color palette (supports css/scss/tailwind/json formats)
-- \`get_typography\` -- Typography specs
-- \`get_logos\` -- Logo variants and usage guidelines
-- \`get_components\` -- Component specifications
-- \`get_guidelines\` -- Brand guidelines
-- \`get_tokens\` -- Design tokens in any format
-- \`get_textures\` -- Texture assets
-- \`get_css\` -- Raw CSS files
+- \`get_brand_overview\` -- High-level overview + taste primer
+- \`get_magic_trick\` -- Verbatim magic_trick.md
+- \`get_positioning\` -- Positioning document
+- \`get_audience\` -- Audience YAML, parsed
+- \`get_messaging\` -- Messaging document
+- \`get_differentiation\` -- Differentiation document
+- \`get_concepts\` -- Creative concepts/directions
+- \`get_voice\` -- Voice document
+- \`get_colors_and_type\` -- Colors + typography custom properties
+- \`get_assets\` -- Logos + brand assets
+- \`get_fonts\` -- Font faces
+- \`get_components\` -- UI primitives
+- \`get_tokens\` -- Token specimens
+- \`get_motion\` -- Motion system
+- \`get_css\` -- colors_and_type.css + motion.css text
 - \`search_brand\` -- Full-text search
-- \`get_context_diff\` -- Compare marketing vs product
+- \`get_context_diff\` -- Diff base vs web vs product
 - \`validate_usage\` -- Validate brand compliance`;
 
   updateFileWithDelimiters(join(outputDir, 'CLAUDE.md'), claudeBlock);
   console.log('[OK] Generated CLAUDE.md');
 
   // Generate AGENTS.md
-  const agentsBlock = `# ${config.name} -- Agent Guidelines
+  const agentsBlock = `# ${brandName} -- Agent Guidelines
 
 ## Design System Rules
 
-When generating code or content for ${config.name}:
+When generating code or content for ${brandName}:
 
-1. Always use the brand colors from the design system (use \`get_colors\` tool)
-2. Use the specified typography (use \`get_typography\` tool)
-3. Follow the brand voice guidelines (use \`get_guidelines\` with section "brand-voice")
-4. Use the correct context: "marketing" for website, "product" for app
-5. Validate any color/font choices with \`validate_usage\`
+1. Always load the brand overview first with \`get_brand_overview\`
+2. Use colors and typography via \`get_colors_and_type\`
+3. Follow the brand voice guidelines via \`get_voice\`
+4. Use the correct context: "base" (default), "web" for website, "product" for app
+5. Validate any design choices with \`validate_usage\`
 
 ## Context Rules
 
-- **Marketing context**: Use marketing-specific colors, typography, and components
-- **Product context**: Use product-specific colors, typography, and components
-- **Shared assets**: Available in both contexts as defaults`;
+- **base**: Default shared assets (agent/visual/)
+- **web**: Web-specific overrides (agent/visual/artifacts/web/)
+- **product**: Product/app-specific overrides (agent/visual/artifacts/product/)`;
 
   updateFileWithDelimiters(join(outputDir, 'AGENTS.md'), agentsBlock);
   console.log('[OK] Generated AGENTS.md');
 
   // Generate SKILLS.md
-  const skillsBlock = `# ${config.name} -- Skills Reference
+  const skillsBlock = `# ${brandName} -- Skills Reference
 
 ## Design System Query Skills
 
-### Get Brand Colors
+### Get Brand Colors and Typography
 \`\`\`
-Tool: get_colors
-Args: { "context": "marketing", "format": "css" }
+Tool: get_colors_and_type
+Args: { "context": "base" }
 \`\`\`
 
-### Get Typography
+### Get Voice Guidelines
 \`\`\`
-Tool: get_typography
-Args: { "context": "product", "format": "json" }
+Tool: get_voice
 \`\`\`
 
 ### Search Design System
 \`\`\`
 Tool: search_brand
-Args: { "query": "button primary", "context": "product" }
+Args: { "query": "button primary", "context": "base" }
 \`\`\`
 
 ### Export Design Tokens
 \`\`\`
 Tool: get_tokens
-Args: { "format": "tailwind", "category": "colors" }
+Args: { "context": "base" }
 \`\`\`
 
 ### Compare Contexts
 \`\`\`
 Tool: get_context_diff
-Args: { "category": "colors" }
 \`\`\``;
 
   updateFileWithDelimiters(join(outputDir, 'SKILLS.md'), skillsBlock);
   console.log('[OK] Generated SKILLS.md');
 
   // Generate DESIGN.md
-  const colorSummary = index.resolved.all.colors.slice(0, 10)
-    .map((c) => `- **${c.name}**: \`${c.value}\` (${c.token})`)
+  const tokenSummary = index.base.tokens.slice(0, 10)
+    .map((t) => `- **${t.name}**: \`${t.value}\``)
     .join('\n');
 
-  const typoSummary = index.resolved.all.typography.slice(0, 10)
-    .map((t) => `- **${t.name}**: ${t.fontSize ?? ''} ${t.fontFamily ?? ''} ${t.fontWeight ?? ''}`.trim())
+  const componentSummary = index.base.components
+    .map((c) => `- **${c.name}**: ${c.description ?? 'No description'}`)
     .join('\n');
 
-  const componentSummary = index.resolved.all.components
-    .map((c) => `- **${c.name}** (${c.category}): ${c.description ?? 'No description'}`)
+  const assetSummary = index.base.assets.slice(0, 10)
+    .map((a) => `- **${a.file}** (${a.format})`)
     .join('\n');
 
-  const designBlock = `# ${config.name} -- Design System Reference
+  const designBlock = `# ${brandName} -- Design System Reference
 
-## Colors
+## Tokens (base context)
 
-${colorSummary || 'No colors defined.'}
+${tokenSummary || 'No tokens defined.'}
 
-## Typography
-
-${typoSummary || 'No typography defined.'}
-
-## Components
+## Components (base context)
 
 ${componentSummary || 'No components defined.'}
 
-## Logo Variants
+## Assets (base context)
 
-${index.resolved.all.logos.variants.map((v) => `- **${v.name}** (${v.format})`).join('\n') || 'No logo variants.'}`;
+${assetSummary || 'No assets defined.'}`;
 
   updateFileWithDelimiters(join(outputDir, 'DESIGN.md'), designBlock);
   console.log('[OK] Generated DESIGN.md');
