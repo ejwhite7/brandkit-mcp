@@ -1,13 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { existsSync, mkdirSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
+import yaml from 'js-yaml';
 
 const TEST_DIR = join(process.cwd(), '__test_cli__');
 
 describe('CLI Init Command', () => {
-  beforeAll(() => {
+  // Run init once in beforeAll so every `it` asserts against the same known
+  // state regardless of execution order (no test depends on another running
+  // first).
+  beforeAll(async () => {
     rmSync(TEST_DIR, { recursive: true, force: true });
     mkdirSync(TEST_DIR, { recursive: true });
+    const { initCommand } = await import('../cli/commands/init.js');
+    await initCommand(TEST_DIR, { name: 'Test Brand', force: true });
   });
 
   afterAll(() => {
@@ -15,9 +21,6 @@ describe('CLI Init Command', () => {
   });
 
   it('creates the brand_atomic_system directory and key v2 files', async () => {
-    const { initCommand } = await import('../cli/commands/init.js');
-    await initCommand(TEST_DIR, { name: 'Test Brand', force: true });
-
     expect(existsSync(join(TEST_DIR, 'brand_atomic_system'))).toBe(true);
     expect(existsSync(join(TEST_DIR, 'brand_atomic_system/magic_trick.md'))).toBe(true);
     expect(existsSync(join(TEST_DIR, 'brand_atomic_system/agent/verbal/positioning.md'))).toBe(true);
@@ -44,6 +47,21 @@ describe('CLI Init Command', () => {
     expect(config).toContain('version: 2');
     expect(config).toContain('Test Brand');
     expect(config).toContain('brand_atomic_system');
+  });
+
+  it('emits a config that parses cleanly when the brand name has YAML metacharacters', async () => {
+    const dir = join(TEST_DIR, 'special-name');
+    const { initCommand } = await import('../cli/commands/init.js');
+    await initCommand(dir, { name: 'Acme: Corp #1 @home', force: true });
+
+    const raw = readFileSync(join(dir, 'brandkit.config.yaml'), 'utf-8');
+    const parsed = yaml.load(raw) as {
+      version: number;
+      brand: { name: string; root: string };
+    };
+    expect(parsed.version).toBe(2);
+    expect(parsed.brand.name).toBe('Acme: Corp #1 @home');
+    expect(parsed.brand.root).toBe('./brand_atomic_system');
   });
 });
 

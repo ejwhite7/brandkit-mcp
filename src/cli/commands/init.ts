@@ -5,9 +5,11 @@ import {
   statSync,
   writeFileSync,
   existsSync,
+  rmSync,
 } from 'fs';
 import { isAbsolute, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import yaml from 'js-yaml';
 
 function findTemplatesDir(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -55,20 +57,36 @@ export async function initCommand(
 
   const templatesDir = findTemplatesDir();
   mkdirSync(targetDir, { recursive: true });
+  // Remove any prior brand_atomic_system tree first so --force is a clean
+  // overwrite rather than a partial merge that can leave stale files behind.
+  rmSync(brandDir, { recursive: true, force: true });
   copyRecursive(templatesDir, brandDir);
 
+  // Build the config as an object and serialize with js-yaml so brand names
+  // containing YAML metacharacters (e.g. `Acme: Corp`, `@handle`) are quoted
+  // correctly instead of producing an unparseable config.
   writeFileSync(
     join(targetDir, 'brandkit.config.yaml'),
-    `version: 2
-brand:
-  name: ${brandName}
-  description: Describe your brand here.
-  root: ./brand_atomic_system
-contexts: [base, web, product]
-ignore:
-  - human/
-`,
+    yaml.dump({
+      version: 2,
+      brand: {
+        name: brandName,
+        description: 'Describe your brand here.',
+        root: './brand_atomic_system',
+      },
+      contexts: ['base', 'web', 'product'],
+      ignore: ['human/'],
+    }),
   );
+
+  // A v1 install leaves a `brand/` directory that v2 ignores. Warn rather
+  // than silently leaving an orphaned tree alongside the new layout.
+  if (existsSync(join(targetDir, 'brand'))) {
+    console.warn(
+      'Note: a legacy v1 `brand/` directory is still present and is no longer used by v2. ' +
+        'Remove it once you have migrated its contents into brand_atomic_system/.',
+    );
+  }
 
   console.log('');
   console.log('BrandKit MCP initialized successfully!');
