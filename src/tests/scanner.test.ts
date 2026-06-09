@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { scanBrandRoot } from '../scanner/directory-scanner.js';
 
 const FIXTURE = resolve(__dirname, '../../__test_fixtures__/v2/full');
@@ -54,5 +56,17 @@ describe('scanBrandRoot', () => {
   it('ignores human/ by default', () => {
     const scan = scanBrandRoot(FIXTURE);
     expect(scan.warnings.every((w) => !w.includes('human/'))).toBe(true);
+  });
+});
+
+describe('css-only motion systems', () => {
+  it('does not warn about missing motion.json when motion.css exists', () => {
+    const root = mkdtempSync(join(tmpdir(), 'bk-motion-'));
+    const motionDir = join(root, 'agent', 'visual', 'motion');
+    mkdirSync(motionDir, { recursive: true });
+    writeFileSync(join(motionDir, 'motion.css'), '.fade { transition: opacity 200ms; }\n');
+    const scan = scanBrandRoot(root);
+    expect(scan.warnings.find((w) => w.includes('No motion.json'))).toBeUndefined();
+    expect(scan.base.motion?.css).toContain('.fade');
   });
 });

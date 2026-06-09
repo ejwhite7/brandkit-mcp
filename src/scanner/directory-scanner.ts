@@ -212,9 +212,12 @@ function parseVisualDir(
   if (existsSync(motionDir) && isDirectory(motionDir)) {
     try {
       const result = parseMotionDir(motionDir);
-      // Only add warnings that don't mention missing motion.json when there's
-      // at least a motion.css (partial motion systems are valid)
-      warnings.push(...result.warnings);
+      // A CSS-only motion system is valid: suppress the "No motion.json"
+      // warning when motion.css is present.
+      const filtered = result.css
+        ? result.warnings.filter((w) => !w.startsWith('No motion.json found'))
+        : result.warnings;
+      warnings.push(...filtered);
       if (result.tokens !== null || result.css) {
         const motion: MotionSystem = {
           tokens: result.tokens,
