@@ -47,11 +47,13 @@ in one go.
 # 1. Make sure main is green
 git checkout main && git pull
 
-# 2. Update the hardcoded version in src/adapters/cloudflare-worker.ts
-#    (Workers cannot read package.json at runtime) and commit the bump
+# 2. Bump the version in package.json, server.json, AND the hardcoded
+#    string in src/adapters/cloudflare-worker.ts (Workers cannot read
+#    package.json at runtime), then commit. Keeping all three in sync is
+#    enforced by src/tests/cloudflare-version.test.ts.
 
-# 3. Tag (no need to bump package.json by hand -- the workflow syncs
-#    the version into package.json AND server.json from the tag)
+# 3. Tag (the workflow re-syncs package.json and server.json from the
+#    tag, so a mismatched tag still publishes consistently)
 git tag v0.1.1
 git push origin v0.1.1
 ```
