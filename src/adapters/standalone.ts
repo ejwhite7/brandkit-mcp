@@ -3,8 +3,9 @@
  * @description Standalone HTTP server adapter for BrandKit MCP.
  * Runs the MCP server with SSE transport on a plain Node.js HTTP server
  * without any framework dependencies beyond the MCP SDK.
- * Transports are tracked per sessionId so multiple clients can connect
- * concurrently (mirrors the express SSE path in src/index.ts).
+ * Each SSE client gets its own MCP Server instance (the SDK allows exactly
+ * one transport per Server). Transports are tracked per sessionId so multiple
+ * clients can connect concurrently (mirrors the express SSE path in src/index.ts).
  */
 
 import { createServer, type Server as HttpServer } from 'http';
@@ -33,49 +34,59 @@ export async function startStandaloneServer(
   const config = resolveConfigPaths(rawConfig, dirname(filePath));
   const index = await buildDesignSystemIndex(config);
 
-  const mcpServer = new Server(
-    { name: 'brandkit-mcp', version: getPackageVersion() },
-    { capabilities: { tools: {}, resources: {}, prompts: {} } },
-  );
-  registerAllTools(mcpServer, () => index);
-
   // One transport per connected client, keyed by sessionId.
   const sessions = new Map<string, SSEServerTransport>();
 
   const httpServer = createServer(async (req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost');
+    try {
+      const url = new URL(req.url ?? '/', 'http://localhost');
 
-    if (url.pathname === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', assets: index.base.tokens.length + index.base.components.length + index.base.assets.length }));
-      return;
-    }
-
-    if (req.method === 'GET' && url.pathname === '/sse') {
-      const transport = new SSEServerTransport('/messages', res as never);
-      sessions.set(transport.sessionId, transport);
-      res.on('close', () => sessions.delete(transport.sessionId));
-      await mcpServer.connect(transport);
-      return;
-    }
-
-    if (req.method === 'POST' && url.pathname === '/messages') {
-      const sessionId = url.searchParams.get('sessionId') ?? '';
-      const transport = sessions.get(sessionId);
-      if (transport) {
-        await transport.handlePostMessage(req as never, res as never);
-      } else {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'No active SSE session for sessionId' }));
+      if (url.pathname === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', assets: index.base.tokens.length + index.base.components.length + index.base.assets.length }));
+        return;
       }
-      return;
-    }
 
-    res.writeHead(404);
-    res.end('Not Found');
+      if (req.method === 'GET' && url.pathname === '/sse') {
+        // The MCP SDK allows one transport per Server instance, so each SSE
+        // connection gets its own Server sharing the index via closure.
+        const sessionServer = new Server(
+          { name: 'brandkit-mcp', version: getPackageVersion() },
+          { capabilities: { tools: {}, resources: {}, prompts: {} } },
+        );
+        registerAllTools(sessionServer, () => index);
+        const transport = new SSEServerTransport('/messages', res);
+        sessions.set(transport.sessionId, transport);
+        res.on('close', () => sessions.delete(transport.sessionId));
+        await sessionServer.connect(transport);
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/messages') {
+        const sessionId = url.searchParams.get('sessionId') ?? '';
+        const transport = sessions.get(sessionId);
+        if (transport) {
+          await transport.handlePostMessage(req, res);
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No active SSE session for sessionId' }));
+        }
+        return;
+      }
+
+      res.writeHead(404);
+      res.end('Not Found');
+    } catch (err) {
+      console.error('[brandkit-mcp] Request handler error:', err);
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      }
+    }
   });
 
-  await new Promise<void>((resolveListen) => {
+  await new Promise<void>((resolveListen, rejectListen) => {
+    httpServer.once('error', rejectListen);
     httpServer.listen(port, () => {
       const address = httpServer.address();
       const actualPort = typeof address === 'object' && address !== null ? address.port : port;
@@ -98,6 +109,7 @@ const isDirectRun = (() => {
   }
 })();
 if (isDirectRun) {
-  const port = parseInt(process.env.PORT ?? '3001', 10);
+  const parsed = parseInt(process.env.PORT ?? '3001', 10);
+  const port = Number.isNaN(parsed) ? 3001 : parsed;
   startStandaloneServer(port).catch(console.error);
 }

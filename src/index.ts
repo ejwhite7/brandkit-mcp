@@ -94,20 +94,41 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     const sessions = new Map<string, InstanceType<typeof SSEServerTransport>>();
 
     app.get('/sse', async (_req, res) => {
-      const t = new SSEServerTransport('/messages', res);
-      sessions.set(t.sessionId, t);
-      res.on('close', () => sessions.delete(t.sessionId));
-      await server.connect(t);
+      try {
+        // The MCP SDK allows one transport per Server instance, so each SSE
+        // connection gets its own Server sharing the index via closure.
+        const sessionServer = new Server(
+          { name: 'brandkit-mcp', version: getPackageVersion() },
+          { capabilities: { tools: {}, resources: {}, prompts: {} } },
+        );
+        registerAllTools(sessionServer, () => currentIndex);
+        const t = new SSEServerTransport('/messages', res);
+        sessions.set(t.sessionId, t);
+        res.on('close', () => sessions.delete(t.sessionId));
+        await sessionServer.connect(t);
+      } catch (err) {
+        console.error('[brandkit-mcp] Request handler error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Internal server error' });
+        }
+      }
     });
 
     app.post('/messages', async (req, res) => {
-      const sessionId = (req.query.sessionId as string) ?? '';
-      const t = sessions.get(sessionId);
-      if (!t) {
-        res.status(400).json({ error: 'No active SSE session for sessionId' });
-        return;
+      try {
+        const sessionId = (req.query.sessionId as string) ?? '';
+        const t = sessions.get(sessionId);
+        if (!t) {
+          res.status(400).json({ error: 'No active SSE session for sessionId' });
+          return;
+        }
+        await t.handlePostMessage(req, res);
+      } catch (err) {
+        console.error('[brandkit-mcp] Request handler error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Internal server error' });
+        }
       }
-      await t.handlePostMessage(req, res);
     });
 
     app.listen(port, () => {
