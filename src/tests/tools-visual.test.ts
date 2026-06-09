@@ -8,6 +8,8 @@ import * as components from '../tools/get-components.js';
 import * as tokens from '../tools/get-tokens.js';
 import * as css from '../tools/get-css.js';
 import * as contextDiff from '../tools/get-context-diff.js';
+import * as search from '../tools/search-brand.js';
+import * as validateUsage from '../tools/validate-usage.js';
 
 describe('get_colors_and_type', () => {
   it('returns base custom properties', () => {
@@ -197,5 +199,23 @@ describe('runtime context coercion (tolerance principle)', () => {
     expect(parsed.a).toBe('base');
     expect(parsed.b).toBe('product');
     expect(parsed._warnings.length).toBeGreaterThan(0);
+  });
+});
+
+describe('required-arg guards', () => {
+  it('search_brand degrades gracefully when query is missing', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = search.handler(idx, {} as never);
+    const parsed = JSON.parse(result.text);
+    expect(parsed.results).toEqual([]);
+    expect(parsed._warnings.some((w: string) => w.includes('query'))).toBe(true);
+  });
+
+  it('validate_usage degrades gracefully when snippet is missing', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = validateUsage.handler(idx, {} as never);
+    const parsed = JSON.parse(result.text);
+    expect(parsed.violations).toEqual([]);
+    expect(parsed._warnings.some((w: string) => w.includes('snippet'))).toBe(true);
   });
 });

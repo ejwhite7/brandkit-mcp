@@ -25,8 +25,21 @@ interface Violation { rule: string; match: string; suggestion?: string }
 
 export function handler(
   index: DesignSystemIndex,
-  args: { snippet: string; format?: 'html' | 'css' },
+  args: { snippet?: unknown; format?: 'html' | 'css' },
 ) {
+  if (typeof args.snippet !== 'string') {
+    return [
+      {
+        type: 'text' as const,
+        text: JSON.stringify(
+          { violations: [], _warnings: ['Missing or invalid required "snippet" argument'] },
+          null,
+          2,
+        ),
+      },
+    ];
+  }
+
   const warnings: string[] = [];
   const violations: Violation[] = [];
 

@@ -30,8 +30,20 @@ interface SearchHit {
 
 export function handler(
   index: DesignSystemIndex,
-  args: { query: string; limit?: number },
+  args: { query?: unknown; limit?: number },
 ) {
+  if (typeof args.query !== 'string' || args.query.length === 0) {
+    return [
+      {
+        type: 'text' as const,
+        text: JSON.stringify(
+          { query: null, results: [], _warnings: ['Missing or invalid required "query" argument'] },
+          null,
+          2,
+        ),
+      },
+    ];
+  }
   const q = args.query.toLowerCase();
   const limit = args.limit ?? 20;
   const warnings: string[] = [];
