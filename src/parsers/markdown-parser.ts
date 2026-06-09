@@ -249,14 +249,17 @@ export function parseTokenSpecimen(filePath: string): TokenSpecimenResult {
   }
   const { data, content } = matter(raw);
   const name = data.name as string | undefined;
-  const value = data.value as string | undefined;
   const type = data.type as string | undefined;
-  if (!name || !value || !type) {
+  // value may legitimately be falsy (0, false) — check presence, not truthiness.
+  const hasValue = data.value !== undefined && data.value !== null;
+  if (!name || !hasValue || !type) {
     warnings.push(
       `Token specimen at ${filePath} missing required frontmatter (name/value/type); skipping`,
     );
     return { specimen: null, warnings };
   }
+  // YAML parses bare numbers/booleans to non-strings; TokenSpecimen.value is a string.
+  const value = String(data.value);
   return {
     specimen: {
       name,

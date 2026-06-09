@@ -27,3 +27,20 @@ describe('parseTokenSpecimen', () => {
     expect(result.warnings.some((w) => /name|value|type/.test(w))).toBe(true);
   });
 });
+
+describe('parseTokenSpecimen value edge cases', () => {
+  it('accepts a falsy-but-present value (value: 0)', () => {
+    const path = md('---\nname: spacing-0\nvalue: 0\ntype: spacing\n---\nZero spacing.\n');
+    const { specimen, warnings } = parseTokenSpecimen(path);
+    expect(warnings).toEqual([]);
+    expect(specimen?.name).toBe('spacing-0');
+    expect(specimen?.value).toBe('0');
+  });
+
+  it('stringifies numeric values', () => {
+    const path = md('---\nname: z-modal\nvalue: 1000\ntype: z-index\n---\n');
+    const { specimen } = parseTokenSpecimen(path);
+    expect(specimen?.value).toBe('1000');
+    expect(typeof specimen?.value).toBe('string');
+  });
+});
