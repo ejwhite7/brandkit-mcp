@@ -11,9 +11,8 @@ __test_fixtures__/
 __test_cli__/
 doc/
 
-# repowise API keys (local)
+# local tooling (repowise, claude, mcp client config)
 .repowise
-.github
 .claude
 .mcp.json
 docs
