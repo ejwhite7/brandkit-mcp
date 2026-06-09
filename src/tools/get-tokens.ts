@@ -6,8 +6,9 @@
  */
 
 import type { DesignSystemIndex } from '../indexer/types.js';
-import type { BrandContext, TokenSpecimen } from '../types/design-system.js';
+import type { BrandContext } from '../types/design-system.js';
 import { coerceContext } from './_context.js';
+import { toCSS, toSCSS, toTailwind, toW3C } from '../formatters/token-formatters.js';
 
 export const TOOL_NAME = 'get_tokens';
 
@@ -26,32 +27,6 @@ export const INPUT_SCHEMA = {
     type: { type: 'string', description: 'Filter by token type (color, font, radius, spacing, etc.)' },
   },
 };
-
-function toCSS(tokens: TokenSpecimen[]): string {
-  const lines = tokens.map((t) => `  --${t.name}: ${t.value};`);
-  return `:root {\n${lines.join('\n')}\n}\n`;
-}
-
-function toSCSS(tokens: TokenSpecimen[]): string {
-  return tokens.map((t) => `$${t.name}: ${t.value};`).join('\n') + '\n';
-}
-
-function toTailwind(tokens: TokenSpecimen[]): string {
-  const byType: Record<string, Record<string, string>> = {};
-  for (const t of tokens) {
-    byType[t.type] ??= {};
-    byType[t.type][t.name] = t.value;
-  }
-  return JSON.stringify({ theme: { extend: byType } }, null, 2);
-}
-
-function toW3C(tokens: TokenSpecimen[]): string {
-  const out: Record<string, { $value: string; $type: string; $description?: string }> = {};
-  for (const t of tokens) {
-    out[t.name] = { $value: t.value, $type: t.type, $description: t.role };
-  }
-  return JSON.stringify(out, null, 2);
-}
 
 /**
  * Handles the get_tokens tool call.
