@@ -63,10 +63,16 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
 
   if (options.watch) {
     console.error('[brandkit-mcp] File watching enabled');
-    watchBrandDirectory(config, (newIndex) => {
+    const stopWatcher = watchBrandDirectory(config, (newIndex) => {
       currentIndex = newIndex;
       console.error(`[brandkit-mcp] Index updated: ${newIndex.base.tokens.length + newIndex.base.components.length + newIndex.base.assets.length} assets`);
     });
+    // Close the watcher on shutdown so the process can exit cleanly.
+    const shutdown = (signal: NodeJS.Signals) => {
+      void stopWatcher().finally(() => process.exit(signal === 'SIGINT' ? 130 : 143));
+    };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
   }
 
   if (transport === 'stdio') {
