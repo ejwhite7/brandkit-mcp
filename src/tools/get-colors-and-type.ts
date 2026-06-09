@@ -1,5 +1,6 @@
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandContext } from '../types/design-system.js';
+import { coerceContext } from './_context.js';
 
 export const TOOL_NAME = 'get_colors_and_type';
 
@@ -14,8 +15,8 @@ export const INPUT_SCHEMA = {
 };
 
 export function handler(index: DesignSystemIndex, args: { context?: BrandContext }) {
-  const ctx = args.context ?? 'base';
   const warnings: string[] = [];
+  const ctx = coerceContext(args.context, warnings);
   const file = index[ctx].colorsAndType ?? index.base.colorsAndType;
   if (!file) warnings.push('No colors_and_type.css found');
   return [

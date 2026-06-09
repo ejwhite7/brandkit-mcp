@@ -7,6 +7,7 @@
 
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandContext } from '../types/design-system.js';
+import { coerceContext } from './_context.js';
 
 export const TOOL_NAME = 'get_context_diff';
 
@@ -27,8 +28,9 @@ export function handler(
   index: DesignSystemIndex,
   args: { a?: BrandContext; b?: BrandContext },
 ) {
-  const a = args.a ?? 'web';
-  const b = args.b ?? 'product';
+  const warnings: string[] = [];
+  const a = args.a === undefined ? 'web' : coerceContext(args.a, warnings);
+  const b = args.b === undefined ? 'product' : coerceContext(args.b, warnings);
 
   // Custom properties (colors_and_type)
   const propsA = index[a].colorsAndType?.customProperties ?? index.base.colorsAndType?.customProperties ?? {};
@@ -65,7 +67,7 @@ export function handler(
           customProperties: { changed, onlyInA, onlyInB },
           components: { onlyInA: compsAOnly, onlyInB: compsBOnly },
           tokens: { onlyInA: tokensAOnly, onlyInB: tokensBOnly },
-          _warnings: [],
+          _warnings: warnings,
         },
         null,
         2,

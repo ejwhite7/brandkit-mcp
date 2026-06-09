@@ -7,6 +7,7 @@ import * as motion from '../tools/get-motion.js';
 import * as components from '../tools/get-components.js';
 import * as tokens from '../tools/get-tokens.js';
 import * as css from '../tools/get-css.js';
+import * as contextDiff from '../tools/get-context-diff.js';
 
 describe('get_colors_and_type', () => {
   it('returns base custom properties', () => {
@@ -167,5 +168,34 @@ describe('get_tokens warning injection per format', () => {
     const idx = buildFixtureIndex('v2/empty');
     const [result] = tokens.handler(idx, { format: 'scss' });
     expect(result.text.startsWith('/* warnings:')).toBe(true);
+  });
+});
+
+describe('runtime context coercion (tolerance principle)', () => {
+  it('get_colors_and_type falls back to base with a warning for unknown context', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = cat.handler(idx, { context: 'marketing' as never });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.context).toBe('base');
+    expect(parsed._warnings.some((w: string) => w.includes('marketing'))).toBe(true);
+  });
+
+  it('all single-context visual tools tolerate an unknown context', () => {
+    const idx = buildFixtureIndex('v2/full');
+    for (const mod of [css, tokens, motion, assets, fonts, components]) {
+      const [result] = mod.handler(idx, { context: 'shared' as never });
+      const parsed = JSON.parse(result.text);
+      expect(parsed.context).toBe('base');
+      expect(parsed._warnings.some((w: string) => w.includes('shared'))).toBe(true);
+    }
+  });
+
+  it('get_context_diff tolerates unknown contexts and surfaces warnings', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = contextDiff.handler(idx, { a: 'marketing' as never, b: 'product' });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.a).toBe('base');
+    expect(parsed.b).toBe('product');
+    expect(parsed._warnings.length).toBeGreaterThan(0);
   });
 });

@@ -1,5 +1,6 @@
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandContext } from '../types/design-system.js';
+import { coerceContext } from './_context.js';
 
 export const TOOL_NAME = 'get_motion';
 
@@ -14,9 +15,9 @@ export const INPUT_SCHEMA = {
 };
 
 export function handler(index: DesignSystemIndex, args: { context?: BrandContext }) {
-  const ctx = args.context ?? 'base';
-  const motion = index[ctx].motion ?? index.base.motion;
   const warnings: string[] = [];
+  const ctx = coerceContext(args.context, warnings);
+  const motion = index[ctx].motion ?? index.base.motion;
   if (!motion) warnings.push('No motion system found at agent/visual/motion/');
   return [
     {

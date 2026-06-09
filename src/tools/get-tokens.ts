@@ -7,6 +7,7 @@
 
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandContext, TokenSpecimen } from '../types/design-system.js';
+import { coerceContext } from './_context.js';
 
 export const TOOL_NAME = 'get_tokens';
 
@@ -63,9 +64,9 @@ export function handler(
     type?: string;
   },
 ) {
-  const ctx = args.context ?? 'base';
-  const format = args.format ?? 'json';
   const warnings: string[] = [];
+  const ctx = coerceContext(args.context, warnings);
+  const format = args.format ?? 'json';
 
   let tokens = index[ctx].tokens.length ? index[ctx].tokens : index.base.tokens;
   if (args.type) {

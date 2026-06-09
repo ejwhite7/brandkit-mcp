@@ -7,6 +7,7 @@
 
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandContext } from '../types/design-system.js';
+import { coerceContext } from './_context.js';
 
 export const TOOL_NAME = 'get_components';
 
@@ -28,16 +29,17 @@ export function handler(
   index: DesignSystemIndex,
   args: { context?: BrandContext; name?: string },
 ) {
-  const ctx = args.context ?? 'base';
   const warnings: string[] = [];
+  const ctx = coerceContext(args.context, warnings);
 
   // Use override layer if it has components; otherwise fall through to base.
   const list = index[ctx].components.length ? index[ctx].components : index.base.components;
 
   let filtered = list;
-  if (args.name) {
-    filtered = filtered.filter((c) => c.name.toLowerCase() === args.name!.toLowerCase());
-    if (filtered.length === 0) warnings.push(`No component named "${args.name}" in ${ctx} context`);
+  if (typeof args.name === 'string' && args.name.length > 0) {
+    const name = args.name;
+    filtered = filtered.filter((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (filtered.length === 0) warnings.push(`No component named "${name}" in ${ctx} context`);
   } else if (filtered.length === 0) {
     warnings.push('No components found');
   }
