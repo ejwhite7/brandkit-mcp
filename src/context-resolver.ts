@@ -176,16 +176,18 @@ function extractTypography(css: DesignCSSFile, ctx: BrandContext): DesignTypogra
     const trimmed = value.trim();
     if (lower.includes('font-family') || lower.includes('font-display') || lower.includes('font-body')) {
       item.fontFamily = trimmed;
+    } else if (lower.includes('letter-spacing') || lower.includes('tracking')) {
+      item.letterSpacing = trimmed;
+    } else if (lower.includes('line-height')) {
+      item.lineHeight = trimmed;
+    } else if (lower.includes('text-transform')) {
+      item.textTransform = trimmed;
     } else if (lower.includes('font-size') || lower.includes('size')) {
       item.fontSize = trimmed;
     } else if (lower.includes('font-weight') || lower.includes('weight')) {
       item.fontWeight = trimmed;
-    } else if (lower.includes('line-height') || lower.includes('line')) {
+    } else if (/(^|-)line(-|$)/.test(lower)) {
       item.lineHeight = trimmed;
-    } else if (lower.includes('letter-spacing') || lower.includes('tracking')) {
-      item.letterSpacing = trimmed;
-    } else if (lower.includes('text-transform')) {
-      item.textTransform = trimmed;
     }
     items.push(item);
   }

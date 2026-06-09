@@ -6,6 +6,46 @@ import { resolveAll } from '../context-resolver.js';
 const FIXTURE = resolve(__dirname, '../../__test_fixtures__/v2/full');
 const EMPTY = resolve(__dirname, '../../__test_fixtures__/v2/empty');
 
+describe('extractTypography classification', () => {
+  it('does not misfile tokens containing generic substrings', () => {
+    const scan = {
+      magicTrick: undefined,
+      verbal: {},
+      base: {
+        colorsAndType: {
+          filePath: '/fake/colors_and_type.css',
+          rawContent: '',
+          customProperties: {
+            '--text-underline-offset': '2px',
+            '--line-height-tight': '1.2',
+            '--letter-spacing-wide': '0.05em',
+            '--font-size-display': '4rem',
+          },
+        },
+        components: [],
+        tokens: [],
+        assets: [],
+        fonts: [],
+        motion: undefined,
+      },
+      web: { colorsAndType: undefined, components: [], tokens: [], assets: [], fonts: [], motion: undefined },
+      product: { colorsAndType: undefined, components: [], tokens: [], assets: [], fonts: [], motion: undefined },
+      warnings: [],
+    };
+    const resolved = resolveAll(scan as never, { brandName: 'T' });
+    const byToken = Object.fromEntries(resolved.base.typography.map((t) => [t.token, t]));
+
+    // --text-underline-offset contains "line" (from "underline") but must NOT be filed as lineHeight
+    expect(byToken['--text-underline-offset']?.lineHeight).toBeUndefined();
+    // --line-height-tight should correctly be lineHeight
+    expect(byToken['--line-height-tight']?.lineHeight).toBe('1.2');
+    // --letter-spacing-wide should not be misclassified
+    expect(byToken['--letter-spacing-wide']?.letterSpacing).toBe('0.05em');
+    // --font-size-display should correctly be fontSize
+    expect(byToken['--font-size-display']?.fontSize).toBe('4rem');
+  });
+});
+
 describe('resolveAll', () => {
   it('produces base/web/product views', () => {
     const scan = scanBrandRoot(FIXTURE);
