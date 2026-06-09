@@ -1,18 +1,19 @@
 /**
  * @file preview/server.ts
- * @description Local preview server for browsing the design system visually.
- * Provides a web-based UI showing colors, typography, components, logos,
- * guidelines, and other design system assets.
+ * @description Local preview server for browsing the brand atomic system
+ * visually. Renders the v2 index: colors, typography, token specimens,
+ * components, assets, fonts, motion, the verbal layer, raw CSS, and search.
  */
 
 import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import ejs from 'ejs';
-import { readFileSync } from 'fs';
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandKitConfig } from '../types/config.js';
+import type { BrandContext } from '../types/design-system.js';
+import { handler as searchBrandHandler } from '../tools/search-brand.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,6 +21,15 @@ const __dirname = dirname(__filename);
 /** Mutable reference wrapper so hot-reload can update the live index. */
 export interface IndexRef {
   current: DesignSystemIndex;
+}
+
+const CONTEXTS = ['base', 'web', 'product'] as const;
+
+/** Coerce a ?context= query value to a valid BrandContext (default base). */
+function pickContext(value: unknown): BrandContext {
+  return typeof value === 'string' && (CONTEXTS as readonly string[]).includes(value)
+    ? (value as BrandContext)
+    : 'base';
 }
 
 /**
@@ -115,89 +125,99 @@ export function createPreviewServer(
 
   // Routes
   app.get('/', (_req, res) => {
-    const index = ref.current;
-    const inventory = {
-      tokens: index.base.tokens.length,
-      components: index.base.components.length,
-      fonts: index.base.fonts.length,
-      assets: index.base.assets.length,
-      motion: index.base.motion != null,
-    };
-    res.send(renderPage('index', { title: `${config.brand.name} Design System`, inventory }));
+    res.send(renderPage('index', { title: `${config.brand.name} Brand System` }));
   });
 
-  app.get('/colors', (_req, res) => {
-    const index = ref.current;
+  app.get('/colors', (req, res) => {
+    const ctx = pickContext(req.query.context);
     res.send(renderPage('colors', {
-      title: 'Colors and Typography',
-      base: index.base.colorsAndType,
-      web: index.web.colorsAndType,
-      product: index.product.colorsAndType,
+      title: 'Colors',
+      ctx,
+      colors: ref.current.resolved[ctx].colors,
     }));
   });
 
-  app.get('/typography', (_req, res) => {
-    const index = ref.current;
+  app.get('/typography', (req, res) => {
+    const ctx = pickContext(req.query.context);
     res.send(renderPage('typography', {
       title: 'Typography',
-      base: index.base.colorsAndType,
+      ctx,
+      typography: ref.current.resolved[ctx].typography,
     }));
   });
 
-  app.get('/assets', (_req, res) => {
-    const index = ref.current;
-    res.send(renderPage('assets', {
-      title: 'Assets',
-      assets: index.base.assets,
-    }));
-  });
-
-  app.get('/components', (_req, res) => {
-    const index = ref.current;
-    res.send(renderPage('components', {
-      title: 'Components',
-      base: index.base.components,
-      web: index.web.components,
-      product: index.product.components,
-    }));
-  });
-
-  app.get('/tokens', (_req, res) => {
-    const index = ref.current;
+  app.get('/tokens', (req, res) => {
+    const ctx = pickContext(req.query.context);
     res.send(renderPage('tokens', {
       title: 'Design Tokens',
-      tokens: index.base.tokens,
+      ctx,
+      tokens: ref.current.resolved[ctx].tokens,
     }));
   });
 
-  app.get('/motion', (_req, res) => {
+  app.get('/components', (req, res) => {
+    const ctx = pickContext(req.query.context);
+    res.send(renderPage('components', {
+      title: 'Components',
+      ctx,
+      components: ref.current.resolved[ctx].components,
+    }));
+  });
+
+  app.get('/assets', (req, res) => {
+    const ctx = pickContext(req.query.context);
+    const index = ref.current;
+    // Override layer falls through to base when empty (same rule as get_assets).
+    const assets = index[ctx].assets.length ? index[ctx].assets : index.base.assets;
+    res.send(renderPage('assets', { title: 'Assets', ctx, assets }));
+  });
+
+  app.get('/fonts', (req, res) => {
+    const ctx = pickContext(req.query.context);
+    const index = ref.current;
+    const fonts = index[ctx].fonts.length ? index[ctx].fonts : index.base.fonts;
+    res.send(renderPage('fonts', { title: 'Fonts', ctx, fonts }));
+  });
+
+  app.get('/motion', (req, res) => {
+    const ctx = pickContext(req.query.context);
     const index = ref.current;
     res.send(renderPage('motion', {
       title: 'Motion',
-      motion: index.base.motion,
-    }));
-  });
-
-  app.get('/fonts', (_req, res) => {
-    const index = ref.current;
-    res.send(renderPage('fonts', {
-      title: 'Fonts',
-      fonts: index.base.fonts,
+      ctx,
+      motion: index[ctx].motion ?? index.base.motion,
     }));
   });
 
   app.get('/verbal', (_req, res) => {
+    res.send(renderPage('verbal', { title: 'Verbal Identity' }));
+  });
+
+  app.get('/css', (req, res) => {
+    const ctx = pickContext(req.query.context);
     const index = ref.current;
-    res.send(renderPage('verbal', {
-      title: 'Verbal Layer',
-      verbal: index.verbal,
-      magicTrick: index.magicTrick,
+    res.send(renderPage('css', {
+      title: 'CSS',
+      ctx,
+      colorsAndTypeCss:
+        index[ctx].colorsAndType?.rawContent ?? index.base.colorsAndType?.rawContent ?? '',
+      motionCss: index[ctx].motion?.css ?? index.base.motion?.css ?? '',
     }));
   });
 
   app.get('/search', (req, res) => {
-    const query = (req.query.q as string) ?? '';
-    const results: unknown[] = [];
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    interface SearchHit { kind: string; snippet: string; source?: string; context?: string }
+    let results: SearchHit[] = [];
+    if (query) {
+      try {
+        // Reuse the search_brand tool's tested search logic.
+        const [content] = searchBrandHandler(ref.current, { query });
+        results = (JSON.parse(content.text) as { results: SearchHit[] }).results;
+      } catch {
+        // Tolerance principle: render an empty result list, not a 500.
+      }
+    }
     res.send(renderPage('search', { title: 'Search', query, results }));
   });
 

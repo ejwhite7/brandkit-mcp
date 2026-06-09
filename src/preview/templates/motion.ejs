@@ -1,0 +1,17 @@
+<h1>Motion</h1>
+<p class="context-switch">
+  <% for (const c of ['base', 'web', 'product']) { %><a href="?context=<%= c %>" class="badge<%= c === ctx ? ' active' : '' %>"><%= c %></a><% } %>
+</p>
+
+<% if (!motion) { %>
+<p>No motion system found at agent/visual/motion/.</p>
+<% } else { %>
+  <% if (motion.tokens) { %>
+  <h2>motion.json</h2>
+  <pre class="doc-body"><%= JSON.stringify(motion.tokens, null, 2) %></pre>
+  <% } %>
+  <% if (motion.css) { %>
+  <h2>motion.css</h2>
+  <pre class="doc-body"><%= motion.css %></pre>
+  <% } %>
+<% } %>

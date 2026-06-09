@@ -1,0 +1,29 @@
+<h1>Verbal Identity</h1>
+
+<% if (index.magicTrick) { %>
+<h2>Magic Trick (taste primer)</h2>
+<pre class="doc-body"><%= index.magicTrick.content %></pre>
+<% } %>
+
+<% const verbalDocs = [
+  ['Positioning', index.verbal.positioning],
+  ['Messaging', index.verbal.messaging],
+  ['Differentiation', index.verbal.differentiation],
+  ['Concepts', index.verbal.concepts],
+  ['Voice', index.verbal.voice],
+]; %>
+<% for (const [label, doc] of verbalDocs) { %>
+<h2><%= label %></h2>
+<% if (doc) { %>
+<pre class="doc-body"><%= doc.body %></pre>
+<% } else { %>
+<p>Not present.</p>
+<% } %>
+<% } %>
+
+<h2>Audience</h2>
+<% if (index.verbal.audience) { %>
+<pre class="doc-body"><%= JSON.stringify(index.verbal.audience.data, null, 2) %></pre>
+<% } else { %>
+<p>Not present.</p>
+<% } %>

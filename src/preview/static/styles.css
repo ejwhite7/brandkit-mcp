@@ -163,3 +163,11 @@ body {
 .snippet { font-size: 0.875rem; color: var(--color-text-muted); }
 .source { display: block; margin-top: 0.5rem; font-size: 0.75rem; color: var(--color-text-muted); }
 
+
+/* v2 additions */
+.context-switch { margin-bottom: 1.5rem; }
+.context-switch a { margin-right: 0.5rem; text-decoration: none; }
+.context-switch a.active { background: #0d6efd; color: #fff; }
+.doc-body { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem; overflow-x: auto; white-space: pre-wrap; font-size: 0.875rem; margin-bottom: 1rem; font-family: var(--font-mono); }
+.search-input { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); width: 320px; font-size: 0.875rem; }
+.search-button { padding: 0.5rem 1rem; border: none; border-radius: var(--radius); background: #0d6efd; color: #fff; font-size: 0.875rem; cursor: pointer; }

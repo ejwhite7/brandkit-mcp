@@ -1,0 +1,23 @@
+<h1>Fonts</h1>
+<p class="context-switch">
+  <% for (const c of ['base', 'web', 'product']) { %><a href="?context=<%= c %>" class="badge<%= c === ctx ? ' active' : '' %>"><%= c %></a><% } %>
+</p>
+
+<% if (fonts.length === 0) { %>
+<p>No font faces found for the <%= ctx %> context.</p>
+<% } else { %>
+<table class="data-table">
+  <thead><tr><th>Family</th><th>Weight</th><th>Style</th><th>Format</th><th>File</th></tr></thead>
+  <tbody>
+    <% for (const f of fonts) { %>
+    <tr>
+      <td><strong><%= f.family %></strong></td>
+      <td><%= f.weight || '' %></td>
+      <td><%= f.style || '' %></td>
+      <td><span class="badge"><%= f.format %></span></td>
+      <td><code><%= f.file %></code></td>
+    </tr>
+    <% } %>
+  </tbody>
+</table>
+<% } %>

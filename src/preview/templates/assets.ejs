@@ -1,0 +1,22 @@
+<h1>Assets</h1>
+<p class="context-switch">
+  <% for (const c of ['base', 'web', 'product']) { %><a href="?context=<%= c %>" class="badge<%= c === ctx ? ' active' : '' %>"><%= c %></a><% } %>
+</p>
+
+<% if (assets.length === 0) { %>
+<p>No assets found for the <%= ctx %> context.</p>
+<% } else { %>
+<table class="data-table">
+  <thead><tr><th>ID</th><th>File</th><th>Format</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <% for (const a of assets) { %>
+    <tr>
+      <td><code><%= a.id || '' %></code></td>
+      <td><%= a.file %></td>
+      <td><span class="badge"><%= a.format %></span></td>
+      <td><%= a.purpose || '' %></td>
+    </tr>
+    <% } %>
+  </tbody>
+</table>
+<% } %>

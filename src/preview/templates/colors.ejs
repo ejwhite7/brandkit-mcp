@@ -1,31 +1,22 @@
-<h1>Color Palette</h1>
+<h1>Colors</h1>
+<p class="context-switch">
+  <% for (const c of ['base', 'web', 'product']) { %><a href="?context=<%= c %>" class="badge<%= c === ctx ? ' active' : '' %>"><%= c %></a><% } %>
+</p>
 
-<% const contexts = [
-  { name: 'All (Resolved)', colors: all },
-  { name: 'Shared', colors: shared },
-  { name: 'Marketing', colors: marketing },
-  { name: 'Product', colors: product },
-]; %>
-
-<% for (const ctx of contexts) { %>
-  <% if (ctx.colors.length > 0) { %>
-  <section>
-    <h2><%= ctx.name %> (<%= ctx.colors.length %>)</h2>
-    <div class="color-grid">
-      <% for (const color of ctx.colors) { %>
-      <div class="color-swatch">
-        <div class="swatch" style="background-color: <%= color.value %>"></div>
-        <div class="color-info">
-          <strong><%= color.name %></strong>
-          <code><%= color.token %></code>
-          <span class="value"><%= color.value %></span>
-          <% if (color.role) { %><span class="role"><%= color.role %></span><% } %>
-          <% if (color.usage) { %><p class="usage"><%= color.usage %></p><% } %>
-        </div>
-      </div>
-      <% } %>
+<% if (colors.length === 0) { %>
+<p>No colors found for the <%= ctx %> context.</p>
+<% } else { %>
+<div class="color-grid">
+  <% for (const c of colors) { %>
+  <div class="color-swatch">
+    <div class="swatch" style="background: <%= c.hex || c.value %>"></div>
+    <div class="color-info">
+      <strong><%= c.name %></strong>
+      <code><%= c.token %></code>
+      <span class="value"><%= c.value %></span>
+      <% if (c.role) { %><span class="role"><%= c.role %></span><% } %>
     </div>
-  </section>
+  </div>
   <% } %>
+</div>
 <% } %>
-

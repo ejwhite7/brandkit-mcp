@@ -11,6 +11,7 @@ import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
 import { validateCommand } from './commands/validate.js';
 import { docsCommand } from './commands/docs.js';
+import { previewCommand } from './commands/preview.js';
 import { startServer } from '../index.js';
 import { getPackageVersion } from '../version.js';
 
@@ -53,18 +54,13 @@ program
 
 program
   .command('preview')
-  .description('Local preview UI (temporarily disabled — being rewritten for v2)')
+  .description('Start the local preview UI for browsing the brand atomic system')
   .option('--port <number>', 'Port for preview server', '3000')
   .option('--config <path>', 'Path to brandkit.config.yaml')
   .option('--watch', 'Enable hot reload on file changes')
   .option('--open', 'Open browser automatically')
-  .action(() => {
-    console.error(
-      'The visual preview UI has not been rewritten for the v2 brand atomic system layout.\n' +
-        'The MCP server (`brandkit-mcp serve`) is unaffected and works correctly.\n' +
-        'Track progress: https://github.com/ejwhite7/brandkit-mcp/issues',
-    );
-    process.exit(1);
+  .action(async (options) => {
+    await previewCommand(options);
   });
 
 program
