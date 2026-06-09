@@ -200,6 +200,15 @@ describe('runtime context coercion (tolerance principle)', () => {
     expect(parsed.b).toBe('product');
     expect(parsed._warnings.length).toBeGreaterThan(0);
   });
+
+  it('get_context_diff applies documented defaults for null contexts', () => {
+    const idx = buildFixtureIndex('v2/full');
+    const [result] = contextDiff.handler(idx, { a: null as never, b: null as never });
+    const parsed = JSON.parse(result.text);
+    expect(parsed.a).toBe('web');
+    expect(parsed.b).toBe('product');
+    expect(parsed._warnings).toEqual([]);
+  });
 });
 
 describe('required-arg guards', () => {

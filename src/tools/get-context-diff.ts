@@ -29,8 +29,8 @@ export function handler(
   args: { a?: BrandContext; b?: BrandContext },
 ) {
   const warnings: string[] = [];
-  const a = args.a === undefined ? 'web' : coerceContext(args.a, warnings);
-  const b = args.b === undefined ? 'product' : coerceContext(args.b, warnings);
+  const a = args.a == null ? 'web' : coerceContext(args.a, warnings);
+  const b = args.b == null ? 'product' : coerceContext(args.b, warnings);
 
   // Custom properties (colors_and_type)
   const propsA = index[a].colorsAndType?.customProperties ?? index.base.colorsAndType?.customProperties ?? {};
