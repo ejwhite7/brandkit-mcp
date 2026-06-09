@@ -181,7 +181,7 @@ Commands:
   init [directory]      Scaffold a brand atomic system from the starter template
   validate [config]     Validate configuration and scan for issues
   serve                 Start the MCP server
-  preview               Start the local preview server
+  preview               Local preview UI (temporarily disabled -- being rewritten for v2)
   docs                  Generate project documentation files
 
 Global Options:
