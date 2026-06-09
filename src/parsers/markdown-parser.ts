@@ -189,7 +189,11 @@ function extractDescription(content: string): string {
 
 function extractSection(content: string, heading: string): string | undefined {
   const escaped = escapeRegExp(heading);
-  const re = new RegExp(`^##\\s+${escaped}\\b[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|$)`, 'mi');
+  // Terminate at the next `## ` heading or true end-of-string. A bare `$`
+  // with the m flag matches every line end and truncates the capture;
+  // `^##\s` (not `\n##\s`) keeps an empty section empty when two headings
+  // are adjacent with no blank line between them.
+  const re = new RegExp(`^##\\s+${escaped}\\b[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|$(?![\\s\\S]))`, 'mi');
   const match = re.exec(content);
   return match ? match[1].trim() : undefined;
 }

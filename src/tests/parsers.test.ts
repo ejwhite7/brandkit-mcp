@@ -171,3 +171,31 @@ describe('Image Parser', () => {
   });
 });
 
+describe('component usage section extraction', () => {
+  it('captures multi-line Usage sections, not just the first line', () => {
+    const dir = TEST_DIR;
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, 'button-multiline.md');
+    writeFileSync(
+      path,
+      '---\nname: Button\n---\n# Button\n\n## Usage\nLine one.\nLine two.\n\n## Other\nIgnored.\n',
+    );
+    const [component] = parseComponentMarkdown(path, 'base');
+    expect(component.usage).toContain('Line one.');
+    expect(component.usage).toContain('Line two.');
+    expect(component.usage).not.toContain('Ignored');
+  });
+
+  it('does not leak the next section into an empty Usage section', () => {
+    const dir = TEST_DIR;
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, 'button-empty-usage.md');
+    writeFileSync(
+      path,
+      '---\nname: Button\n---\n# Button\n\n## Usage\n## Other\nIgnored.\n',
+    );
+    const [component] = parseComponentMarkdown(path, 'base');
+    expect(component.usage ?? '').not.toContain('Ignored');
+  });
+});
+
