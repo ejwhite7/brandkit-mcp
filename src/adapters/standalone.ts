@@ -11,6 +11,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { loadConfig, resolveConfigPaths } from '../config/loader.js';
 import { buildDesignSystemIndex } from '../indexer/index.js';
 import { registerAllTools } from '../tools/index.js';
+import { getPackageVersion } from '../version.js';
 
 /**
  * Starts a standalone HTTP server with SSE transport.
@@ -23,7 +24,7 @@ export async function startStandaloneServer(port: number = 3001, configPath?: st
   const index = await buildDesignSystemIndex(config);
 
   const mcpServer = new Server(
-    { name: 'brandkit-mcp', version: '0.1.0' },
+    { name: 'brandkit-mcp', version: getPackageVersion() },
     { capabilities: { tools: {} } },
   );
   registerAllTools(mcpServer, () => index);

@@ -19,7 +19,7 @@ export default {
     if (url.pathname === '/') {
       return new Response(JSON.stringify({
         name: 'brandkit-mcp',
-        version: '0.1.0',
+        version: '2.0.2', // keep in sync with package.json — see RELEASING.md
         description: 'BrandKit MCP server running on Cloudflare Workers',
         endpoints: {
           sse: '/sse',

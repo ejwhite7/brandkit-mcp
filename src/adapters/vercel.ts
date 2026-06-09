@@ -10,6 +10,7 @@ import { loadConfig, resolveConfigPaths } from '../config/loader.js';
 import { buildDesignSystemIndex } from '../indexer/index.js';
 import { registerAllTools } from '../tools/index.js';
 import type { DesignSystemIndex } from '../indexer/types.js';
+import { getPackageVersion } from '../version.js';
 
 let cachedIndex: DesignSystemIndex | null = null;
 let sseTransport: InstanceType<typeof SSEServerTransport> | null = null;
@@ -36,7 +37,7 @@ export async function handleSSE(req: { method?: string }, res: {
   const index = await getIndex();
 
   const server = new Server(
-    { name: 'brandkit-mcp', version: '0.1.0' },
+    { name: 'brandkit-mcp', version: getPackageVersion() },
     { capabilities: { tools: {} } },
   );
 

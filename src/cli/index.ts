@@ -8,39 +8,18 @@
  */
 
 import { Command } from 'commander';
-import { readFileSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { initCommand } from './commands/init.js';
 import { validateCommand } from './commands/validate.js';
 import { docsCommand } from './commands/docs.js';
 import { startServer } from '../index.js';
-
-function readPackageVersion(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    join(here, '../../package.json'),
-    join(here, '../../../package.json'),
-    join(here, '../package.json'),
-  ];
-  for (const c of candidates) {
-    if (existsSync(c)) {
-      try {
-        return JSON.parse(readFileSync(c, 'utf-8')).version as string;
-      } catch {
-        // fall through
-      }
-    }
-  }
-  return '0.0.0';
-}
+import { getPackageVersion } from '../version.js';
 
 const program = new Command();
 
 program
   .name('brandkit-mcp')
   .description('Expose your company\'s design system to AI tools via the Model Context Protocol')
-  .version(readPackageVersion());
+  .version(getPackageVersion());
 
 program
   .command('init')

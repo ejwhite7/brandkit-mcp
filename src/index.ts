@@ -17,6 +17,7 @@ import { watchBrandDirectory } from './indexer/hot-reload.js';
 import type { DesignSystemIndex } from './indexer/types.js';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getPackageVersion } from './version.js';
 
 /** Current design system index -- updated on hot-reload. */
 let currentIndex: DesignSystemIndex;
@@ -55,7 +56,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   console.error(`[brandkit-mcp] Indexed ${currentIndex.base.tokens.length + currentIndex.base.components.length + currentIndex.base.assets.length} assets in ${elapsed}ms`);
 
   const server = new Server(
-    { name: 'brandkit-mcp', version: '0.1.0' },
+    { name: 'brandkit-mcp', version: getPackageVersion() },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 

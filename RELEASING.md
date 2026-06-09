@@ -47,7 +47,10 @@ in one go.
 # 1. Make sure main is green
 git checkout main && git pull
 
-# 2. Tag (no need to bump package.json by hand -- the workflow syncs
+# 2. Update the hardcoded version in src/adapters/cloudflare-worker.ts
+#    (Workers cannot read package.json at runtime) and commit the bump
+
+# 3. Tag (no need to bump package.json by hand -- the workflow syncs
 #    the version into package.json AND server.json from the tag)
 git tag v0.1.1
 git push origin v0.1.1
