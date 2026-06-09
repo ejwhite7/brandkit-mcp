@@ -165,14 +165,15 @@ function inferColorRole(token: string): string | undefined {
 
 /**
  * Attempts to normalize a CSS color value to a hex string.
- * Returns the original value if normalization isn't possible.
+ * Valid hex lengths: 3 (#rgb), 4 (#rgba), 6 (#rrggbb), 8 (#rrggbbaa).
+ * Returns undefined if normalization isn't possible.
  */
-function normalizeToHex(value: string): string | undefined {
-  const hexMatch = value.match(/^#([0-9a-f]{3,8})$/i);
+export function normalizeToHex(value: string): string | undefined {
+  const hexMatch = value.match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
   if (hexMatch) {
     const hex = hexMatch[1];
-    if (hex.length === 3) {
-      return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`;
+    if (hex.length === 3 || hex.length === 4) {
+      return `#${[...hex].map((c) => c + c).join('')}`;
     }
     return `#${hex}`;
   }

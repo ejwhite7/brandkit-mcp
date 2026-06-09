@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { parseCSSFile, extractColorsFromCSS, extractTypographyFromCSS } from '../parsers/css-parser.js';
+import { parseCSSFile, extractColorsFromCSS, extractTypographyFromCSS, normalizeToHex } from '../parsers/css-parser.js';
 import { parseGuidelineMarkdown, parseComponentMarkdown, parsePaletteMarkdown } from '../parsers/markdown-parser.js';
 import { parseFontFile, inferFontWeight } from '../parsers/font-parser.js';
 import { inferLogoVariantName } from '../parsers/image-parser.js';
@@ -196,6 +196,23 @@ describe('component usage section extraction', () => {
     );
     const [component] = parseComponentMarkdown(path, 'base');
     expect(component.usage ?? '').not.toContain('Ignored');
+  });
+});
+
+describe('normalizeToHex', () => {
+  it('expands 3-digit shorthand', () => {
+    expect(normalizeToHex('#abc')).toBe('#aabbcc');
+  });
+  it('expands 4-digit #RGBA shorthand', () => {
+    expect(normalizeToHex('#abcd')).toBe('#aabbccdd');
+  });
+  it('rejects invalid 5- and 7-digit values', () => {
+    expect(normalizeToHex('#abcde')).toBeUndefined();
+    expect(normalizeToHex('#abcdeff')).toBeUndefined();
+  });
+  it('passes 6- and 8-digit values through', () => {
+    expect(normalizeToHex('#aabbcc')).toBe('#aabbcc');
+    expect(normalizeToHex('#aabbccdd')).toBe('#aabbccdd');
   });
 });
 
