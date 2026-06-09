@@ -143,6 +143,17 @@ export function loadConfigFromString(yamlText: string, sourcePath: string): Bran
     );
   }
 
+  // CLAUDE.md contract: a config without `version: 2` throws
+  // BrandkitV1ConfigError with migration guidance, even when no positive
+  // v1 marker is present.
+  if (parsedObj.version !== 2) {
+    throw new BrandkitV1ConfigError(
+      `Config at ${sourcePath} is missing \`version: 2\` (found: ${JSON.stringify(parsedObj.version)}). ` +
+        'BrandKit v2 requires `version: 2`. ' +
+        'Migrate to v2: see docs/superpowers/specs/2026-05-14-brand-atomic-system-restructure-design.md',
+    );
+  }
+
   // Validate against v2 schema
   const result = BrandKitConfigSchema.safeParse(parsedObj);
 

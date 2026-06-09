@@ -41,4 +41,14 @@ describe('config loader v1 rejection', () => {
     expect(cfg.brand.name).toBe('Acme');
     expect(cfg.contexts).toEqual(['base', 'web', 'product']);
   });
+
+  it('throws BrandkitV1ConfigError when version is missing entirely', () => {
+    const yaml = `brand:\n  name: Acme\n`;
+    expect(() => loadConfigFromString(yaml, '/tmp/fake.yaml')).toThrow(BrandkitV1ConfigError);
+  });
+
+  it('throws BrandkitV1ConfigError on a non-2 version', () => {
+    const yaml = `version: 3\nbrand:\n  name: Acme\n`;
+    expect(() => loadConfigFromString(yaml, '/tmp/fake.yaml')).toThrow(BrandkitV1ConfigError);
+  });
 });
