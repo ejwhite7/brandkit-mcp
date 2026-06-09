@@ -91,7 +91,13 @@ export function createPreviewServer(
       templateContent = '<h1>Template not found</h1>';
     }
 
-    const body = ejs.render(templateContent, { ...data, config, index });
+    let body: string;
+    try {
+      body = ejs.render(templateContent, { ...data, config, index });
+    } catch (err) {
+      // Tolerance principle: a broken template renders an error page, not a 500.
+      body = `<h1>Template error</h1><pre>${String(err)}</pre>`;
+    }
 
     let layoutContent: string;
     try {
@@ -100,7 +106,11 @@ export function createPreviewServer(
       return body;
     }
 
-    return ejs.render(layoutContent, { body, title: data.title ?? config.brand.name, config });
+    try {
+      return ejs.render(layoutContent, { body, title: data.title ?? config.brand.name, config });
+    } catch {
+      return body;
+    }
   }
 
   // Routes
