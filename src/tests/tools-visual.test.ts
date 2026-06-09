@@ -141,3 +141,31 @@ describe('get_css', () => {
     expect(parsed._warnings.length).toBeGreaterThan(0);
   });
 });
+
+describe('get_tokens warning injection per format', () => {
+  it('returns valid JSON for tailwind format when warnings exist', () => {
+    const idx = buildFixtureIndex('v2/empty');
+    const [result] = tokens.handler(idx, { format: 'tailwind' });
+    const parsed = JSON.parse(result.text); // must not throw
+    expect(parsed._warnings).toContain('No token specimens found');
+  });
+
+  it('returns valid JSON for w3c format when warnings exist', () => {
+    const idx = buildFixtureIndex('v2/empty');
+    const [result] = tokens.handler(idx, { format: 'w3c' });
+    const parsed = JSON.parse(result.text); // must not throw
+    expect(parsed._warnings).toContain('No token specimens found');
+  });
+
+  it('keeps comment-style warnings for css format', () => {
+    const idx = buildFixtureIndex('v2/empty');
+    const [result] = tokens.handler(idx, { format: 'css' });
+    expect(result.text.startsWith('/* warnings:')).toBe(true);
+  });
+
+  it('keeps comment-style warnings for scss format', () => {
+    const idx = buildFixtureIndex('v2/empty');
+    const [result] = tokens.handler(idx, { format: 'scss' });
+    expect(result.text.startsWith('/* warnings:')).toBe(true);
+  });
+});

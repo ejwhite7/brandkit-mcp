@@ -91,9 +91,19 @@ export function handler(
       text = JSON.stringify({ context: ctx, tokens, _warnings: warnings }, null, 2);
   }
 
-  // For non-json formats, append warnings as a CSS/SCSS comment so they're discoverable.
-  if (format !== 'json' && warnings.length > 0) {
-    text = `/* warnings: ${warnings.join('; ')} */\n${text}`;
+  // Surface warnings in a format-appropriate way: a comment for text formats,
+  // an embedded _warnings key for JSON-document formats (tailwind, w3c).
+  if (warnings.length > 0) {
+    if (format === 'css' || format === 'scss') {
+      text = `/* warnings: ${warnings.join('; ')} */\n${text}`;
+    } else if (format === 'tailwind' || format === 'w3c') {
+      text = JSON.stringify(
+        { ...(JSON.parse(text) as Record<string, unknown>), _warnings: warnings },
+        null,
+        2,
+      );
+    }
+    // format === 'json' already embeds _warnings in its payload.
   }
 
   return [{ type: 'text' as const, text }];
