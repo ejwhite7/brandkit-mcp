@@ -131,6 +131,10 @@ Seven creative/verbal tools (`get_brand_overview`, `get_positioning`, `get_audie
 
 **Context vocabulary.** v2 uses `base | web | product`. The v1 vocabulary (`shared | marketing | product`) is gone. A `brandkit.config.yaml` without `version: 2` throws `BrandkitV1ConfigError` at startup.
 
+**`config.contexts` is reserved.** The field is validated and defaulted but
+not yet honored: the resolver always materializes `base`, `web`, and
+`product`. Setting `contexts: [base]` does not disable the override layers.
+
 **`human/` is ignored.** The scanner skips the `human/` directory entirely. Drop PDFs, print specs, or any material not intended for AI consumption there.
 
 ---

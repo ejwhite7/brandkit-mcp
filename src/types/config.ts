@@ -19,6 +19,8 @@ export const BrandKitConfigSchema = z.object({
     description: z.string().optional(),
     root: z.string().default('./brand_atomic_system'),
   }),
+  // RESERVED: accepted for forward compatibility but not yet honored — the
+  // resolver always materializes all three contexts. See CLAUDE.md.
   contexts: z
     .array(z.enum(['base', 'web', 'product']))
     .default(['base', 'web', 'product']),
