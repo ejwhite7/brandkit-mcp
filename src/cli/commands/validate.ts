@@ -5,7 +5,9 @@
  */
 
 import { existsSync } from 'fs';
-import { loadConfig, resolveConfigPaths } from '../../config/loader.js';
+import { dirname } from 'path';
+import { loadConfigWithPath, resolveConfigPaths } from '../../config/loader.js';
+import type { BrandKitConfig } from '../../types/config.js';
 import { buildDesignSystemIndex } from '../../indexer/index.js';
 
 /**
@@ -15,10 +17,10 @@ import { buildDesignSystemIndex } from '../../indexer/index.js';
 export async function validateCommand(configPath?: string): Promise<void> {
   console.log('Validating BrandKit MCP configuration...\n');
 
-  let config;
+  let config: BrandKitConfig;
   try {
-    const rawConfig = loadConfig(configPath);
-    config = resolveConfigPaths(rawConfig, process.cwd());
+    const { config: rawConfig, filePath } = loadConfigWithPath(configPath);
+    config = resolveConfigPaths(rawConfig, dirname(filePath));
     console.log('[OK] Configuration loaded successfully');
     console.log(`     Brand name: ${config.brand.name}`);
   } catch (err) {

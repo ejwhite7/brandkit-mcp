@@ -10,8 +10,8 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { loadConfig, resolveConfigPaths } from '../../config/loader.js';
+import { join, dirname } from 'path';
+import { loadConfigWithPath, resolveConfigPaths } from '../../config/loader.js';
 import { buildDesignSystemIndex } from '../../indexer/index.js';
 
 const DELIMITER_START = '<!-- brandkit-mcp:start -->';
@@ -59,8 +59,10 @@ function updateFileWithDelimiters(filePath: string, generatedBlock: string): voi
 export async function docsCommand(options: { config?: string; output?: string }): Promise<void> {
   console.log('Generating project documentation...\n');
 
-  const rawConfig = loadConfig(options.config);
-  const config = resolveConfigPaths(rawConfig, process.cwd());
+  // Resolve relative paths against the config file's own directory (same
+  // portability fix as startServer in src/index.ts).
+  const { config: rawConfig, filePath } = loadConfigWithPath(options.config);
+  const config = resolveConfigPaths(rawConfig, dirname(filePath));
   const index = await buildDesignSystemIndex(config);
   const outputDir = options.output ?? process.cwd();
 
