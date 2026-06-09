@@ -62,6 +62,14 @@ export async function initCommand(
   rmSync(brandDir, { recursive: true, force: true });
   copyRecursive(templatesDir, brandDir);
 
+  // The starter template ships only agent-readable content; create the
+  // human/ drop zone (PDFs, print specs) that the v2 layout documents.
+  mkdirSync(join(brandDir, 'human'), { recursive: true });
+  writeFileSync(
+    join(brandDir, 'human', 'readme.md'),
+    '# human/\n\nDrop PDFs, print specs, and other human-only material here.\nThe MCP scanner ignores this directory entirely.\n',
+  );
+
   // Build the config as an object and serialize with js-yaml so brand names
   // containing YAML metacharacters (e.g. `Acme: Corp`, `@handle`) are quoted
   // correctly instead of producing an unparseable config.
