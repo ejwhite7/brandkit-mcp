@@ -10,3 +10,10 @@ coverage/
 __test_fixtures__/
 __test_cli__/
 doc/
+
+# repowise API keys (local)
+.repowise
+.github
+.claude
+.mcp.json
+docs
