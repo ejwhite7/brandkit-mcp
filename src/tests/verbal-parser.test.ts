@@ -29,4 +29,12 @@ describe('parseVerbalDoc', () => {
   it('returns undefined on missing file', () => {
     expect(parseVerbalDoc('/nonexistent/file.md')).toBeUndefined();
   });
+
+  it('degrades gracefully on malformed frontmatter (tolerance principle)', () => {
+    const path = md('---\nbad: : :\n---\n# Positioning\n\nBody text survives.\n');
+    const doc = parseVerbalDoc(path);
+    expect(doc).toBeDefined();
+    expect(doc?.frontmatter).toEqual({});
+    expect(doc?.body).toContain('Body text survives');
+  });
 });

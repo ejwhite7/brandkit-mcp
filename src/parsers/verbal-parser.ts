@@ -20,9 +20,19 @@ export function parseVerbalDoc(path: string): VerbalDoc | undefined {
   } catch {
     return undefined;
   }
-  const { data, content } = matter(raw);
+  // Tolerance principle: malformed frontmatter must not abort the scan.
+  // Fall back to treating the whole file as body with empty frontmatter.
+  let data: Record<string, unknown> = {};
+  let content = raw;
+  try {
+    const parsed = matter(raw);
+    data = parsed.data as Record<string, unknown>;
+    content = parsed.content;
+  } catch {
+    // keep defaults: empty frontmatter, full raw body
+  }
   return {
-    frontmatter: data as Record<string, unknown>,
+    frontmatter: data,
     body: content.trim(),
     source: path,
   };
