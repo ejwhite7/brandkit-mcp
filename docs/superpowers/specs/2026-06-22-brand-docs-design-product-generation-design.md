@@ -1,0 +1,233 @@
+# Brand Docs Generation: DESIGN.md + PRODUCT.md
+
+**Date:** 2026-06-22
+**Status:** Approved (design)
+
+## Problem
+
+Coding agents that build websites, apps, and marketing assets for a brand
+do not always run through the BrandKit MCP. When they don't, they have no
+structured access to the brand's intent — who the product is for, how it
+should sound, and what it should (and should not) look like.
+
+We want the MCP to emit two human-readable reference files at the project
+root — `DESIGN.md` and `PRODUCT.md` — synthesized from the brand atomic
+system plus four human-authored answers. These files **guide non-MCP coding
+agents**. The MCP itself never reads them back as input; they are write-only
+outputs, regenerated from the brand and a stored brief.
+
+The four questions (intentionally demanding specificity):
+
+1. **Who is this product for?** Be specific. Not "users" but "solo founders
+   evaluating a new tool on their phone between meetings."
+2. **What is the brand voice in three words?** Pick real words. "Warm and
+   mechanical and opinionated" beats "modern and clean."
+3. **Any visual references?** Named brands, products, or printed objects, not
+   adjectives. "Klim Type Foundry specimen pages," not "technical and clean."
+4. **Anti-references?** Things the product should explicitly *not* look like,
+   equally named.
+
+## Constraints & Decisions
+
+- **Trigger model: tool + stored brief.** An stdio MCP server cannot block its
+  boot to interactively ask a human four questions. So:
+  - A new `sync_brand_docs` MCP tool gathers the four answers in-chat, saves
+    them, and writes both files.
+  - On every server startup (all transports), if a complete brief exists, both
+    files are silently regenerated from brand atoms + brief. If no complete
+    brief exists, startup logs a hint and skips — it never blocks boot.
+- **The MCP does not read DESIGN.md / PRODUCT.md.** They are outputs only.
+- **Generation is deterministic** (string templates, no LLM call). The startup
+  path has no agent in the loop and must be reproducible. Tradeoff: prose is
+  predictable but less "woven" than an LLM would produce.
+- **Brief is stored in `brandkit.config.yaml`** under a `brief:` block (user
+  decision). Tradeoff: the tool rewrites the YAML via js-yaml `dump`, which
+  **drops comments and custom formatting** in that file. Documented as a known
+  caveat in the tool's `_warnings`.
+- **Output location defaults to the directory containing
+  `brandkit.config.yaml`** (a stable project-root anchor, more reliable than
+  cwd, which mcp-proxy / Docker can set oddly).
+- **First write tool.** The MCP currently exposes no write tools. This adds
+  one. `magic_trick.md` must remain on a hard denylist and is never written.
+  The CLAUDE.md "no write tools today" note is updated.
+- **File split** (each input maps to exactly one file, except voice words):
+  - **PRODUCT.md** — *who & why*. Verbal atoms (positioning, audience,
+    messaging, differentiation, concepts, voice) + Q1 (audience) + Q2 (voice
+    words).
+  - **DESIGN.md** — *how it looks*, Stitch-style intent doc. Visual atoms
+    (colors_and_type, fonts, components, tokens, motion) + Q3 (visual
+    references) + Q4 (anti-references) + Q2 (voice words, for tone).
+
+## Architecture
+
+### 1. Config schema — `brief` block
+
+`src/types/config.ts`: extend `BrandKitConfigSchema` with an optional block.
+
+```ts
+brief: z
+  .object({
+    audience: z.string().optional(),
+    voice_words: z.string().optional(),
+    visual_references: z.string().optional(),
+    anti_references: z.string().optional(),
+  })
+  .optional(),
+```
+
+Example:
+
+```yaml
+brief:
+  audience: "solo founders evaluating a new tool on their phone between meetings"
+  voice_words: "warm, mechanical, opinionated"
+  visual_references: "Klim Type Foundry specimen pages; Linear's changelog"
+  anti_references: "generic SaaS dashboards; Material Design demos"
+```
+
+A brief is **complete** only when all four fields are present and non-empty.
+A helper `isBriefComplete(config)` centralizes this check.
+
+### 2. Generator module — `src/brand-docs/generate.ts`
+
+Pure, deterministic:
+
+```ts
+export function generateBrandDocs(
+  index: DesignSystemIndex,
+  config: BrandKitConfig,
+): { design: string; product: string }
+```
+
+- No I/O, no LLM. Reads from the already-built `index` (base context) and
+  `config.brief`.
+- **PRODUCT.md** sections: Audience (brief.audience), Voice (brief.voice_words),
+  Positioning, Messaging, Differentiation, Concepts — drawn from the verbal
+  atoms in the index. Missing atoms degrade gracefully (omit or note absence),
+  never throw (tolerance principle).
+- **DESIGN.md** sections (Stitch-flavored intent doc): Audience & tone (voice
+  words), Visual references (brief.visual_references), Anti-references
+  (brief.anti_references), Color, Typography, Components, Motion — drawn from
+  the visual atoms in the index.
+- Both files carry a generated note: "Generated by brandkit-mcp from the brand
+  atomic system + brief. Edit outside the delimiter block; the block is
+  overwritten on regeneration."
+
+### 3. Shared writer — `src/brand-docs/write.ts`
+
+Move `updateFileWithDelimiters` out of `src/cli/commands/docs.ts` into a
+shared util (the docs command imports it from here afterward). Behavior
+unchanged:
+
+- Markers: `<!-- brandkit-mcp:start -->` / `<!-- brandkit-mcp:end -->`.
+- File absent → create with delimited block.
+- Delimiters present → replace only the delimited region (human content
+  outside survives).
+- File present, no delimiters → append the block (never overwrite).
+
+A small `writeBrandDocs(outputDir, { design, product })` wraps two calls.
+
+### 4. Startup hook — `src/index.ts`
+
+In `startServer`, after the index is built and before/around tool
+registration (runs for all transports):
+
+```
+if (isBriefComplete(config)) {
+  const { design, product } = generateBrandDocs(currentIndex, config);
+  writeBrandDocs(outputDir, { design, product });   // outputDir = configDir
+  console.error('[brandkit-mcp] Regenerated DESIGN.md and PRODUCT.md');
+} else {
+  console.error('[brandkit-mcp] Brief incomplete — run the sync_brand_docs tool to generate DESIGN.md / PRODUCT.md');
+}
+```
+
+`outputDir` is the directory of the resolved config file (`dirname(filePath)`).
+Wrapped in try/catch so a write failure logs but never crashes the server.
+
+### 5. `sync_brand_docs` tool — `src/tools/sync-brand-docs.ts`
+
+Registered in `src/tools/index.ts`. The server's first **write** tool.
+
+**Input** (all optional):
+`audience`, `voiceWords`, `visualReferences`, `antiReferences` (strings).
+
+**Logic:**
+1. Merge provided args over `config.brief` (args win).
+2. If the merged brief is **incomplete** → return the list of still-missing
+   questions verbatim, plus an instruction: "Ask the user these questions, then
+   call `sync_brand_docs` again with the answers." No write. (Client-agnostic —
+   no reliance on MCP elicitation support.)
+3. If **complete** →
+   a. Persist the merged brief into `brandkit.config.yaml`: read raw file,
+      `yaml.load`, set `brief`, `yaml.dump`, write back. Never touch
+      `magic_trick.md` or any other file.
+   b. Regenerate DESIGN.md + PRODUCT.md via the shared generator/writer.
+   c. Return a summary (files written, brief used) plus `_warnings[]`,
+      including the YAML-comment-loss caveat.
+
+Guard: a hardcoded denylist ensures the tool only ever writes
+`brandkit.config.yaml`, `DESIGN.md`, `PRODUCT.md` — and never `magic_trick.md`.
+
+The tool needs the config file path and the current index; it receives the
+index via the same `() => currentIndex` accessor used by other tools, and
+resolves the config path the same way `startServer` does (or via a passed
+reference). Implementation detail to settle in the plan: thread the resolved
+config file path into tool registration so the tool can rewrite it.
+
+### 6. Refactor the `docs` command — `src/cli/commands/docs.ts`
+
+Today `docs` emits its own token-dump `DESIGN.md`. Replace that section with a
+call to the shared generator so there is exactly one DESIGN.md format, and add
+`PRODUCT.md` to its output. CLAUDE.md / AGENTS.md / SKILLS.md generation is
+unchanged. The command imports `updateFileWithDelimiters` from the shared util.
+
+### 7. CLAUDE.md update
+
+Update the "Conventions" section: the MCP now exposes one write tool
+(`sync_brand_docs`); `magic_trick.md` is on the write denylist; document the
+`brief` config block and the DESIGN.md / PRODUCT.md outputs. Tool count goes
+from 18 to 19.
+
+## Data Flow
+
+```
+brandkit.config.yaml (brief:) ─┐
+                               ├─> generateBrandDocs(index, config)
+brand atomic system (index) ───┘        │
+                                        ├─> DESIGN.md   (delimited block)
+                                        └─> PRODUCT.md  (delimited block)
+
+Boot path:        startServer ─> if brief complete ─> generate + write
+Tool path:        sync_brand_docs ─> complete? ─> save brief + generate + write
+                                  └─> incomplete? ─> return questions, no write
+CLI path:         brandkit-mcp docs ─> generate + write (+ CLAUDE/AGENTS/SKILLS)
+```
+
+## Error Handling
+
+- Generator never throws on missing atoms; absent sections are omitted or noted
+  (tolerance principle). Tools always include `_warnings: string[]`.
+- Startup write is wrapped so failure logs to stderr and the server still runs.
+- The tool validates that all four answers are present before any write; an
+  incomplete call is a no-op that returns guidance.
+
+## Testing (`src/tests/`)
+
+- `generateBrandDocs`: correct sections per file; brief values appear in the
+  right file; missing verbal/visual atoms degrade gracefully without throwing.
+- `isBriefComplete`: true only when all four fields non-empty.
+- `updateFileWithDelimiters` (shared): create / replace-in-place / append paths,
+  human content outside markers preserved.
+- `sync_brand_docs`: incomplete → returns missing questions, writes nothing;
+  complete → persists brief to config, writes both files, `_warnings` includes
+  YAML caveat; never writes `magic_trick.md`.
+- Startup: complete brief regenerates files; incomplete brief skips.
+
+## Out of Scope (YAGNI)
+
+- LLM-synthesized prose (deterministic templates only).
+- Per-context (web/product) variants of DESIGN.md / PRODUCT.md — base only.
+- MCP elicitation — deliberately avoided for client portability.
+- Honoring `config.contexts` (already reserved/unhonored elsewhere).
+```
