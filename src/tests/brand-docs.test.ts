@@ -12,6 +12,7 @@ import {
 } from '../brand-docs/brief.js';
 import { buildFixtureIndex } from './helpers.js';
 import { generateBrandDocs, bullets } from '../brand-docs/generate.js';
+import { regenerateBrandDocsIfReady } from '../brand-docs/regenerate.js';
 
 describe('config brief block', () => {
   it('parses an optional brief with four string fields', () => {
@@ -172,5 +173,32 @@ describe('bullets', () => {
   it('renders multiple items as a bullet list', () => {
     expect(bullets('Klim; Linear')).toBe('- Klim\n- Linear');
     expect(bullets('a\nb')).toBe('- a\n- b');
+  });
+});
+
+describe('regenerateBrandDocsIfReady', () => {
+  const fullBrief = {
+    audience: 'a',
+    voice_words: 'b',
+    visual_references: 'c',
+    anti_references: 'd',
+  };
+
+  it('writes both files when the brief is complete', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-regen-'));
+    const index = buildFixtureIndex('v2/full');
+    const result = regenerateBrandDocsIfReady(index, fullBrief, dir);
+    expect(result.written).toBe(true);
+    expect(existsSync(join(dir, 'DESIGN.md'))).toBe(true);
+    expect(existsSync(join(dir, 'PRODUCT.md'))).toBe(true);
+  });
+
+  it('skips and reports when the brief is incomplete', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-regen-'));
+    const index = buildFixtureIndex('v2/full');
+    const result = regenerateBrandDocsIfReady(index, { audience: 'a' }, dir);
+    expect(result.written).toBe(false);
+    expect(result.reason).toBe('brief-incomplete');
+    expect(existsSync(join(dir, 'DESIGN.md'))).toBe(false);
   });
 });
