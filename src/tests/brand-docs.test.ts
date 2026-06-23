@@ -11,7 +11,7 @@ import {
   BRIEF_PLACEHOLDER,
 } from '../brand-docs/brief.js';
 import { buildFixtureIndex } from './helpers.js';
-import { generateBrandDocs } from '../brand-docs/generate.js';
+import { generateBrandDocs, bullets } from '../brand-docs/generate.js';
 
 describe('config brief block', () => {
   it('parses an optional brief with four string fields', () => {
@@ -155,5 +155,22 @@ describe('generateBrandDocs', () => {
     expect(product).toContain('Product Brief');
     expect(design).toContain('Design Brief');
     expect(product).toContain('Not defined in the brand atomic system');
+  });
+});
+
+describe('bullets', () => {
+  it('returns empty string for empty/whitespace input', () => {
+    expect(bullets('')).toBe('');
+    expect(bullets('   ')).toBe('');
+  });
+
+  it('returns the cleaned single item without trailing delimiter', () => {
+    expect(bullets('Stripe; ')).toBe('Stripe');
+    expect(bullets('Linear')).toBe('Linear');
+  });
+
+  it('renders multiple items as a bullet list', () => {
+    expect(bullets('Klim; Linear')).toBe('- Klim\n- Linear');
+    expect(bullets('a\nb')).toBe('- a\n- b');
   });
 });

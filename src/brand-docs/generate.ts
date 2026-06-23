@@ -23,12 +23,13 @@ function section(title: string, body: string): string {
 }
 
 /** Split a free-text answer on newlines/semicolons into a bullet list. */
-function bullets(text: string): string {
+export function bullets(text: string): string {
   const items = text
     .split(/[\n;]+/)
     .map((s) => s.trim())
     .filter(Boolean);
-  if (items.length <= 1) return text.trim();
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0];
   return items.map((i) => `- ${i}`).join('\n');
 }
 
