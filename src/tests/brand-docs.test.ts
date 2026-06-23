@@ -10,6 +10,8 @@ import {
   BRIEF_QUESTIONS,
   BRIEF_PLACEHOLDER,
 } from '../brand-docs/brief.js';
+import { buildFixtureIndex } from './helpers.js';
+import { generateBrandDocs } from '../brand-docs/generate.js';
 
 describe('config brief block', () => {
   it('parses an optional brief with four string fields', () => {
@@ -117,5 +119,41 @@ describe('writeBrandDocs', () => {
     expect(existsSync(productPath)).toBe(true);
     expect(readFileSync(designPath, 'utf-8')).toContain('D');
     expect(readFileSync(productPath, 'utf-8')).toContain('P');
+  });
+});
+
+describe('generateBrandDocs', () => {
+  const brief = {
+    audience: 'solo founders between meetings',
+    voice_words: 'warm, mechanical, opinionated',
+    visual_references: 'Klim specimen pages; Linear changelog',
+    anti_references: 'generic SaaS dashboards; Material demos',
+  };
+
+  it('puts audience + voice + verbal atoms in PRODUCT.md', () => {
+    const index = buildFixtureIndex('v2/full');
+    const { product } = generateBrandDocs(index, brief);
+    expect(product).toContain('Product Brief');
+    expect(product).toContain('solo founders between meetings');
+    expect(product).toContain('warm, mechanical, opinionated');
+    expect(product).toContain('ship marketing pages');
+  });
+
+  it('puts references + anti-references + visual atoms in DESIGN.md', () => {
+    const index = buildFixtureIndex('v2/full');
+    const { design } = generateBrandDocs(index, brief);
+    expect(design).toContain('Design Brief');
+    expect(design).toContain('Klim specimen pages');
+    expect(design).toContain('generic SaaS dashboards');
+    expect(design).toContain('Anti-references');
+    expect(design).toContain('Button');
+  });
+
+  it('does not throw and notes absence when atoms are missing (empty fixture)', () => {
+    const index = buildFixtureIndex('v2/empty');
+    const { design, product } = generateBrandDocs(index, brief);
+    expect(product).toContain('Product Brief');
+    expect(design).toContain('Design Brief');
+    expect(product).toContain('Not defined in the brand atomic system');
   });
 });
