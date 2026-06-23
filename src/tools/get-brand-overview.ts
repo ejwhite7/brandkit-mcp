@@ -2,7 +2,7 @@
  * @file get-brand-overview.ts
  * @description MCP tool: get_brand_overview
  * Returns a high-level overview of the design system including brand name,
- * contexts, asset inventory, available 18 tools, and taste primer.
+ * contexts, asset inventory, available 19 tools, and taste primer.
  */
 
 import type { DesignSystemIndex } from '../indexer/types.js';
@@ -37,6 +37,7 @@ const TOOLS: ReadonlyArray<readonly [string, string]> = [
   ['search_brand', 'Full-text search'],
   ['validate_usage', 'Validate brand compliance'],
   ['get_context_diff', 'Diff base vs web vs product'],
+  ['sync_brand_docs', 'Generate or update DESIGN.md and PRODUCT.md from the brief'],
 ];
 
 /**

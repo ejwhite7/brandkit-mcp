@@ -34,11 +34,12 @@ import * as css              from './get-css.js';
 import * as searchBrand      from './search-brand.js';
 import * as validateUsage    from './validate-usage.js';
 import * as contextDiff      from './get-context-diff.js';
+import * as syncBrandDocs    from './sync-brand-docs.js';
 
 import { listResources, readResource } from '../resources/index.js';
 import { listPrompts, getPrompt } from '../prompts/index.js';
 
-/** All tool modules in registration order (v2 surface, 18 tools). */
+/** All tool modules in registration order (v2 surface, 19 tools). */
 const ALL_TOOLS = [
   brandOverview,
   magicTrick,
@@ -58,6 +59,7 @@ const ALL_TOOLS = [
   searchBrand,
   validateUsage,
   contextDiff,
+  syncBrandDocs,
 ] as const;
 
 /**
@@ -70,6 +72,7 @@ const ALL_TOOLS = [
 export function registerAllTools(
   server: Server,
   getIndex: () => DesignSystemIndex,
+  context?: { configPath: string; outputDir: string },
 ): void {
   // ---- Tools --------------------------------------------------------------
 
@@ -105,6 +108,7 @@ export function registerAllTools(
         case searchBrand.TOOL_NAME:      return { content: searchBrand.handler(index, args as never) };
         case validateUsage.TOOL_NAME:    return { content: validateUsage.handler(index, args as never) };
         case contextDiff.TOOL_NAME:      return { content: contextDiff.handler(index, args as never) };
+        case syncBrandDocs.TOOL_NAME:    return { content: await syncBrandDocs.handler(index, args as never, context) };
         default:
           return {
             content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
