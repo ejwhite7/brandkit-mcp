@@ -202,3 +202,28 @@ describe('regenerateBrandDocsIfReady', () => {
     expect(existsSync(join(dir, 'DESIGN.md'))).toBe(false);
   });
 });
+
+describe('brand-docs delimiter round-trip', () => {
+  const fullBrief = {
+    audience: 'a',
+    voice_words: 'b',
+    visual_references: 'c',
+    anti_references: 'd',
+  };
+
+  it('preserves human content outside the block across regenerations', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-roundtrip-'));
+    const index = buildFixtureIndex('v2/full');
+    // First generation.
+    regenerateBrandDocsIfReady(index, fullBrief, dir);
+    // Human appends content AFTER the generated block.
+    const designPath = join(dir, 'DESIGN.md');
+    const withHuman = readFileSync(designPath, 'utf-8') + '\n## Human notes\nkeep me\n';
+    writeFileSync(designPath, withHuman, 'utf-8');
+    // Second generation must preserve the human section.
+    regenerateBrandDocsIfReady(index, fullBrief, dir);
+    const after = readFileSync(designPath, 'utf-8');
+    expect(after).toContain('## Human notes');
+    expect(after).toContain('keep me');
+  });
+});

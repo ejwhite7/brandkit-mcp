@@ -54,8 +54,9 @@ describe('sync_brand_docs', () => {
     expect(existsSync(join(ctx.outputDir, 'DESIGN.md'))).toBe(true);
     expect(existsSync(join(ctx.outputDir, 'PRODUCT.md'))).toBe(true);
 
-    const savedCfg = yaml.load(readFileSync(ctx.configPath, 'utf-8')) as Record<string, any>;
-    expect(savedCfg.brief.voice_words).toBe('warm, mechanical, opinionated');
+    const savedCfg = yaml.load(readFileSync(ctx.configPath, 'utf-8')) as Record<string, unknown>;
+    const savedBrief = savedCfg.brief as Record<string, string>;
+    expect(savedBrief.voice_words).toBe('warm, mechanical, opinionated');
 
     expect((payload._warnings as string[]).join(' ')).toContain('comments');
   });
@@ -71,9 +72,10 @@ describe('sync_brand_docs', () => {
     const content = await call(index, { audience: 'updated audience' }, ctx);
     const payload = JSON.parse(content[0].text) as Record<string, unknown>;
     expect(payload.status).toBe('written');
-    const savedCfg = yaml.load(readFileSync(ctx.configPath, 'utf-8')) as Record<string, any>;
-    expect(savedCfg.brief.audience).toBe('updated audience');
-    expect(savedCfg.brief.anti_references).toBe('antis');
+    const savedCfg = yaml.load(readFileSync(ctx.configPath, 'utf-8')) as Record<string, unknown>;
+    const savedBrief = savedCfg.brief as Record<string, string>;
+    expect(savedBrief.audience).toBe('updated audience');
+    expect(savedBrief.anti_references).toBe('antis');
   });
 
   it('never writes a magic_trick.md', async () => {
@@ -93,5 +95,27 @@ describe('sync_brand_docs', () => {
     const payload = JSON.parse(content[0].text) as Record<string, unknown>;
     expect(payload.ok).toBe(false);
     expect(String(payload.error)).toContain('no config path');
+  });
+
+  it('refuses to overwrite a config it could not read as v2, but still writes the docs', async () => {
+    const index = buildFixtureIndex('v2/full');
+    const ctx = setup();
+    // A config missing `version: 2` — must not be clobbered.
+    const original = 'brand:\n  name: NoVersion\n  root: ./\n';
+    writeFileSync(ctx.configPath, original, 'utf-8');
+    const content = await call(
+      index,
+      { audience: 'a', voiceWords: 'b', visualReferences: 'c', antiReferences: 'd' },
+      ctx,
+    );
+    const payload = JSON.parse(content[0].text) as Record<string, unknown>;
+    expect(payload.status).toBe('written');
+    expect(payload.savedConfig).toBe(false);
+    // Config file is untouched.
+    expect(readFileSync(ctx.configPath, 'utf-8')).toBe(original);
+    // Docs are still generated.
+    expect(existsSync(join(ctx.outputDir, 'DESIGN.md'))).toBe(true);
+    expect(existsSync(join(ctx.outputDir, 'PRODUCT.md'))).toBe(true);
+    expect((payload._warnings as string[]).join(' ')).toContain('refusing to overwrite');
   });
 });

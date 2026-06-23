@@ -83,8 +83,10 @@ export async function handler(
 
   // Load any existing brief from the config file.
   let raw: Record<string, unknown> = {};
+  let configReadOk = false;
   try {
     raw = (yaml.load(readFileSync(context.configPath, 'utf-8')) as Record<string, unknown>) ?? {};
+    configReadOk = true;
   } catch (err) {
     warnings.push(
       `Could not read existing config at ${context.configPath}: ${err instanceof Error ? err.message : String(err)}`,
@@ -113,16 +115,22 @@ export async function handler(
   // Persist the brief back into brandkit.config.yaml (re-serializes the file,
   // dropping any comments / custom formatting).
   let savedConfig = false;
-  try {
-    raw.brief = merged;
-    writeFileSync(context.configPath, yaml.dump(raw), 'utf-8');
-    savedConfig = true;
+  if (configReadOk && raw.version === 2) {
+    try {
+      raw.brief = merged;
+      writeFileSync(context.configPath, yaml.dump(raw), 'utf-8');
+      savedConfig = true;
+      warnings.push(
+        'Saved the brief into brandkit.config.yaml. Note: rewriting the YAML drops any comments or custom formatting in that file.',
+      );
+    } catch (err) {
+      warnings.push(
+        `Could not write brief to config: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  } else {
     warnings.push(
-      'Saved the brief into brandkit.config.yaml. Note: rewriting the YAML drops any comments or custom formatting in that file.',
-    );
-  } catch (err) {
-    warnings.push(
-      `Could not write brief to config: ${err instanceof Error ? err.message : String(err)}`,
+      'Skipped writing the brief to brandkit.config.yaml because the existing config could not be read or is not a v2 config; refusing to overwrite it.',
     );
   }
 
