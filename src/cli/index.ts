@@ -65,7 +65,7 @@ program
 
 program
   .command('docs')
-  .description('Generate project documentation files (CLAUDE.md, AGENTS.md, SKILLS.md, DESIGN.md)')
+  .description('Generate project documentation files (CLAUDE.md, AGENTS.md, SKILLS.md, DESIGN.md, PRODUCT.md)')
   .option('--config <path>', 'Path to brandkit.config.yaml')
   .option('--output <dir>', 'Output directory for generated docs', '.')
   .action(docsCommand);
