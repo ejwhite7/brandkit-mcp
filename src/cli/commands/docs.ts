@@ -1,7 +1,8 @@
 /**
  * @file commands/docs.ts
  * @description Implementation of the `brandkit-mcp docs` command.
- * Generates project documentation files: CLAUDE.md, AGENTS.md, SKILLS.md, and DESIGN.md.
+ * Generates project documentation files: CLAUDE.md, AGENTS.md, SKILLS.md,
+ * DESIGN.md, and PRODUCT.md.
  *
  * User content outside the branded delimiter block is preserved on
  * subsequent runs. Only the region between the start and end delimiters
@@ -9,52 +10,16 @@
  * block is appended so nothing is lost.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { loadConfigWithPath, resolveConfigPaths } from '../../config/loader.js';
 import { buildDesignSystemIndex } from '../../indexer/index.js';
-
-const DELIMITER_START = '<!-- brandkit-mcp:start -->';
-const DELIMITER_END = '<!-- brandkit-mcp:end -->';
-
-/**
- * Write a generated block into a file while preserving any user content
- * that lives outside the delimiter markers.
- *
- * - If the file does not exist: create it with the delimited block.
- * - If the file exists and contains delimiters: replace only the
- *   delimited region.
- * - If the file exists but has no delimiters: append the block so
- *   existing user content is never overwritten.
- */
-function updateFileWithDelimiters(filePath: string, generatedBlock: string): void {
-  const wrappedBlock = `${DELIMITER_START}\n${generatedBlock}\n${DELIMITER_END}`;
-
-  if (!existsSync(filePath)) {
-    writeFileSync(filePath, wrappedBlock + '\n', 'utf-8');
-    return;
-  }
-
-  const existing = readFileSync(filePath, 'utf-8');
-  const startIdx = existing.indexOf(DELIMITER_START);
-  const endIdx = existing.indexOf(DELIMITER_END);
-
-  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-    // Replace the existing delimited block only
-    const updated =
-      existing.slice(0, startIdx) +
-      wrappedBlock +
-      existing.slice(endIdx + DELIMITER_END.length);
-    writeFileSync(filePath, updated, 'utf-8');
-  } else {
-    // No delimiters found -- append to preserve existing content
-    writeFileSync(filePath, existing.trimEnd() + '\n\n' + wrappedBlock + '\n', 'utf-8');
-  }
-}
+import { updateFileWithDelimiters, writeBrandDocs } from '../../brand-docs/write.js';
+import { generateBrandDocs } from '../../brand-docs/generate.js';
+import { fillBriefPlaceholders } from '../../brand-docs/brief.js';
 
 /**
  * Handles the `brandkit-mcp docs` command.
- * Generates CLAUDE.md, AGENTS.md, SKILLS.md, and DESIGN.md from the design system.
+ * Generates CLAUDE.md, AGENTS.md, SKILLS.md, DESIGN.md, and PRODUCT.md from the design system.
  */
 export async function docsCommand(options: { config?: string; output?: string }): Promise<void> {
   console.log('Generating project documentation...\n');
@@ -171,35 +136,12 @@ Tool: get_context_diff
   updateFileWithDelimiters(join(outputDir, 'SKILLS.md'), skillsBlock);
   console.log('[OK] Generated SKILLS.md');
 
-  // Generate DESIGN.md
-  const tokenSummary = index.base.tokens.slice(0, 10)
-    .map((t) => `- **${t.name}**: \`${t.value}\``)
-    .join('\n');
-
-  const componentSummary = index.base.components
-    .map((c) => `- **${c.name}**: ${c.description ?? 'No description'}`)
-    .join('\n');
-
-  const assetSummary = index.base.assets.slice(0, 10)
-    .map((a) => `- **${a.file}** (${a.format})`)
-    .join('\n');
-
-  const designBlock = `# ${brandName} -- Design System Reference
-
-## Tokens (base context)
-
-${tokenSummary || 'No tokens defined.'}
-
-## Components (base context)
-
-${componentSummary || 'No components defined.'}
-
-## Assets (base context)
-
-${assetSummary || 'No assets defined.'}`;
-
-  updateFileWithDelimiters(join(outputDir, 'DESIGN.md'), designBlock);
+  // DESIGN.md + PRODUCT.md via the shared generator (single source of truth).
+  // Empty brief fields render as a placeholder pointing at sync_brand_docs.
+  const brief = fillBriefPlaceholders(config.brief);
+  writeBrandDocs(outputDir, generateBrandDocs(index, brief));
   console.log('[OK] Generated DESIGN.md');
+  console.log('[OK] Generated PRODUCT.md');
 
   console.log('\nAll documentation files generated successfully.');
 }

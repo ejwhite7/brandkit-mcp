@@ -19,6 +19,16 @@ export const BrandKitConfigSchema = z.object({
     description: z.string().optional(),
     root: z.string().default('./brand_atomic_system'),
   }),
+  // Human-authored creative brief. Optional; consumed only to generate
+  // DESIGN.md / PRODUCT.md. Never read back as MCP input.
+  brief: z
+    .object({
+      audience: z.string().optional(),
+      voice_words: z.string().optional(),
+      visual_references: z.string().optional(),
+      anti_references: z.string().optional(),
+    })
+    .optional(),
   // RESERVED: accepted for forward compatibility but not yet honored — the
   // resolver always materializes all three contexts. See CLAUDE.md.
   contexts: z

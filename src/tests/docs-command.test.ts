@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { docsCommand } from '../cli/commands/docs.js';
@@ -27,5 +27,10 @@ describe('docs command path resolution', () => {
     await docsCommand({ config: join(configDir, 'brandkit.config.yaml'), output: outDir });
     const claude = readFileSync(join(outDir, 'CLAUDE.md'), 'utf-8');
     expect(claude).toContain('| Tokens | 1 |');
+
+    expect(existsSync(join(outDir, 'DESIGN.md'))).toBe(true);
+    expect(existsSync(join(outDir, 'PRODUCT.md'))).toBe(true);
+    const product = readFileSync(join(outDir, 'PRODUCT.md'), 'utf-8');
+    expect(product).toContain('PathTest — Product Brief');
   });
 });

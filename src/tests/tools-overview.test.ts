@@ -6,11 +6,11 @@ import * as validate from '../tools/validate-usage.js';
 import * as diff from '../tools/get-context-diff.js';
 
 describe('get_brand_overview', () => {
-  it('lists 18 tools', () => {
+  it('lists 19 tools', () => {
     const idx = buildFixtureIndex('v2/full');
     const [result] = overview.handler(idx);
     const parsed = JSON.parse(result.text);
-    expect(parsed.availableTools).toHaveLength(18);
+    expect(parsed.availableTools).toHaveLength(19);
   });
 
   it('includes taste primer', () => {

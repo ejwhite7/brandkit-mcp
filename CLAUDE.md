@@ -88,13 +88,13 @@ src/
 ├── resources/         # MCP resource handlers (brand:// URIs)
 ├── scanner/           # directory scanner (walks brand atomic system)
 ├── tests/             # vitest
-├── tools/             # 18 MCP tools
+├── tools/             # 19 MCP tools
 └── types/             # design-system + config zod schemas
 ```
 
 ---
 
-## Tool Surface (18 tools)
+## Tool Surface (19 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -116,6 +116,7 @@ src/
 | `search_brand` | Full-text search |
 | `validate_usage` | Validate brand compliance |
 | `get_context_diff` | Diff base vs web vs product |
+| `sync_brand_docs` | Generate/update DESIGN.md + PRODUCT.md from the brand + a 4-answer brief (write tool) |
 
 Seven creative/verbal tools (`get_brand_overview`, `get_positioning`, `get_audience`, `get_messaging`, `get_differentiation`, `get_concepts`, `get_voice`) inject a `_taste_primer` field carrying `magic_trick.md` verbatim. `get_magic_trick` returns the primer directly without wrapping.
 
@@ -123,7 +124,7 @@ Seven creative/verbal tools (`get_brand_overview`, `get_positioning`, `get_audie
 
 ## Conventions
 
-**Never write to `magic_trick.md`.** This file is human-authored. The MCP exposes no write tools today; if write capabilities are added in the future, `magic_trick.md` MUST be on the path denylist.
+**Never write to `magic_trick.md`.** This file is human-authored. The MCP exposes exactly one write tool today (`sync_brand_docs`), which writes only `brandkit.config.yaml`, `DESIGN.md`, and `PRODUCT.md`. `magic_trick.md` MUST remain on the write denylist.
 
 **Tolerance principle.** Parsers degrade gracefully -- never throw on bad input. Tools always include a `_warnings: string[]` field.
 
@@ -136,6 +137,15 @@ not yet honored: the resolver always materializes `base`, `web`, and
 `product`. Setting `contexts: [base]` does not disable the override layers.
 
 **`human/` is ignored.** The scanner skips the `human/` directory entirely. Drop PDFs, print specs, or any material not intended for AI consumption there.
+
+**Brief drives DESIGN.md / PRODUCT.md.** An optional `brief:` block in
+`brandkit.config.yaml` (`audience`, `voice_words`, `visual_references`,
+`anti_references`) is combined with the brand atomic system to generate two
+write-only reference files at the project root: `PRODUCT.md` (who & why, from
+the verbal atoms) and `DESIGN.md` (how it looks, from the visual atoms). They
+guide coding agents that are NOT using the MCP. The MCP never reads them back
+as input. They are regenerated on server startup (when the brief is complete)
+and by the `sync_brand_docs` tool, which asks for any missing answers first.
 
 ---
 

@@ -18,6 +18,7 @@ import type { DesignSystemIndex } from './indexer/types.js';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getPackageVersion } from './version.js';
+import { regenerateBrandDocsIfReady } from './brand-docs/regenerate.js';
 
 /** Current design system index -- updated on hot-reload. */
 let currentIndex: DesignSystemIndex;
@@ -55,12 +56,31 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   const elapsed = Date.now() - startTime;
   console.error(`[brandkit-mcp] Indexed ${currentIndex.base.tokens.length + currentIndex.base.components.length + currentIndex.base.assets.length} assets in ${elapsed}ms`);
 
+  // Regenerate the DESIGN.md / PRODUCT.md reference files for non-MCP coding
+  // agents. Written next to brandkit.config.yaml. The MCP never reads these
+  // files back as input. Never blocks startup.
+  try {
+    const result = regenerateBrandDocsIfReady(currentIndex, config.brief, configDir);
+    if (result.written) {
+      console.error('[brandkit-mcp] Regenerated DESIGN.md and PRODUCT.md');
+    } else {
+      console.error(
+        '[brandkit-mcp] Brief incomplete — run the sync_brand_docs tool to generate DESIGN.md / PRODUCT.md',
+      );
+    }
+  } catch (err) {
+    console.error(
+      '[brandkit-mcp] Failed to regenerate brand docs:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
   const server = new Server(
     { name: 'brandkit-mcp', version: getPackageVersion() },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
-  registerAllTools(server, () => currentIndex);
+  registerAllTools(server, () => currentIndex, { configPath: filePath, outputDir: configDir });
 
   if (options.watch) {
     console.error('[brandkit-mcp] File watching enabled');
@@ -101,7 +121,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
           { name: 'brandkit-mcp', version: getPackageVersion() },
           { capabilities: { tools: {}, resources: {}, prompts: {} } },
         );
-        registerAllTools(sessionServer, () => currentIndex);
+        registerAllTools(sessionServer, () => currentIndex, { configPath: filePath, outputDir: configDir });
         const t = new SSEServerTransport('/messages', res);
         sessions.set(t.sessionId, t);
         res.on('close', () => sessions.delete(t.sessionId));
