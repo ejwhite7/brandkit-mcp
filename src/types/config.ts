@@ -46,6 +46,8 @@ export const BrandKitConfigSchema = z.object({
       transport: z.enum(['stdio', 'sse', 'http']).default('stdio'),
       port: z.number().int().min(1).max(65535).default(3001),
       host: z.string().min(1).default('127.0.0.1'),
+      allowedHosts: z.array(z.string().min(1)).default([]),
+      allowedOrigins: z.array(z.string().min(1)).default([]),
     })
     .default({}),
 });

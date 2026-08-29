@@ -17,7 +17,12 @@ import { loadConfigWithPath, resolveConfigPaths } from '../config/loader.js';
 import { buildDesignSystemIndex } from '../indexer/index.js';
 import { registerAllTools } from '../tools/index.js';
 import { getPackageVersion } from '../version.js';
-import { createNetworkAuthPolicy, formatHostForUrl } from '../network.js';
+import {
+  createNetworkAuthPolicy,
+  createNetworkRequestPolicy,
+  formatHostForUrl,
+  getDistinctRequestHeader,
+} from '../network.js';
 
 /**
  * Starts a standalone HTTP server with SSE transport.
@@ -41,6 +46,12 @@ export async function startStandaloneServer(
   const listenHost = host ?? config.server.host;
   const urlHost = formatHostForUrl(listenHost);
   const authPolicy = createNetworkAuthPolicy(listenHost, authToken);
+  const requestPolicy = createNetworkRequestPolicy(
+    listenHost,
+    listenPort,
+    config.server.allowedHosts,
+    config.server.allowedOrigins,
+  );
   const index = await buildDesignSystemIndex(config);
 
   // One transport per connected client, keyed by sessionId.
@@ -49,6 +60,15 @@ export async function startStandaloneServer(
   const httpServer = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
+
+      if (!requestPolicy.validate(
+        getDistinctRequestHeader(req, 'host'),
+        getDistinctRequestHeader(req, 'origin'),
+      )) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Forbidden' }));
+        return;
+      }
 
       if (!authPolicy.authorize(req.headers.authorization)) {
         res.writeHead(401, {
@@ -73,7 +93,11 @@ export async function startStandaloneServer(
           { capabilities: { tools: {}, resources: {}, prompts: {} } },
         );
         registerAllTools(sessionServer, () => index);
-        const transport = new SSEServerTransport('/messages', res);
+        const transport = new SSEServerTransport(
+          '/messages',
+          res,
+          requestPolicy.sdkDnsRebindingOptions,
+        );
         sessions.set(transport.sessionId, transport);
         res.on('close', () => sessions.delete(transport.sessionId));
         await sessionServer.connect(transport);

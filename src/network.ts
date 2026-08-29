@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import { isIP } from 'net';
+import type { IncomingMessage } from 'http';
 
 /** Formats a configured hostname or IP address for use in an HTTP URL. */
 export function formatHostForUrl(host: string): string {
@@ -18,6 +19,168 @@ export function isLoopbackHost(host: string): boolean {
   return mappedIpv4 !== undefined
     && isIP(mappedIpv4) === 4
     && mappedIpv4.split('.')[0] === '127';
+}
+
+function isWildcardHost(host: string): boolean {
+  const normalized = host.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  return normalized === '0.0.0.0' || normalized === '::';
+}
+
+function normalizeHostname(value: string, label: string): string {
+  if (value.trim() !== value || value.length === 0) {
+    throw new Error(`${label} must be a non-empty hostname without surrounding whitespace`);
+  }
+
+  let url: URL;
+  try {
+    url = new URL(`http://${value}`);
+  } catch {
+    throw new Error(`${label} must be a valid hostname without a port`);
+  }
+
+  if (url.username || url.password || url.port || url.pathname !== '/' || url.search || url.hash) {
+    throw new Error(`${label} must be a hostname without a port, path, credentials, query, or fragment`);
+  }
+  return url.hostname.toLowerCase().replace(/\.$/, '');
+}
+
+function normalizeOrigin(value: string, label: string): string {
+  if (value.trim() !== value || value.length === 0) {
+    throw new Error(`${label} must be a non-empty HTTP(S) origin without surrounding whitespace`);
+  }
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${label} must be a valid HTTP(S) origin`);
+  }
+
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:')
+    || url.username
+    || url.password
+    || url.pathname !== '/'
+    || url.search
+    || url.hash
+    || url.origin === 'null'
+  ) {
+    throw new Error(`${label} must contain only an http(s) scheme, hostname, and optional port`);
+  }
+  return url.origin.toLowerCase();
+}
+
+function singleHeaderValue(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value.length === 1 ? value[0] : undefined;
+  return value;
+}
+
+/** Reads a request header without silently accepting duplicate field lines. */
+export function getDistinctRequestHeader(
+  request: IncomingMessage,
+  name: 'host' | 'origin',
+): string | string[] | undefined {
+  return request.headersDistinct[name] ?? request.headers[name];
+}
+
+export interface SdkDnsRebindingOptions {
+  enableDnsRebindingProtection: boolean;
+  allowedHosts?: string[];
+  allowedOrigins?: string[];
+}
+
+export interface NetworkRequestPolicy {
+  readonly sdkDnsRebindingOptions: SdkDnsRebindingOptions;
+  validate(
+    hostHeader: string | string[] | undefined,
+    originHeader: string | string[] | undefined,
+  ): boolean;
+}
+
+/**
+ * Creates the Host and Origin policy shared by every Node HTTP MCP transport.
+ * Host allowlists contain hostnames (not ports); Origin allowlists are exact origins.
+ */
+export function createNetworkRequestPolicy(
+  listenHost: string,
+  listenPort: number,
+  configuredAllowedHosts: readonly string[] = [],
+  configuredAllowedOrigins: readonly string[] = [],
+): NetworkRequestPolicy {
+  const allowedHosts = new Set(configuredAllowedHosts.map((host, index) => (
+    normalizeHostname(host, `server.allowedHosts[${index}]`)
+  )));
+  const allowedOrigins = new Set(configuredAllowedOrigins.map((origin, index) => (
+    normalizeOrigin(origin, `server.allowedOrigins[${index}]`)
+  )));
+  const automaticHostTrust = allowedHosts.size === 0;
+
+  if (automaticHostTrust) {
+    if (isWildcardHost(listenHost)) {
+      throw new Error(
+        'server.allowedHosts must contain at least one trusted hostname when server.host is a wildcard address',
+      );
+    }
+    allowedHosts.add(normalizeHostname(formatHostForUrl(listenHost), 'server.host'));
+  }
+
+  const sdkHostnames = automaticHostTrust && isLoopbackHost(listenHost)
+    ? new Set([...allowedHosts, 'localhost', '127.0.0.1', '[::1]'])
+    : allowedHosts;
+  // The SDK performs literal Host matching, so include both the portless and
+  // direct-listener forms. For ephemeral ports, the shared outer validator is
+  // authoritative because the final port is not known when the transport is built.
+  const sdkAllowedHosts = listenPort === 0
+    ? undefined
+    : [...sdkHostnames].flatMap((hostname) => [hostname, `${hostname}:${listenPort}`]);
+  const sdkAllowedOrigins = configuredAllowedOrigins.length > 0
+    ? [...allowedOrigins]
+    : undefined;
+
+  return {
+    sdkDnsRebindingOptions: {
+      enableDnsRebindingProtection: true,
+      allowedHosts: sdkAllowedHosts,
+      allowedOrigins: sdkAllowedOrigins,
+    },
+    validate(hostHeader, originHeader): boolean {
+      const host = singleHeaderValue(hostHeader);
+      if (host === undefined) return false;
+
+      let hostname: string;
+      try {
+        const parsed = new URL(`http://${host}`);
+        if (parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+          return false;
+        }
+        hostname = parsed.hostname.toLowerCase().replace(/\.$/, '');
+      } catch {
+        return false;
+      }
+
+      const hostAllowed = automaticHostTrust && isLoopbackHost(listenHost)
+        ? isLoopbackHost(hostname)
+        : allowedHosts.has(hostname);
+      if (!hostAllowed) return false;
+
+      if (originHeader === undefined) return true;
+      const origin = singleHeaderValue(originHeader);
+      if (origin === undefined) return false;
+
+      let normalizedOrigin: string;
+      let originHostname: string;
+      try {
+        normalizedOrigin = normalizeOrigin(origin, 'Origin header');
+        originHostname = new URL(normalizedOrigin).hostname.toLowerCase().replace(/\.$/, '');
+      } catch {
+        return false;
+      }
+
+      if (allowedOrigins.size > 0) return allowedOrigins.has(normalizedOrigin);
+      if (automaticHostTrust && isLoopbackHost(listenHost)) return isLoopbackHost(originHostname);
+      return allowedHosts.has(originHostname);
+    },
+  };
 }
 
 export interface NetworkAuthPolicy {

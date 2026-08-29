@@ -11,8 +11,27 @@ describe('config v2 schema', () => {
     expect(parsed.contexts).toEqual(['base', 'web', 'product']);
     expect(parsed.brand.root).toBe('./brand_atomic_system');
     expect(parsed.ignore).toContain('human/');
-    expect(parsed.server).toEqual({ transport: 'stdio', port: 3001, host: '127.0.0.1' });
+    expect(parsed.server).toEqual({
+      transport: 'stdio',
+      port: 3001,
+      host: '127.0.0.1',
+      allowedHosts: [],
+      allowedOrigins: [],
+    });
     expect(parsed.preview).toEqual({ port: 3000, host: '127.0.0.1' });
+  });
+
+  it('accepts explicit network trust configuration', () => {
+    const parsed = BrandKitConfigSchema.parse({
+      version: 2,
+      brand: { name: 'Acme Corp' },
+      server: {
+        allowedHosts: ['mcp.example.com'],
+        allowedOrigins: ['https://admin.example.com'],
+      },
+    });
+    expect(parsed.server.allowedHosts).toEqual(['mcp.example.com']);
+    expect(parsed.server.allowedOrigins).toEqual(['https://admin.example.com']);
   });
 
   it('accepts Streamable HTTP and explicit network hosts', () => {

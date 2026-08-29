@@ -172,6 +172,21 @@ Your `brandkit.config.yaml` must also be updated to declare `version: 2` and use
 
 **Transports.** The server supports stdio (recommended for Claude Desktop), SSE (legacy HTTP), and Streamable HTTP (current MCP spec). Network transports remain unauthenticated when bound to loopback for local development. Before binding SSE or HTTP to any non-loopback host, set `BRANDKIT_AUTH_TOKEN`; clients must send it as `Authorization: Bearer <token>` on every request.
 
+Every network transport rejects untrusted `Host` and `Origin` headers with HTTP 403. Loopback listeners automatically trust loopback hostnames and origins, including IPv4, IPv6, and ephemeral ports. A concrete non-loopback `server.host` derives trust for that exact hostname. Wildcard bindings (`0.0.0.0` or `::`) fail at startup unless `server.allowedHosts` is explicit:
+
+```yaml
+server:
+  transport: http
+  host: 0.0.0.0
+  port: 3001
+  allowedHosts:
+    - mcp.example.com       # hostname only; Host-header ports are ignored
+  allowedOrigins:
+    - https://app.example.com
+```
+
+`allowedOrigins` entries are exact HTTP(S) origins, including the port when it is non-default. If the list is empty, requests without an `Origin` header remain valid for MCP clients, while a supplied Origin must use a trusted Host hostname. Configure `allowedOrigins` explicitly when a browser application is hosted on a different origin. IPv6 entries in `allowedHosts` use brackets, for example `[2001:db8::10]`.
+
 ## CLI Reference
 
 ```

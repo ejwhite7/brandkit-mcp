@@ -25,7 +25,7 @@ function writeConfig(transport: 'sse' | 'http' = 'sse'): string {
   const configPath = join(dir, 'brandkit.config.yaml');
   writeFileSync(
     configPath,
-    `version: 2\nbrand:\n  name: Auth Test\n  root: ${JSON.stringify(fixtureRoot)}\nserver:\n  transport: ${transport}\n  host: "0.0.0.0"\n`,
+    `version: 2\nbrand:\n  name: Auth Test\n  root: ${JSON.stringify(fixtureRoot)}\nserver:\n  transport: ${transport}\n  host: "0.0.0.0"\n  allowedHosts:\n    - "127.0.0.1"\n`,
   );
   return configPath;
 }

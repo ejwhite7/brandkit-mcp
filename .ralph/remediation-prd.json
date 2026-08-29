@@ -48,7 +48,7 @@
       "title": "Enable Host Origin and DNS rebinding protection",
       "dependencies": ["SEC-001"],
       "acceptance": ["invalid Host and Origin return 403", "all network transports use equivalent protection", "regression tests cover hostile headers"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "SEC-004",

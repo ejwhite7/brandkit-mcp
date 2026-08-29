@@ -20,7 +20,12 @@ import { fileURLToPath } from 'url';
 import { getPackageVersion } from './version.js';
 import { regenerateBrandDocsIfReady } from './brand-docs/regenerate.js';
 import type { Server as HttpServer } from 'http';
-import { createNetworkAuthPolicy, formatHostForUrl } from './network.js';
+import {
+  createNetworkAuthPolicy,
+  createNetworkRequestPolicy,
+  formatHostForUrl,
+  getDistinctRequestHeader,
+} from './network.js';
 
 /** Current design system index -- updated on hot-reload. */
 let currentIndex: DesignSystemIndex;
@@ -114,6 +119,23 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   const host = options.host ?? config.server.host;
   const urlHost = formatHostForUrl(host);
   const authPolicy = createNetworkAuthPolicy(host, options.authToken);
+  const requestPolicy = createNetworkRequestPolicy(
+    host,
+    port,
+    config.server.allowedHosts,
+    config.server.allowedOrigins,
+  );
+
+  app.use((req, res, next) => {
+    if (requestPolicy.validate(
+      getDistinctRequestHeader(req, 'host'),
+      getDistinctRequestHeader(req, 'origin'),
+    )) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: 'Forbidden' });
+  });
 
   app.use((req, res, next) => {
     if (authPolicy.authorize(req.headers.authorization)) {
@@ -137,7 +159,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
           { capabilities: { tools: {}, resources: {}, prompts: {} } },
         );
         registerAllTools(sessionServer, () => currentIndex, { configPath: filePath, outputDir: configDir });
-        const t = new SSEServerTransport('/messages', res);
+        const t = new SSEServerTransport('/messages', res, requestPolicy.sdkDnsRebindingOptions);
         sessions.set(t.sessionId, t);
         res.on('close', () => sessions.delete(t.sessionId));
         await sessionServer.connect(t);
@@ -182,6 +204,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
 
     const httpTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless: simpler for single-tenant brand servers
+      ...requestPolicy.sdkDnsRebindingOptions,
     });
     await server.connect(httpTransport);
 

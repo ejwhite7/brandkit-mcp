@@ -65,3 +65,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; remove `BRANDKIT_AUTH_TOKEN` from deployment configuration if no longer used.
 - Commit: Pending at time of entry.
 - Next eligible story: SEC-003.
+
+## 2026-08-28 23:37 EDT — SEC-003
+
+- Objective: Reject DNS-rebinding and hostile browser authority headers consistently.
+- Defect reproduced: Network transports accepted arbitrary Host and Origin values and left SDK rebinding protection disabled.
+- Changes: Added shared normalized Host/Origin policy, explicit `allowedHosts` and `allowedOrigins`, wildcard fail-closed startup, duplicate-header rejection, outer validation on every endpoint, and SDK rebinding options.
+- Files changed: `src/network.ts`, `src/types/config.ts`, `src/index.ts`, `src/adapters/standalone.ts`, `README.md`, and network/config tests.
+- Tests added: IPv4/IPv6 loopback, wildcard and concrete hosts, exact origins, missing/malformed/duplicate headers, and hostile HTTP/SSE/standalone requests.
+- Verification commands: Focused 23 tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `git diff --check`.
+- Verification results: Focused tests pass; full 214 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Request authority is validated before authentication, and wildcard binds cannot start without explicit public host trust.
+- Compatibility review: Loopback clients retain automatic safe Host/Origin trust, including ephemeral ports.
+- Remaining risks: Network write tools remain visible until SEC-004.
+- Rollback: Revert this story commit and remove the new allowlist fields from configuration.
+- Commit: Pending at time of entry.
+- Next eligible story: SEC-004.
