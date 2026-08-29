@@ -10,7 +10,9 @@
   },
   "files": [
     "dist",
+    "api",
     "templates",
+    "vercel.json",
     "README.md",
     "LICENSE",
     "server.json"

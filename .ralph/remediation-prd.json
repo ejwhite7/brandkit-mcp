@@ -152,7 +152,7 @@
       "title": "Implement a production Vercel Streamable HTTP entry point or remove support claims",
       "dependencies": ["HTTP-001", "SEC-002"],
       "acceptance": ["default handler exists", "cold start authentication initialize and tool call pass", "otherwise Vercel configuration and claims are removed"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "CLOUDFLARE-001",

@@ -210,6 +210,22 @@ npm run test:docker-smoke
 
 The token is injected at runtime and is also required by the authenticated health check. Compose refuses to start when it is absent. To use your own brand, mount a regular config file and brand directory, set `BRANDKIT_CONFIG` to the container path of that config, and keep `server.allowedHosts` limited to the hostnames clients actually use. Do not put the token in the image or config file. Compose intentionally exposes only the authenticated MCP service; run the preview CLI separately on a trusted local machine. Existing stdio container integrations can override the image command with `node /app/dist/cli/index.js serve --transport stdio --config <path>` and do not need to publish a port.
 
+### Vercel
+
+The repository includes one stateless Node.js Function at `/api/mcp`. Set
+`BRANDKIT_AUTH_TOKEN` in every Vercel environment and send it as a Bearer token.
+Vercel's `VERCEL_URL` and `VERCEL_PROJECT_PRODUCTION_URL` are trusted
+automatically. For a custom domain, set `BRANDKIT_ALLOWED_HOSTS` to a
+comma-separated hostname list, without schemes or paths.
+
+The default deployment explicitly bundles `templates/starter/**` and serves
+that data read-only. To deploy another brand, set `BRANDKIT_CONFIG` to its
+repository-relative config path and update `functions.api/mcp.js.includeFiles`
+in `vercel.json` to include both that config and its complete brand root. Vercel
+runtime files are immutable; the function never advertises `sync_brand_docs`.
+Each request creates and closes its own MCP server and transport, so requests do
+not depend on a warm instance or session affinity.
+
 ## CLI Reference
 
 ```

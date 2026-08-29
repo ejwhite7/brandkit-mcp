@@ -278,3 +278,20 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit and reinstall; that restores known critical/high advisories and removes audit enforcement.
 - Commit: Pending at time of entry.
 - Next eligible story: VERCEL-001.
+
+## 2026-08-29 01:56 EDT — VERCEL-001
+
+- Objective: Replace the broken warm-instance SSE adapter with a real cold-start-safe Vercel MCP function.
+- Defect reproduced: The legacy adapter had no default export, no authentication, and stored SSE sessions only in warm-instance memory, so cold starts and fan-out broke initialize/message flows.
+- Changes: Added a discoverable `/api/mcp` default function; build and package the Vercel adapter; use one fresh stateless Streamable HTTP Server/transport per POST; warm-cache immutable index data only; require bearer auth; validate Host/Origin from Vercel/custom-domain environment; cap JSON at 256 KiB and work at 30 seconds; return structured redacted errors; explicitly bundle read-only starter data; modernize `vercel.json` with a 60-second function limit and package the deployment files.
+- Files changed: `src/adapters/vercel.ts`, `api/mcp.js`, `vercel.json`, `tsup.config.ts`, `package.json`, `README.md`, and `src/tests/vercel-adapter.test.ts`.
+- Tests added: Two isolated module cold starts using the real MCP client for initialize/listTools/get_brand_overview; write-tool hiding; missing auth; hostile Host; authenticated GET 405/Allow; malformed and oversized bodies; redacted missing-brand failure; config/build/pack discovery contract.
+- Verification commands: Focused 5 tests; `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`; production/full audits; `npm ls`; pack dry run and installed-tarball default-export import; `git diff --check`.
+- Verification results: Full 37 files / 287 tests pass; typecheck, lint, build/DTS, audits (0), dependency tree, package/import, and diff check pass. Vercel CLI 58.7.1 is installed, but `vercel build` was not run because this checkout has no `.vercel` link and linking would create external project state.
+- Security review: Token and trusted hosts are mandatory/fail closed; errors do not expose paths or brand data; request state is never reused; serverless tools are read-only.
+- Compatibility review: Legacy `/api/sse` and `/api/messages` are replaced by current `/api/mcp`; the bundled starter is the safe default. Custom brand deployments set `BRANDKIT_CONFIG` and update `includeFiles` for the complete config/root.
+- Skill influence: Vercel Functions guidance drove the stateless request design, immutable external state contract, discoverable `api/` entry, explicit `includeFiles`, and duration headroom.
+- Remaining risks: The Cloudflare Worker still advertises endpoints it does not implement.
+- Rollback: Revert this story commit; this restores an unauthenticated warm-instance SSE adapter that is not production-safe.
+- Commit: Pending at time of entry.
+- Next eligible story: CLOUDFLARE-001.
