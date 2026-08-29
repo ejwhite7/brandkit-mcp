@@ -160,7 +160,7 @@
       "title": "Implement Cloudflare MCP or remove the broken adapter",
       "dependencies": ["SEC-002"],
       "acceptance": ["advertised endpoints do not return 404", "Worker handshake passes or all Cloudflare support claims are removed"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "QA-001",

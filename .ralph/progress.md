@@ -295,3 +295,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; this restores an unauthenticated warm-instance SSE adapter that is not production-safe.
 - Commit: Pending at time of entry.
 - Next eligible story: CLOUDFLARE-001.
+
+## 2026-08-29 02:00 EDT — CLOUDFLARE-001
+
+- Objective: Ensure the repository does not advertise a Cloudflare MCP deployment that cannot complete an MCP handshake.
+- Defect reproduced: `wrangler.toml` deployed a simplified Worker that advertised `/sse` and `/messages`, but the adapter implemented only `/` and `/health`; both advertised MCP endpoints returned 404, and the target had no authentication or MCP server transport.
+- Decision: Retire the unsupported Cloudflare target instead of presenting a nonfunctional or insecure deployment as production-ready.
+- Changes: Removed `wrangler.toml` and the Worker stub; removed active Cloudflare references from architecture, release, and runtime-version documentation; replaced the Worker-specific hardcoded-version test with a release-wide contract that keeps `package.json`, `server.json`, and registry package versions aligned.
+- Files changed: `wrangler.toml`, `src/adapters/cloudflare-worker.ts`, `src/tests/cloudflare-version.test.ts`, `src/tests/release-version.test.ts`, `src/version.ts`, `RELEASING.md`, and `CLAUDE.md`.
+- Verification commands: Focused release-version test, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm audit --omit=dev`, package dry run, Cloudflare/Wrangler claim audit, and `git diff --check`.
+- Verification results: Focused test passes; full 37 files / 287 tests pass; typecheck, lint, build/DTS, production audit (0 vulnerabilities), package audit, and diff check pass. No Cloudflare/Wrangler adapter or configuration ships in the npm package.
+- Security review: Removing the unauthenticated stub closes a misleading network surface; future Cloudflare support must provide a real authenticated MCP transport and immutable/data-store architecture before it is advertised.
+- Compatibility review: Cloudflare deployment is intentionally unsupported. The documented and packaged stdio, HTTP/SSE, Docker, and Vercel paths are unchanged.
+- Remaining risks: QA-001 now requires two consecutive independent adversarial passes with no new actionable findings.
+- Rollback: Reverting this story would restore a deployment target whose advertised MCP endpoints always return 404 and should not be done without a complete Worker implementation.
+- Commit: Pending at time of entry.
+- Next eligible story: QA-001.

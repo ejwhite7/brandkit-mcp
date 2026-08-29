@@ -76,7 +76,7 @@ it needs -- including the brand's instincts, not just its specs.
 
 ```
 src/
-├── adapters/          # Cloudflare Workers + Vercel + standalone HTTP wrappers
+├── adapters/          # Vercel and standalone HTTP wrappers
 ├── cli/               # init, serve, validate, docs commands
 ├── config/            # zod schema loader (v2)
 ├── context-resolver.ts # base/web/product merge

@@ -47,10 +47,8 @@ in one go.
 # 1. Make sure main is green
 git checkout main && git pull
 
-# 2. Bump the version in package.json, server.json, AND the hardcoded
-#    string in src/adapters/cloudflare-worker.ts (Workers cannot read
-#    package.json at runtime), then commit. Keeping all three in sync is
-#    enforced by src/tests/cloudflare-version.test.ts.
+# 2. Bump the version in package.json and server.json, then commit. The
+#    publish workflow also synchronizes both files from the release tag.
 
 # 3. Tag (the workflow re-syncs package.json and server.json from the
 #    tag, so a mismatched tag still publishes consistently)
