@@ -49,6 +49,34 @@ export function configureHttpServerLimits(
   server.maxHeadersCount = limits.maxHeadersCount;
 }
 
+/**
+ * Resolves only after a Node HTTP server has successfully bound its socket.
+ * The temporary error handler is removed after startup so later runtime
+ * errors retain Node's normal handling and any listeners installed by the
+ * embedder.
+ */
+export function waitForHttpServerListening(server: HttpServer): Promise<HttpServer> {
+  if (server.listening) return Promise.resolve(server);
+
+  return new Promise((resolve, reject) => {
+    const cleanup = (): void => {
+      server.off('listening', onListening);
+      server.off('error', onError);
+    };
+    const onListening = (): void => {
+      cleanup();
+      resolve(server);
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+
+    server.once('listening', onListening);
+    server.once('error', onError);
+  });
+}
+
 export class NetworkRequestTimeoutError extends Error {}
 export class NetworkBodyTooLargeError extends Error {}
 export class NetworkInvalidJsonError extends Error {}

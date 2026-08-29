@@ -39,10 +39,11 @@
     {
       "id": "HTTP-003",
       "severity": "high",
-      "status": "open",
+      "status": "resolved",
       "title": "startServer resolves before network listen succeeds",
       "evidence": "HTTP and SSE branches return immediately after app.listen; occupied ports resolve successfully then emit an uncaught EADDRINUSE.",
-      "story": "HTTP-003"
+      "story": "HTTP-003",
+      "resolution": "HTTP and SSE startup now await listening, reject initial errors, defer watcher creation, and clean watcher/signal resources on failure or server close."
     },
     {
       "id": "CI-001",

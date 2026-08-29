@@ -200,7 +200,7 @@
       "title": "Make network startup await listening and reject failures",
       "dependencies": ["HTTP-002"],
       "acceptance": ["startServer resolves only after listening", "occupied ports reject without uncaught errors", "partial startup resources are cleaned up"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "CI-001",

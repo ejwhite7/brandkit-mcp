@@ -29,6 +29,7 @@ import {
   NetworkRequestTimeoutError,
   type NetworkResourceLimits,
   resolveNetworkLimits,
+  waitForHttpServerListening,
   withRequestTimeout,
 } from './network.js';
 
@@ -118,24 +119,43 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     return server;
   };
 
-  if (options.watch) {
+  let stopWatcher: (() => Promise<void>) | undefined;
+  let watcherShutdown: ((signal: NodeJS.Signals) => void) | undefined;
+  let watcherCleanupPromise: Promise<void> | undefined;
+  const startWatcher = (): void => {
+    if (!options.watch) return;
     console.error('[brandkit-mcp] File watching enabled');
-    const stopWatcher = watchBrandDirectory(config, (newIndex) => {
+    stopWatcher = watchBrandDirectory(config, (newIndex) => {
       indexRef.current = newIndex;
       console.error(`[brandkit-mcp] Index updated: ${newIndex.contexts.base.tokens.length + newIndex.contexts.base.components.length + newIndex.contexts.base.assets.length} assets`);
     });
     // Close the watcher on shutdown so the process can exit cleanly.
-    const shutdown = (signal: NodeJS.Signals) => {
-      void stopWatcher().finally(() => process.exit(signal === 'SIGINT' ? 130 : 143));
+    watcherShutdown = (signal: NodeJS.Signals) => {
+      void cleanupWatcher().finally(() => process.exit(signal === 'SIGINT' ? 130 : 143));
     };
-    process.once('SIGINT', shutdown);
-    process.once('SIGTERM', shutdown);
-  }
+    process.once('SIGINT', watcherShutdown);
+    process.once('SIGTERM', watcherShutdown);
+  };
+
+  const cleanupWatcher = (): Promise<void> => {
+    watcherCleanupPromise ??= (async () => {
+      if (watcherShutdown) {
+        process.removeListener('SIGINT', watcherShutdown);
+        process.removeListener('SIGTERM', watcherShutdown);
+        watcherShutdown = undefined;
+      }
+      const stop = stopWatcher;
+      stopWatcher = undefined;
+      await stop?.();
+    })();
+    return watcherCleanupPromise;
+  };
 
   if (transport === 'stdio') {
     const server = createMcpServer();
     const stdioTransport = new StdioServerTransport();
     await server.connect(stdioTransport);
+    startWatcher();
     console.error('[brandkit-mcp] Server running on stdio');
     return;
   }
@@ -154,6 +174,42 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     config.server.allowedOrigins,
   );
   const limits = resolveNetworkLimits(options.networkLimits);
+
+  const finishNetworkStartup = async (
+    httpServer: HttpServer,
+    onListening: (actualPort: number) => void,
+  ): Promise<HttpServer> => {
+    configureHttpServerLimits(httpServer, limits);
+    try {
+      await waitForHttpServerListening(httpServer);
+      startWatcher();
+      // Closing the returned server is the embedder's lifecycle boundary.
+      // Watcher shutdown is intentionally asynchronous so it cannot delay or
+      // hang Node's server close callback.
+      httpServer.once('close', () => {
+        void cleanupWatcher().catch(() => {
+          console.error('[brandkit-mcp] Watcher cleanup error');
+        });
+      });
+      const address = httpServer.address();
+      const actualPort = typeof address === 'object' && address !== null ? address.port : port;
+      onListening(actualPort);
+      return httpServer;
+    } catch (error) {
+      try {
+        await cleanupWatcher();
+      } catch {
+        console.error('[brandkit-mcp] Startup watcher cleanup error');
+      }
+      httpServer.closeAllConnections();
+      if (httpServer.listening) {
+        await new Promise<void>((resolveClose) => {
+          httpServer.close(() => resolveClose());
+        });
+      }
+      throw error;
+    }
+  };
 
   app.use((req, res, next) => {
     if (requestPolicy.validate(
@@ -262,14 +318,11 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       });
     }) satisfies ErrorRequestHandler);
 
-    const httpServer = app.listen(port, host, () => {
-      const address = httpServer.address();
-      const actualPort = typeof address === 'object' && address !== null ? address.port : port;
+    const httpServer = app.listen(port, host);
+    return finishNetworkStartup(httpServer, (actualPort) => {
       console.error(`[brandkit-mcp] SSE server running at http://${urlHost}:${actualPort}`);
       console.error(`[brandkit-mcp] Connect via SSE at http://${urlHost}:${actualPort}/sse`);
     });
-    configureHttpServerLimits(httpServer, limits);
-    return httpServer;
   }
 
   if (transport === 'http') {
@@ -371,13 +424,10 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       });
     });
 
-    const httpServer = app.listen(port, host, () => {
-      const address = httpServer.address();
-      const actualPort = typeof address === 'object' && address !== null ? address.port : port;
+    const httpServer = app.listen(port, host);
+    return finishNetworkStartup(httpServer, (actualPort) => {
       console.error(`[brandkit-mcp] Streamable HTTP server running at http://${urlHost}:${actualPort}/mcp`);
     });
-    configureHttpServerLimits(httpServer, limits);
-    return httpServer;
   }
 
   throw new Error(`Unknown transport: ${transport}`);

@@ -368,3 +368,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores destructive config writes and symlink redirection.
 - Commit: Pending at time of entry.
 - Next eligible story: HTTP-003.
+
+## 2026-08-29 02:43 EDT — HTTP-003
+
+- Objective: Make HTTP/SSE startup completion and failure observable and resource-safe for programmatic callers.
+- Defect reproduced: On an occupied port, `await startServer()` returned a non-listening server, then a late `EADDRINUSE` escaped as an uncaught error.
+- Changes: Added a shared listen-wait helper; HTTP and SSE now resolve only after the listening event and reject the initial error event; network watchers start only after bind succeeds; startup failure closes any bound socket and removes watcher/signal state; closing a returned network server also stops its watcher; cleanup is memoized across close, signal, and failure paths.
+- Files changed: `src/index.ts`, `src/network.ts`, and `src/tests/server-startup.test.ts`.
+- Tests added: Occupied HTTP and SSE ports; no uncaught error, watcher, or signal leak; successful ephemeral listening; post-start runtime error listener behavior; watcher-start failure after bind; embedder server close; overlapping SIGTERM/server-close cleanup exactly once.
+- Verification commands: Focused 23-test startup/HTTP/auth matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 40 files / 315 tests pass; typecheck, lint, build/DTS, and diff check pass.
+- Security review: Failed binds no longer leave watchers or protocol state active; cleanup errors are redacted and credentials remain untouched.
+- Compatibility review: Successful HTTP/SSE return values and ephemeral ports are unchanged; callers gain reliable await/reject semantics and server close now owns watcher lifecycle.
+- Rollback: Revert this story commit; that restores late uncaught startup failures.
+- Commit: Pending at time of entry.
+- Next eligible story: CI-001.
