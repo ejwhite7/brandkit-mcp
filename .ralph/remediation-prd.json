@@ -80,7 +80,7 @@
       "title": "Contain every brand file read within the brand root",
       "dependencies": ["BASE-001"],
       "acceptance": ["all fixed and discovered reads share one containment policy", "outside-root symlinks are rejected", "symlink escape tests pass"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FS-002",

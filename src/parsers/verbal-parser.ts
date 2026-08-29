@@ -4,19 +4,19 @@
  */
 
 import matter from 'gray-matter';
-import { readFileSync, existsSync } from 'fs';
 import type { VerbalDoc } from '../types/design-system.js';
+import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 /**
  * Parse a verbal/agent markdown document with frontmatter support.
  * @param path - Absolute path to the markdown file
  * @returns Parsed verbal document or undefined if file doesn't exist
  */
-export function parseVerbalDoc(path: string): VerbalDoc | undefined {
-  if (!existsSync(path)) return undefined;
+export function parseVerbalDoc(path: string, reader: BrandReadPolicy): VerbalDoc | undefined {
+  if (!reader.isFile(path)) return undefined;
   let raw: string;
   try {
-    raw = readFileSync(path, 'utf-8');
+    raw = reader.readFile(path, 'utf-8');
   } catch {
     return undefined;
   }

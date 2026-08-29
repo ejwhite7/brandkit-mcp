@@ -129,3 +129,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; custom `networkLimits` embedder options will no longer be accepted.
 - Commit: Pending at time of entry.
 - Next eligible story: FS-001.
+
+## 2026-08-29 00:10 EDT — FS-001
+
+- Objective: Prevent every brand-input read from escaping `brand.root`.
+- Defect reproduced: Recursive discovery had a partial canonical-path check, while fixed markdown/YAML/CSS/motion reads and parser APIs followed arbitrary outside-root symlinks.
+- Changes: Added a per-scan `BrandReadPolicy` with lexical and canonical containment, safe in-root symlink support, redacted rejection errors, `O_NOFOLLOW` canonical opens, regular-file/directory checks, and inode/device revalidation; routed scanner and every file-reading parser through it; made Sharp consume validated buffers; rejected manifest traversal.
+- Files changed: `README.md`, `src/filesystem/brand-read-policy.ts`, scanner, seven parser modules, six parser tests, and `src/tests/filesystem-containment.test.ts`.
+- Tests added: Outside symlinks for all fixed and discovered inputs; parent/discovered directory escapes; index/tool/resource non-leakage including path redaction; image encoding containment; manifest traversal; valid in-root symlinks.
+- Verification commands: Focused 44 and 68-test parser/containment runs, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 235 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Outside content and canonical target paths do not enter indexes, tools, resources, previews, or warnings; no global mutable root policy is used.
+- Compatibility review: Valid files and symlinks whose final targets remain within the configured root continue to work.
+- Remaining risks: In-root directory symlink cycles and ignore-boundary semantics remain for FS-002.
+- Rollback: Revert this story commit; parser callers would return to path-only signatures.
+- Commit: Pending at time of entry.
+- Next eligible story: FS-002.

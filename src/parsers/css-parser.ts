@@ -5,8 +5,8 @@
  */
 
 import * as csstree from 'css-tree';
-import { readFileSync } from 'fs';
 import type { DesignColor, DesignTypographyItem, DesignCSSFile, BrandContext } from '../types/design-system.js';
+import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 /** Regular expression to detect CSS color values, including modern color functions. */
 const COLOR_RE =
@@ -21,10 +21,10 @@ const TYPO_TOKEN_RE = /font|type|text|heading|body|display|caption|label|title|l
  * @param context - Which design context this file belongs to
  * @returns Parsed CSS file with custom properties and extracted design tokens
  */
-export function parseCSSFile(filePath: string, _context: BrandContext): DesignCSSFile {
+export function parseCSSFile(filePath: string, _context: BrandContext, reader: BrandReadPolicy): DesignCSSFile {
   let rawContent: string;
   try {
-    rawContent = readFileSync(filePath, 'utf-8');
+    rawContent = reader.readFile(filePath, 'utf-8');
   } catch {
     console.error(`[css-parser] Could not read file: ${filePath}`);
     return { filePath, rawContent: '', customProperties: {}, classes: [] };
@@ -179,4 +179,3 @@ export function normalizeToHex(value: string): string | undefined {
   }
   return undefined;
 }
-

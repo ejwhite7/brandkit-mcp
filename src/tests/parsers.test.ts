@@ -10,8 +10,10 @@ import { parseCSSFile, extractColorsFromCSS, extractTypographyFromCSS, normalize
 import { parseGuidelineMarkdown, parseComponentMarkdown, parsePaletteMarkdown } from '../parsers/markdown-parser.js';
 import { parseFontFile, inferFontWeight } from '../parsers/font-parser.js';
 import { inferLogoVariantName } from '../parsers/image-parser.js';
+import { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 const TEST_DIR = join(process.cwd(), '__test_fixtures__');
+const reader = new BrandReadPolicy(TEST_DIR);
 
 describe('CSS Parser', () => {
   const cssFilePath = join(TEST_DIR, 'test-colors.css');
@@ -30,14 +32,14 @@ describe('CSS Parser', () => {
   });
 
   it('should parse CSS custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'base');
+    const result = parseCSSFile(cssFilePath, 'base', reader);
     expect(result.customProperties['--color-primary']).toBe('#1a1a2e');
     expect(result.customProperties['--color-secondary']).toBe('#16213e');
     expect(result.customProperties['--color-accent']).toBe('#e94560');
   });
 
   it('should extract colors from custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'base');
+    const result = parseCSSFile(cssFilePath, 'base', reader);
     const colors = extractColorsFromCSS(result.customProperties, 'base', cssFilePath);
     expect(colors.length).toBeGreaterThanOrEqual(3);
     const primary = colors.find((c) => c.token === '--color-primary');
@@ -47,13 +49,13 @@ describe('CSS Parser', () => {
   });
 
   it('should extract typography from custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'base');
+    const result = parseCSSFile(cssFilePath, 'base', reader);
     const typo = extractTypographyFromCSS(result.customProperties, 'base', cssFilePath);
     expect(typo.length).toBeGreaterThanOrEqual(1);
   });
 
   it('should not extract non-color properties as colors', () => {
-    const result = parseCSSFile(cssFilePath, 'base');
+    const result = parseCSSFile(cssFilePath, 'base', reader);
     const colors = extractColorsFromCSS(result.customProperties, 'base', cssFilePath);
     const spacing = colors.find((c) => c.token === '--spacing-sm');
     expect(spacing).toBeUndefined();
@@ -116,14 +118,14 @@ For secondary actions.
   });
 
   it('should parse guideline markdown with frontmatter', () => {
-    const result = parseGuidelineMarkdown(guidelinePath, 'base');
+    const result = parseGuidelineMarkdown(guidelinePath, 'base', reader);
     expect(result.title).toBe('Brand Voice');
     expect(result.section).toBe('brand-voice');
     expect(result.content).toContain('confident, clear, and approachable');
   });
 
   it('should parse component markdown', () => {
-    const results = parseComponentMarkdown(componentPath, 'base');
+    const results = parseComponentMarkdown(componentPath, 'base', reader);
     expect(results.length).toBe(1);
     expect(results[0].name).toBe('Button');
     expect(results[0].category).toBe('button');
@@ -131,7 +133,7 @@ For secondary actions.
   });
 
   it('should parse palette markdown tables', () => {
-    const colors = parsePaletteMarkdown(palettePath, 'base');
+    const colors = parsePaletteMarkdown(palettePath, 'base', reader);
     expect(colors.length).toBe(2);
     expect(colors[0].name).toBe('Ocean Blue');
     expect(colors[0].hex).toBe('#0077b6');
@@ -180,7 +182,7 @@ describe('component usage section extraction', () => {
       path,
       '---\nname: Button\n---\n# Button\n\n## Usage\nLine one.\nLine two.\n\n## Other\nIgnored.\n',
     );
-    const [component] = parseComponentMarkdown(path, 'base');
+    const [component] = parseComponentMarkdown(path, 'base', reader);
     expect(component.usage).toContain('Line one.');
     expect(component.usage).toContain('Line two.');
     expect(component.usage).not.toContain('Ignored');
@@ -194,7 +196,7 @@ describe('component usage section extraction', () => {
       path,
       '---\nname: Button\n---\n# Button\n\n## Usage\n## Other\nIgnored.\n',
     );
-    const [component] = parseComponentMarkdown(path, 'base');
+    const [component] = parseComponentMarkdown(path, 'base', reader);
     expect(component.usage ?? '').not.toContain('Ignored');
   });
 });
@@ -215,4 +217,3 @@ describe('normalizeToHex', () => {
     expect(normalizeToHex('#aabbccdd')).toBe('#aabbccdd');
   });
 });
-

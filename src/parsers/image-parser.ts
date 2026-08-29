@@ -5,15 +5,15 @@
  */
 
 import sharp from 'sharp';
-import { readFileSync, statSync } from 'fs';
 import { basename, extname } from 'path';
+import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 /**
  * Processes an image file and returns metadata.
  * @param filePath - Absolute path to the image file
  * @returns Image metadata including dimensions, format, and file size
  */
-export async function parseImageFile(filePath: string): Promise<{
+export async function parseImageFile(filePath: string, reader: BrandReadPolicy): Promise<{
   filePath: string;
   name: string;
   format: string;
@@ -24,18 +24,18 @@ export async function parseImageFile(filePath: string): Promise<{
 }> {
   const ext = extname(filePath).toLowerCase().replace('.', '');
   const name = basename(filePath, extname(filePath));
-  let fileSize: number;
-
+  let input: Buffer;
   try {
-    fileSize = statSync(filePath).size;
+    input = reader.readFile(filePath);
   } catch {
-    fileSize = 0;
+    return { filePath, name, format: ext, fileSize: 0 };
   }
+  const fileSize = input.byteLength;
 
   if (ext === 'svg') {
     let svgContent: string;
     try {
-      svgContent = readFileSync(filePath, 'utf-8');
+      svgContent = input.toString('utf-8');
     } catch {
       return { filePath, name, format: 'svg', fileSize };
     }
@@ -54,7 +54,7 @@ export async function parseImageFile(filePath: string): Promise<{
   }
 
   try {
-    const meta = await sharp(filePath).metadata();
+    const meta = await sharp(input).metadata();
     return {
       filePath,
       name,
@@ -76,12 +76,12 @@ export async function parseImageFile(filePath: string): Promise<{
  * @param filePath - Absolute path to the image file
  * @returns Base64 data URI string
  */
-export async function generateBase64DataURI(filePath: string): Promise<string> {
+export async function generateBase64DataURI(filePath: string, reader: BrandReadPolicy): Promise<string> {
   const ext = extname(filePath).toLowerCase().replace('.', '');
+  const input = reader.readFile(filePath);
 
   if (ext === 'svg') {
-    const svgContent = readFileSync(filePath, 'utf-8');
-    const encoded = Buffer.from(svgContent).toString('base64');
+    const encoded = input.toString('base64');
     return `data:image/svg+xml;base64,${encoded}`;
   }
 
@@ -94,11 +94,10 @@ export async function generateBase64DataURI(filePath: string): Promise<string> {
   const mime = mimeMap[ext] ?? `image/${ext}`;
 
   try {
-    const buffer = await sharp(filePath).toBuffer();
+    const buffer = await sharp(input).toBuffer();
     return `data:${mime};base64,${buffer.toString('base64')}`;
   } catch {
-    const raw = readFileSync(filePath);
-    return `data:${mime};base64,${raw.toString('base64')}`;
+    return `data:${mime};base64,${input.toString('base64')}`;
   }
 }
 
@@ -118,4 +117,3 @@ export function inferLogoVariantName(filename: string): string {
   if (!cleaned) return 'Primary';
   return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
 }
-

@@ -6,9 +6,9 @@
  */
 
 import matter from 'gray-matter';
-import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
 import type { DesignGuideline, DesignComponent, DesignColor, BrandContext, TokenSpecimen } from '../types/design-system.js';
+import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 /**
  * Parses a markdown file as a design guideline.
@@ -16,10 +16,10 @@ import type { DesignGuideline, DesignComponent, DesignColor, BrandContext, Token
  * @param context - Design context
  * @returns Parsed guideline with title, content, and section metadata
  */
-export function parseGuidelineMarkdown(filePath: string, context: BrandContext): DesignGuideline {
+export function parseGuidelineMarkdown(filePath: string, context: BrandContext, reader: BrandReadPolicy): DesignGuideline {
   let raw: string;
   try {
-    raw = readFileSync(filePath, 'utf-8');
+    raw = reader.readFile(filePath, 'utf-8');
   } catch {
     console.error(`[markdown-parser] Could not read file: ${filePath}`);
     return { title: basename(filePath, extname(filePath)), content: '', context, source: filePath };
@@ -51,10 +51,10 @@ export function parseGuidelineMarkdown(filePath: string, context: BrandContext):
  * @param context - Design context
  * @returns Array of parsed components
  */
-export function parseComponentMarkdown(filePath: string, context: BrandContext): DesignComponent[] {
+export function parseComponentMarkdown(filePath: string, context: BrandContext, reader: BrandReadPolicy): DesignComponent[] {
   let raw: string;
   try {
-    raw = readFileSync(filePath, 'utf-8');
+    raw = reader.readFile(filePath, 'utf-8');
   } catch {
     console.error(`[markdown-parser] Could not read file: ${filePath}`);
     return [];
@@ -92,10 +92,10 @@ export function parseComponentMarkdown(filePath: string, context: BrandContext):
  * @param context - Design context
  * @returns Array of DesignColor objects
  */
-export function parsePaletteMarkdown(filePath: string, context: BrandContext): DesignColor[] {
+export function parsePaletteMarkdown(filePath: string, context: BrandContext, reader: BrandReadPolicy): DesignColor[] {
   let raw: string;
   try {
-    raw = readFileSync(filePath, 'utf-8');
+    raw = reader.readFile(filePath, 'utf-8');
   } catch {
     console.error(`[markdown-parser] Could not read file: ${filePath}`);
     return [];
@@ -243,11 +243,11 @@ export interface TokenSpecimenResult {
  * @param filePath - Absolute path to the token specimen markdown file
  * @returns Parse result with specimen, warnings
  */
-export function parseTokenSpecimen(filePath: string): TokenSpecimenResult {
+export function parseTokenSpecimen(filePath: string, reader: BrandReadPolicy): TokenSpecimenResult {
   const warnings: string[] = [];
   let raw: string;
   try {
-    raw = readFileSync(filePath, 'utf-8');
+    raw = reader.readFile(filePath, 'utf-8');
   } catch {
     return { specimen: null, warnings: [`Could not read ${filePath}`] };
   }

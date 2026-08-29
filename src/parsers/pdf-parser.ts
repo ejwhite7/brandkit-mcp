@@ -5,23 +5,23 @@
  */
 
 import pdfParse from 'pdf-parse';
-import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
 import type { DesignGuideline, BrandContext } from '../types/design-system.js';
+import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 /**
  * Extracts all text content from a PDF file.
  * @param filePath - Absolute path to the PDF file
  * @returns Extracted text content and document title
  */
-export async function parsePDFFile(filePath: string): Promise<{
+export async function parsePDFFile(filePath: string, reader: BrandReadPolicy): Promise<{
   filePath: string;
   content: string;
   title?: string;
   pageCount?: number;
 }> {
   try {
-    const buffer = readFileSync(filePath);
+    const buffer = reader.readFile(filePath);
     const data = await pdfParse(buffer);
     return {
       filePath,
@@ -68,4 +68,3 @@ export function extractGuidelinesFromPDF(
     },
   ];
 }
-

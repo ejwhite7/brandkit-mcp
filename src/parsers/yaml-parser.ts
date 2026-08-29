@@ -4,8 +4,8 @@
  * and missing files without throwing.
  */
 
-import { readFileSync } from 'fs';
 import { load } from 'js-yaml';
+import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 export interface YamlParseResult {
   data: unknown;
@@ -18,10 +18,10 @@ export interface YamlParseResult {
  * @param path - Absolute path to the YAML file
  * @returns Parse result with data, warnings, and source metadata
  */
-export function parseYamlFile(path: string): YamlParseResult {
+export function parseYamlFile(path: string, reader: BrandReadPolicy): YamlParseResult {
   let text: string;
   try {
-    text = readFileSync(path, 'utf-8');
+    text = reader.readFile(path, 'utf-8');
   } catch (err) {
     return {
       data: null,

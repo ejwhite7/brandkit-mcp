@@ -17,8 +17,7 @@
  *   <root>/agent/visual/artifacts/product/ (same)
  */
 
-import { readdirSync, statSync, existsSync, readFileSync, realpathSync } from 'fs';
-import { join, extname, relative, sep, basename } from 'path';
+import { join, extname, relative, basename } from 'path';
 import type {
   MagicTrick,
   AudienceDoc,
@@ -34,6 +33,7 @@ import { parseTokenSpecimen } from '../parsers/markdown-parser.js';
 import { parseComponentMarkdown } from '../parsers/markdown-parser.js';
 import { parseCSSFile } from '../parsers/css-parser.js';
 import { parseFontFile } from '../parsers/font-parser.js';
+import { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -67,34 +67,35 @@ export interface ScanOptions {
 export function scanBrandRoot(rootDir: string, options?: ScanOptions): ScanResult {
   const ignore = options?.ignore ?? ['human/'];
   const warnings: string[] = [];
+  const reader = new BrandReadPolicy(rootDir);
 
   // ---------------------------------------------------------------------------
   // 1. magic_trick.md
   // ---------------------------------------------------------------------------
-  const magicTrick = parseMagicTrick(rootDir, warnings);
+  const magicTrick = parseMagicTrick(rootDir, reader, warnings);
 
   // ---------------------------------------------------------------------------
   // 2. Verbal layer
   // ---------------------------------------------------------------------------
-  const verbal = parseVerbalLayer(rootDir, warnings);
+  const verbal = parseVerbalLayer(rootDir, reader, warnings);
 
   // ---------------------------------------------------------------------------
   // 3. Base visual layer (agent/visual/)
   // ---------------------------------------------------------------------------
   const baseVisualDir = join(rootDir, 'agent', 'visual');
-  const base = parseVisualDir(baseVisualDir, 'base', ignore, warnings);
+  const base = parseVisualDir(baseVisualDir, 'base', ignore, reader, warnings);
 
   // ---------------------------------------------------------------------------
   // 4. Web overrides (agent/visual/artifacts/web/)
   // ---------------------------------------------------------------------------
   const webVisualDir = join(rootDir, 'agent', 'visual', 'artifacts', 'web');
-  const web = parseVisualDir(webVisualDir, 'web', ignore, warnings);
+  const web = parseVisualDir(webVisualDir, 'web', ignore, reader, warnings);
 
   // ---------------------------------------------------------------------------
   // 5. Product overrides (agent/visual/artifacts/product/)
   // ---------------------------------------------------------------------------
   const productVisualDir = join(rootDir, 'agent', 'visual', 'artifacts', 'product');
-  const product = parseVisualDir(productVisualDir, 'product', ignore, warnings);
+  const product = parseVisualDir(productVisualDir, 'product', ignore, reader, warnings);
 
   return { magicTrick, verbal, base, web, product, warnings };
 }
@@ -103,11 +104,11 @@ export function scanBrandRoot(rootDir: string, options?: ScanOptions): ScanResul
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function parseMagicTrick(rootDir: string, warnings: string[]): MagicTrick | undefined {
+function parseMagicTrick(rootDir: string, reader: BrandReadPolicy, warnings: string[]): MagicTrick | undefined {
   const filePath = join(rootDir, 'magic_trick.md');
-  if (!existsSync(filePath)) return undefined;
   try {
-    const content = readFileSync(filePath, 'utf-8');
+    if (!reader.isFile(filePath)) return undefined;
+    const content = reader.readFile(filePath, 'utf-8');
     return { content: content.trim(), source: filePath };
   } catch (err) {
     warnings.push(`Could not read magic_trick.md: ${(err as Error).message}`);
@@ -115,36 +116,49 @@ function parseMagicTrick(rootDir: string, warnings: string[]): MagicTrick | unde
   }
 }
 
-function parseVerbalLayer(rootDir: string, warnings: string[]): VerbalLayer {
+function parseVerbalLayer(rootDir: string, reader: BrandReadPolicy, warnings: string[]): VerbalLayer {
   const verbalDir = join(rootDir, 'agent', 'verbal');
 
   // positioning
-  const positioning = parseVerbalDoc(join(verbalDir, 'positioning.md'));
+  const positioning = parseFixedVerbal(join(verbalDir, 'positioning.md'), reader, warnings);
 
   // messaging
-  const messaging = parseVerbalDoc(join(verbalDir, 'messaging.md'));
+  const messaging = parseFixedVerbal(join(verbalDir, 'messaging.md'), reader, warnings);
 
   // differentiation
-  const differentiation = parseVerbalDoc(join(verbalDir, 'differentiation.md'));
+  const differentiation = parseFixedVerbal(join(verbalDir, 'differentiation.md'), reader, warnings);
 
   // concepts
-  const concepts = parseVerbalDoc(join(verbalDir, 'concepts.md'));
+  const concepts = parseFixedVerbal(join(verbalDir, 'concepts.md'), reader, warnings);
 
   // voice
-  const voice = parseVerbalDoc(join(verbalDir, 'voice.md'));
+  const voice = parseFixedVerbal(join(verbalDir, 'voice.md'), reader, warnings);
 
   // audience (YAML)
   let audience: AudienceDoc | undefined;
   const audiencePath = join(verbalDir, 'audience.yaml');
-  if (existsSync(audiencePath)) {
-    const result = parseYamlFile(audiencePath);
-    warnings.push(...result.warnings);
-    if (result.data !== null) {
-      audience = { data: result.data, source: result.source };
+  try {
+    if (reader.isFile(audiencePath)) {
+      const result = parseYamlFile(audiencePath, reader);
+      warnings.push(...result.warnings);
+      if (result.data !== null) {
+        audience = { data: result.data, source: result.source };
+      }
     }
+  } catch (err) {
+    warnings.push(`Rejected audience.yaml: ${(err as Error).message}`);
   }
 
   return { positioning, messaging, differentiation, concepts, voice, audience };
+}
+
+function parseFixedVerbal(path: string, reader: BrandReadPolicy, warnings: string[]) {
+  try {
+    return parseVerbalDoc(path, reader);
+  } catch (err) {
+    warnings.push(`Rejected verbal document ${path}: ${(err as Error).message}`);
+    return undefined;
+  }
 }
 
 function emptyRawContextData(): RawContextData {
@@ -162,17 +176,23 @@ function parseVisualDir(
   visualDir: string,
   _contextLabel: string,
   ignore: string[],
+  reader: BrandReadPolicy,
   warnings: string[],
 ): RawContextData {
-  if (!existsSync(visualDir)) return emptyRawContextData();
+  try {
+    if (!reader.isDirectory(visualDir)) return emptyRawContextData();
+  } catch (err) {
+    warnings.push(`Rejected visual directory ${visualDir}: ${(err as Error).message}`);
+    return emptyRawContextData();
+  }
 
   const data = emptyRawContextData();
 
   // colors_and_type.css
   const cssPath = join(visualDir, 'colors_and_type.css');
-  if (existsSync(cssPath)) {
+  if (safeIsFile(cssPath, reader, warnings)) {
     try {
-      data.colorsAndType = parseCSSFile(cssPath, 'base');
+      data.colorsAndType = parseCSSFile(cssPath, 'base', reader);
     } catch (err) {
       warnings.push(`Failed to parse ${cssPath}: ${(err as Error).message}`);
     }
@@ -180,10 +200,10 @@ function parseVisualDir(
 
   // components/*.md
   const componentsDir = join(visualDir, 'components');
-  if (existsSync(componentsDir) && isDirectory(componentsDir)) {
-    for (const file of listFiles(componentsDir, ['.md'], ignore, visualDir)) {
+  if (safeIsDirectory(componentsDir, reader, warnings)) {
+    for (const file of listFiles(componentsDir, ['.md'], ignore, visualDir, reader, warnings)) {
       try {
-        const parsed = parseComponentMarkdown(file, 'base');
+        const parsed = parseComponentMarkdown(file, 'base', reader);
         data.components.push(...parsed);
       } catch (err) {
         warnings.push(`Failed to parse component ${file}: ${(err as Error).message}`);
@@ -193,10 +213,10 @@ function parseVisualDir(
 
   // tokens/*.md
   const tokensDir = join(visualDir, 'tokens');
-  if (existsSync(tokensDir) && isDirectory(tokensDir)) {
-    for (const file of listFiles(tokensDir, ['.md'], ignore, visualDir)) {
+  if (safeIsDirectory(tokensDir, reader, warnings)) {
+    for (const file of listFiles(tokensDir, ['.md'], ignore, visualDir, reader, warnings)) {
       try {
-        const { specimen, warnings: w } = parseTokenSpecimen(file);
+        const { specimen, warnings: w } = parseTokenSpecimen(file, reader);
         warnings.push(...w);
         if (specimen !== null) {
           data.tokens.push(specimen);
@@ -209,9 +229,9 @@ function parseVisualDir(
 
   // motion/
   const motionDir = join(visualDir, 'motion');
-  if (existsSync(motionDir) && isDirectory(motionDir)) {
+  if (safeIsDirectory(motionDir, reader, warnings)) {
     try {
-      const result = parseMotionDir(motionDir);
+      const result = parseMotionDir(motionDir, reader);
       // A CSS-only motion system is valid: suppress the "No motion.json"
       // warning when motion.css is present.
       const filtered = result.css
@@ -233,14 +253,14 @@ function parseVisualDir(
 
   // fonts/
   const fontsDir = join(visualDir, 'fonts');
-  if (existsSync(fontsDir) && isDirectory(fontsDir)) {
-    data.fonts = parseFontsDir(fontsDir, ignore, visualDir, warnings);
+  if (safeIsDirectory(fontsDir, reader, warnings)) {
+    data.fonts = parseFontsDir(fontsDir, ignore, visualDir, reader, warnings);
   }
 
   // assets/
   const assetsDir = join(visualDir, 'assets');
-  if (existsSync(assetsDir) && isDirectory(assetsDir)) {
-    data.assets = parseAssetsDir(assetsDir, ignore, visualDir, warnings);
+  if (safeIsDirectory(assetsDir, reader, warnings)) {
+    data.assets = parseAssetsDir(assetsDir, ignore, visualDir, reader, warnings);
   }
 
   return data;
@@ -256,6 +276,7 @@ function parseFontsDir(
   fontsDir: string,
   ignore: string[],
   visualRoot: string,
+  reader: BrandReadPolicy,
   warnings: string[],
 ): FontFace[] {
   const fonts: FontFace[] = [];
@@ -263,8 +284,8 @@ function parseFontsDir(
   // Load optional fonts.yaml for metadata overrides
   const fontsYamlPath = join(fontsDir, 'fonts.yaml');
   let fontsYamlData: Record<string, unknown> | null = null;
-  if (existsSync(fontsYamlPath)) {
-    const result = parseYamlFile(fontsYamlPath);
+  if (safeIsFile(fontsYamlPath, reader, warnings)) {
+    const result = parseYamlFile(fontsYamlPath, reader);
     warnings.push(...result.warnings);
     if (result.data && typeof result.data === 'object') {
       fontsYamlData = result.data as Record<string, unknown>;
@@ -288,7 +309,7 @@ function parseFontsDir(
 
   // If we have YAML faces but no physical font files (metadata-only approach),
   // create FontFace entries from the YAML directly
-  const physicalFontFiles = listFiles(fontsDir, [...FONT_EXTENSIONS], ignore, visualRoot);
+  const physicalFontFiles = listFiles(fontsDir, [...FONT_EXTENSIONS], ignore, visualRoot, reader, warnings);
 
   if (physicalFontFiles.length > 0) {
     // Parse physical font files, merging YAML metadata
@@ -321,12 +342,23 @@ function parseFontsDir(
         continue;
       }
       const ext = rawExt as FontFace['format'];
+      const filePath = join(fontsDir, file);
+      try {
+        reader.assertPath(filePath);
+        if (reader.isDirectory(filePath)) {
+          warnings.push(`Rejected font manifest entry that is not a file: ${file}`);
+          continue;
+        }
+      } catch (err) {
+        warnings.push(`Rejected font manifest entry ${file}: ${(err as Error).message}`);
+        continue;
+      }
       fonts.push({
         family: meta.family ?? 'Unknown',
         weight: meta.weight,
         style: (meta.style as 'normal' | 'italic' | undefined) ?? 'normal',
         file,
-        filePath: join(fontsDir, file),
+        filePath,
         format: ext || 'woff2',
       });
     }
@@ -339,6 +371,7 @@ function parseAssetsDir(
   assetsDir: string,
   ignore: string[],
   visualRoot: string,
+  reader: BrandReadPolicy,
   warnings: string[],
 ): AssetEntry[] {
   const assets: AssetEntry[] = [];
@@ -346,8 +379,8 @@ function parseAssetsDir(
   // Load optional assets.yaml for metadata
   const assetsYamlPath = join(assetsDir, 'assets.yaml');
   let assetsYamlData: Record<string, unknown> | null = null;
-  if (existsSync(assetsYamlPath)) {
-    const result = parseYamlFile(assetsYamlPath);
+  if (safeIsFile(assetsYamlPath, reader, warnings)) {
+    const result = parseYamlFile(assetsYamlPath, reader);
     warnings.push(...result.warnings);
     if (result.data && typeof result.data === 'object') {
       assetsYamlData = result.data as Record<string, unknown>;
@@ -368,7 +401,7 @@ function parseAssetsDir(
     }
   }
 
-  const physicalAssetFiles = listFiles(assetsDir, [...IMAGE_EXTENSIONS], ignore, visualRoot);
+  const physicalAssetFiles = listFiles(assetsDir, [...IMAGE_EXTENSIONS], ignore, visualRoot, reader, warnings);
 
   if (physicalAssetFiles.length > 0) {
     for (const filePath of physicalAssetFiles) {
@@ -387,12 +420,23 @@ function parseAssetsDir(
     // No physical files — create entries from YAML only
     for (const [file, meta] of yamlAssetMap) {
       const ext = extname(file).toLowerCase().replace('.', '');
+      const filePath = join(assetsDir, file);
+      try {
+        reader.assertPath(filePath);
+        if (reader.isDirectory(filePath)) {
+          warnings.push(`Rejected asset manifest entry that is not a file: ${file}`);
+          continue;
+        }
+      } catch (err) {
+        warnings.push(`Rejected asset manifest entry ${file}: ${(err as Error).message}`);
+        continue;
+      }
       assets.push({
         id: meta.id,
         file,
         purpose: meta.purpose,
         format: ext,
-        filePath: join(assetsDir, file),
+        filePath,
       });
     }
   }
@@ -410,9 +454,11 @@ function listFiles(
   extensions: string[],
   ignore: string[],
   rootDir: string,
+  reader: BrandReadPolicy,
+  warnings: string[],
 ): string[] {
   const results: string[] = [];
-  walkDir(dir, extensions, ignore, rootDir, results);
+  walkDir(dir, extensions, ignore, rootDir, reader, warnings, results);
   return results;
 }
 
@@ -421,12 +467,15 @@ function walkDir(
   extensions: string[],
   ignore: string[],
   rootDir: string,
+  reader: BrandReadPolicy,
+  warnings: string[],
   results: string[],
 ): void {
   let entries: string[];
   try {
-    entries = readdirSync(dir);
-  } catch {
+    entries = reader.readDirectory(dir);
+  } catch (err) {
+    warnings.push(`Rejected brand directory ${dir}: ${(err as Error).message}`);
     return;
   }
 
@@ -435,53 +484,42 @@ function walkDir(
 
     const fullPath = join(dir, entry);
 
-    // Symlink containment check
-    let realPath: string;
-    try {
-      realPath = realpathSync(fullPath);
-    } catch {
-      continue; // broken symlink
-    }
-
-    let realRoot: string;
-    try {
-      realRoot = realpathSync(rootDir);
-    } catch {
-      realRoot = rootDir;
-    }
-
-    if (realPath !== realRoot && !realPath.startsWith(realRoot + sep)) {
-      continue; // symlink escape
-    }
-
     // Check ignore list against relative path from rootDir
     const relPath = relative(rootDir, fullPath).replace(/\\/g, '/');
     if (ignore.some((prefix) => relPath === prefix || relPath.startsWith(prefix))) {
       continue;
     }
 
-    let stat;
     try {
-      stat = statSync(fullPath);
-    } catch {
-      continue;
-    }
-
-    if (stat.isDirectory()) {
-      walkDir(fullPath, extensions, ignore, rootDir, results);
-    } else if (stat.isFile()) {
-      const ext = extname(entry).toLowerCase();
-      if (extensions.includes(ext)) {
-        results.push(fullPath);
+      if (reader.isDirectory(fullPath)) {
+        walkDir(fullPath, extensions, ignore, rootDir, reader, warnings, results);
+      } else if (reader.isFile(fullPath)) {
+        const ext = extname(entry).toLowerCase();
+        if (extensions.includes(ext)) {
+          results.push(fullPath);
+        }
       }
+    } catch (err) {
+      warnings.push(`Rejected brand path ${fullPath}: ${(err as Error).message}`);
+      continue;
     }
   }
 }
 
-function isDirectory(p: string): boolean {
+function safeIsFile(p: string, reader: BrandReadPolicy, warnings: string[]): boolean {
   try {
-    return statSync(p).isDirectory();
-  } catch {
+    return reader.isFile(p);
+  } catch (err) {
+    warnings.push(`Rejected brand file ${p}: ${(err as Error).message}`);
+    return false;
+  }
+}
+
+function safeIsDirectory(p: string, reader: BrandReadPolicy, warnings: string[]): boolean {
+  try {
+    return reader.isDirectory(p);
+  } catch (err) {
+    warnings.push(`Rejected brand directory ${p}: ${(err as Error).message}`);
     return false;
   }
 }
