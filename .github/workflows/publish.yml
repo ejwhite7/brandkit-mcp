@@ -31,18 +31,9 @@ jobs:
 
       - name: Resolve target version
         id: ver
-        run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          fi
-          if [ -z "$VERSION" ]; then
-            echo "::error::Could not determine version from tag or input"
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing version: $VERSION"
+        env:
+          RELEASE_INPUT_VERSION: ${{ inputs.version }}
+        run: node scripts/resolve-publish-version.mjs
 
       - name: Install dependencies
         run: npm ci
@@ -51,21 +42,20 @@ jobs:
         run: npm run audit:prod
 
       - name: Sync version into package.json and server.json
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          VERSION='${{ steps.ver.outputs.version }}'
           node -e "
             const fs = require('fs');
             for (const f of ['package.json', 'server.json']) {
               const j = JSON.parse(fs.readFileSync(f, 'utf8'));
-              j.version = process.env.V;
+              j.version = process.env.RELEASE_VERSION;
               if (Array.isArray(j.packages)) {
-                for (const p of j.packages) if (p.identifier === 'brandkit-mcp') p.version = process.env.V;
+                for (const p of j.packages) if (p.identifier === 'brandkit-mcp') p.version = process.env.RELEASE_VERSION;
               }
               fs.writeFileSync(f, JSON.stringify(j, null, 2) + '\n');
             }
           "
-        env:
-          V: ${{ steps.ver.outputs.version }}
 
       - name: Typecheck
         run: npm run typecheck
@@ -100,8 +90,9 @@ jobs:
         run: ./mcp-publisher publish
 
       - name: Summary
+        env:
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          echo "## Published \`brandkit-mcp@${{ steps.ver.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- npm: https://www.npmjs.com/package/brandkit-mcp/v/${{ steps.ver.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- MCP Registry: https://registry.modelcontextprotocol.io/v0/servers?search=brandkit-mcp" >> "$GITHUB_STEP_SUMMARY"
+          printf '## Published `brandkit-mcp@%s`\n\n' "$RELEASE_VERSION" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "- npm: https://www.npmjs.com/package/brandkit-mcp/v/$RELEASE_VERSION" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "- MCP Registry: https://registry.modelcontextprotocol.io/v0/servers?search=brandkit-mcp" >> "$GITHUB_STEP_SUMMARY"

@@ -208,7 +208,7 @@
       "title": "Remove publish workflow shell injection",
       "dependencies": ["BASE-002"],
       "acceptance": ["dynamic workflow values enter scripts only through env", "manual versions are strict SemVer", "hostile input cannot execute shell syntax"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "CI-002",

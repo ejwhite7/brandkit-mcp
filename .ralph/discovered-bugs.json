@@ -48,10 +48,11 @@
     {
       "id": "CI-001",
       "severity": "high",
-      "status": "open",
+      "status": "resolved",
       "title": "Manual publish version permits shell injection",
       "evidence": ".github/workflows/publish.yml interpolates workflow_dispatch version expressions directly into privileged shell scripts.",
-      "story": "CI-001"
+      "story": "CI-001",
+      "resolution": "Publish scripts receive dynamic values only through env and a dedicated resolver accepts only strict SemVer from manual inputs or v-tags."
     },
     {
       "id": "CI-002",

@@ -383,3 +383,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores late uncaught startup failures.
 - Commit: Pending at time of entry.
 - Next eligible story: CI-001.
+
+## 2026-08-29 02:47 EDT — CI-001
+
+- Objective: Remove command injection from the privileged manual/tag publish workflow.
+- Defect reproduced: A workflow-dispatch version containing command substitution was interpolated into shell source and created a marker file under the original resolver.
+- Changes: Route manual and resolved versions into shell steps only through environment variables; resolve dispatch versus v-tag in a Node script; enforce full strict SemVer before writing `GITHUB_OUTPUT`; consume the validated environment value for metadata synchronization and release summary.
+- Files changed: `.github/workflows/publish.yml`, `scripts/resolve-publish-version.mjs`, and `src/tests/publish-workflow.test.ts`.
+- Tests added: Parsed workflow prohibits GitHub expression interpolation in every publish `run`; valid stable/prerelease/build SemVer; invalid leading zeros/prefixes/whitespace; v-tag normalization; package/registry synchronization; command substitution, backticks, semicolon, newline/output, and quote payloads remain inert.
+- Verification commands: Focused 19-test publish/release matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm audit --omit=dev`, and `git diff --check`.
+- Verification results: Focused tests pass; full 41 files / 333 tests pass; typecheck, lint, build, production audit (0), and diff check pass.
+- Security review: No untrusted workflow expression is parsed as shell source; validated versions contain no shell or workflow-command metacharacters.
+- Compatibility review: Manual releases and `v*` tag releases retain their existing version synchronization and summaries; invalid tags now fail closed.
+- Rollback: Revert this story commit; that restores confirmed privileged workflow command execution.
+- Commit: Pending at time of entry.
+- Next eligible story: CI-002.
