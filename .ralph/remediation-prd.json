@@ -272,7 +272,7 @@
       "title": "Validate tolerant manifest entry shapes",
       "dependencies": ["FS-001"],
       "acceptance": ["null scalar and array manifest entries never crash scanning", "invalid entries become deterministic warnings", "valid asset and font entries remain indexed"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "TOOL-002",

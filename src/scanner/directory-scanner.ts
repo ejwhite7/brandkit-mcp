@@ -306,6 +306,141 @@ const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.otf', '.ttf']);
 // Image extensions
 const IMAGE_EXTENSIONS = new Set(['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']);
 
+type ManifestRecord = Record<string, unknown>;
+
+interface FontManifestEntry {
+  file: string;
+  family?: string;
+  weight?: string | number;
+  style?: 'normal' | 'italic';
+}
+
+interface AssetManifestEntry {
+  file: string;
+  id?: string;
+  purpose?: string;
+}
+
+const ACCESSOR_PROPERTY = Symbol('accessor-property');
+
+function isManifestRecord(value: unknown): value is ManifestRecord {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+/** Read only an own data property, without consulting prototypes or invoking accessors. */
+function ownManifestValue(record: ManifestRecord, key: string): unknown | typeof ACCESSOR_PROPERTY {
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  if (descriptor === undefined) return undefined;
+  return 'value' in descriptor ? descriptor.value : ACCESSOR_PROPERTY;
+}
+
+function manifestSource(reader: BrandReadPolicy, path: string): string {
+  return relative(reader.configuredRoot, path).replace(/\\/g, '/');
+}
+
+function optionalString(
+  record: ManifestRecord,
+  key: string,
+): { valid: true; value?: string } | { valid: false; reason: string } {
+  const value = ownManifestValue(record, key);
+  if (value === undefined) return { valid: true };
+  if (typeof value !== 'string') return { valid: false, reason: `${key} must be a string` };
+  return { valid: true, value };
+}
+
+function validateFontManifestEntry(
+  value: unknown,
+): { valid: true; entry: FontManifestEntry } | { valid: false; reason: string } {
+  if (!isManifestRecord(value)) return { valid: false, reason: 'expected an object' };
+
+  const file = ownManifestValue(value, 'file');
+  if (typeof file !== 'string' || file.trim().length === 0) {
+    return { valid: false, reason: 'file must be a non-empty string' };
+  }
+  const family = optionalString(value, 'family');
+  if (!family.valid) return family;
+
+  const weight = ownManifestValue(value, 'weight');
+  if (
+    weight !== undefined &&
+    !(typeof weight === 'string' || (typeof weight === 'number' && Number.isFinite(weight)))
+  ) {
+    return { valid: false, reason: 'weight must be a finite number or string' };
+  }
+
+  const style = ownManifestValue(value, 'style');
+  if (style !== undefined && style !== 'normal' && style !== 'italic') {
+    return { valid: false, reason: 'style must be normal or italic' };
+  }
+
+  return {
+    valid: true,
+    entry: {
+      file,
+      family: family.value,
+      weight: weight as string | number | undefined,
+      style,
+    },
+  };
+}
+
+function validateAssetManifestEntry(
+  value: unknown,
+): { valid: true; entry: AssetManifestEntry } | { valid: false; reason: string } {
+  if (!isManifestRecord(value)) return { valid: false, reason: 'expected an object' };
+
+  const file = ownManifestValue(value, 'file');
+  if (typeof file !== 'string' || file.trim().length === 0) {
+    return { valid: false, reason: 'file must be a non-empty string' };
+  }
+  const id = optionalString(value, 'id');
+  if (!id.valid) return id;
+  const purpose = optionalString(value, 'purpose');
+  if (!purpose.valid) return purpose;
+
+  return { valid: true, entry: { file, id: id.value, purpose: purpose.value } };
+}
+
+function validatedManifestEntries<T>(options: {
+  data: unknown;
+  collection: 'faces' | 'assets';
+  kind: 'font' | 'asset';
+  path: string;
+  reader: BrandReadPolicy;
+  warnings: string[];
+  validate: (value: unknown) => { valid: true; entry: T } | { valid: false; reason: string };
+}): T[] {
+  const source = manifestSource(options.reader, options.path);
+  if (!isManifestRecord(options.data)) {
+    options.warnings.push(`Rejected ${options.kind} manifest ${source}: expected a mapping`);
+    return [];
+  }
+
+  const collection = ownManifestValue(options.data, options.collection);
+  if (collection === undefined) return [];
+  if (!Array.isArray(collection)) {
+    options.warnings.push(
+      `Rejected ${options.kind} manifest ${source}: ${options.collection} must be an array`,
+    );
+    return [];
+  }
+
+  const entries: T[] = [];
+  collection.forEach((value, index) => {
+    const result = options.validate(value);
+    if (result.valid) {
+      entries.push(result.entry);
+    } else {
+      options.warnings.push(
+        `Rejected ${options.kind} manifest entry ${source} ${options.collection}[${index}]: ${result.reason}`,
+      );
+    }
+  });
+  return entries;
+}
+
 function parseFontsDir(
   fontsDir: string,
   ignore: IgnoreMatcher,
@@ -316,28 +451,32 @@ function parseFontsDir(
 
   // Load optional fonts.yaml for metadata overrides
   const fontsYamlPath = join(fontsDir, 'fonts.yaml');
-  let fontsYamlData: Record<string, unknown> | null = null;
+  let yamlFaces: FontManifestEntry[] = [];
   if (!ignore.matches(fontsYamlPath) && safeIsFile(fontsYamlPath, reader, warnings)) {
     const result = parseYamlFile(fontsYamlPath, reader);
     warnings.push(...result.warnings);
-    if (result.data && typeof result.data === 'object') {
-      fontsYamlData = result.data as Record<string, unknown>;
+    if (result.warnings.length === 0) {
+      yamlFaces = validatedManifestEntries({
+        data: result.data,
+        collection: 'faces',
+        kind: 'font',
+        path: fontsYamlPath,
+        reader,
+        warnings,
+        validate: validateFontManifestEntry,
+      });
     }
   }
 
   // Build a lookup from file name -> metadata from YAML
   // Expected YAML shape: { faces: [{ family, weight, style, file }] }
   const yamlFaceMap = new Map<string, { family?: string; weight?: string | number; style?: string }>();
-  if (fontsYamlData?.faces && Array.isArray(fontsYamlData.faces)) {
-    for (const face of fontsYamlData.faces as Array<Record<string, unknown>>) {
-      if (typeof face.file === 'string') {
-        yamlFaceMap.set(face.file, {
-          family: face.family as string | undefined,
-          weight: face.weight as string | number | undefined,
-          style: face.style as string | undefined,
-        });
-      }
-    }
+  for (const face of yamlFaces) {
+    yamlFaceMap.set(face.file, {
+      family: face.family,
+      weight: face.weight,
+      style: face.style,
+    });
   }
 
   // If we have YAML faces but no physical font files (metadata-only approach),
@@ -413,27 +552,28 @@ function parseAssetsDir(
 
   // Load optional assets.yaml for metadata
   const assetsYamlPath = join(assetsDir, 'assets.yaml');
-  let assetsYamlData: Record<string, unknown> | null = null;
+  let yamlAssets: AssetManifestEntry[] = [];
   if (!ignore.matches(assetsYamlPath) && safeIsFile(assetsYamlPath, reader, warnings)) {
     const result = parseYamlFile(assetsYamlPath, reader);
     warnings.push(...result.warnings);
-    if (result.data && typeof result.data === 'object') {
-      assetsYamlData = result.data as Record<string, unknown>;
+    if (result.warnings.length === 0) {
+      yamlAssets = validatedManifestEntries({
+        data: result.data,
+        collection: 'assets',
+        kind: 'asset',
+        path: assetsYamlPath,
+        reader,
+        warnings,
+        validate: validateAssetManifestEntry,
+      });
     }
   }
 
   // Build a lookup from file name -> YAML metadata
   // Expected shape: { assets: [{ id, file, purpose }] }
   const yamlAssetMap = new Map<string, { id?: string; purpose?: string }>();
-  if (assetsYamlData?.assets && Array.isArray(assetsYamlData.assets)) {
-    for (const asset of assetsYamlData.assets as Array<Record<string, unknown>>) {
-      if (typeof asset.file === 'string') {
-        yamlAssetMap.set(asset.file, {
-          id: asset.id as string | undefined,
-          purpose: asset.purpose as string | undefined,
-        });
-      }
-    }
+  for (const asset of yamlAssets) {
+    yamlAssetMap.set(asset.file, { id: asset.id, purpose: asset.purpose });
   }
 
   const physicalAssetFiles = listFiles(assetsDir, [...IMAGE_EXTENSIONS], ignore, reader, warnings);

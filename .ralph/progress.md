@@ -514,3 +514,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores YAML amplification and cyclic tool failures.
 - Commit: Pending at time of entry.
 - Next eligible story: MANIFEST-001.
+
+## 2026-08-29 04:18 EDT — MANIFEST-001
+
+- Objective: Keep tolerant asset/font manifest ingestion from crashing on syntactically valid but structurally invalid YAML.
+- Defect reproduced: `faces:\n  -` parsed its item as null, then scanner code dereferenced `face.file` and aborted startup; assets had the same path.
+- Changes: Added shared manifest envelope/collection validation; require each entry to be a plain record with an own non-empty string `file`; read only own data properties without prototype lookup/accessor execution; validate optional asset strings and font family/finite weight/style types; emit brand-relative collection/index warnings and continue with valid siblings; retain existing containment and ingestion accounting.
+- Files changed: `src/scanner/directory-scanner.ts` and `src/tests/manifest-validation.test.ts`.
+- Tests added: Null, scalar, array, nested malformed entries; wrong collection/envelope shapes; wrong metadata types; reserved prototype-like keys; mixed valid siblings; index serialization and `get_assets`/`get_fonts` JSON.
+- Verification commands: Focused 37-test manifest/scanner/budget/safe-YAML matrix plus 67 related tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, production/full audits, and `git diff --check`.
+- Verification results: Focused tests pass; full 45 files / 405 tests pass; typecheck, lint, build/DTS, both audits (0), and diff check pass.
+- Security review: No untrusted manifest property is accessed before validation; inherited/accessor properties are inert; valid file paths still pass the common containment and budget policy.
+- Compatibility review: Valid metadata and files index unchanged; invalid entries now warn rather than crash or silently inject wrong types.
+- Rollback: Revert this story commit; that restores null-entry startup crashes.
+- Commit: Pending at time of entry.
+- Next eligible story: TOOL-002.

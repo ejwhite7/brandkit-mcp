@@ -120,10 +120,11 @@
     {
       "id": "MANIFEST-001",
       "severity": "high",
-      "status": "open",
+      "status": "resolved",
       "title": "Null font and asset manifest entries crash scanning",
       "evidence": "Valid YAML list entries with no value parse as null; scanner manifest loops dereference item.file and abort startup.",
-      "story": "MANIFEST-001"
+      "story": "MANIFEST-001",
+      "resolution": "Font and asset manifests now validate mapping/array/item shapes and typed own data properties before access, warning and continuing on invalid entries."
     },
     {
       "id": "TOOL-002",
