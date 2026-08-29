@@ -104,7 +104,7 @@
       "title": "Make sync config persistence atomic and symlink-safe",
       "dependencies": ["FS-003"],
       "acceptance": ["config symlinks hard links and non-regular files are rejected", "config reads and writes cannot be redirected after startup", "protected targets remain unchanged and sync reports savedConfig false"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FS-004",

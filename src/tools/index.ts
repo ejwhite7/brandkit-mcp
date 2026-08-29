@@ -79,7 +79,7 @@ export interface ToolRegistrationOptions {
 export function registerAllTools(
   server: Server,
   getIndex: () => DesignSystemIndex,
-  context?: { configPath: string; outputDir: string },
+  context?: syncBrandDocs.SyncContext,
   options: ToolRegistrationOptions = {},
 ): void {
   // ---- Tools --------------------------------------------------------------

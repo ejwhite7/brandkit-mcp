@@ -6,7 +6,6 @@
  * writes brandkit.config.yaml, DESIGN.md, and PRODUCT.md — never magic_trick.md.
  */
 
-import { readFileSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import yaml from 'js-yaml';
 import type { DesignSystemIndex } from '../indexer/types.js';
@@ -16,7 +15,12 @@ import {
   type Brief,
 } from '../brand-docs/brief.js';
 import { generateBrandDocs } from '../brand-docs/generate.js';
-import { writeBrandDocs } from '../brand-docs/write.js';
+import {
+  atomicWriteFile,
+  safeReadRegularFile,
+  writeBrandDocs,
+  type RegularFileIdentity,
+} from '../brand-docs/write.js';
 
 export const TOOL_NAME = 'sync_brand_docs';
 
@@ -46,6 +50,7 @@ export const INPUT_SCHEMA = {
 export interface SyncContext {
   configPath: string;
   outputDir: string;
+  configIdentity: RegularFileIdentity;
 }
 
 interface SyncArgs {
@@ -84,8 +89,12 @@ export async function handler(
   // Load any existing brief from the config file.
   let raw: Record<string, unknown> = {};
   let configReadOk = false;
+  let configReadIdentity: RegularFileIdentity | undefined;
   try {
-    raw = (yaml.load(readFileSync(context.configPath, 'utf-8')) as Record<string, unknown>) ?? {};
+    const configFile = safeReadRegularFile(context.configPath, context.configIdentity);
+    raw = (yaml.load(configFile.content) as Record<string, unknown>) ?? {};
+    context.configIdentity = configFile.identity;
+    configReadIdentity = configFile.identity;
     configReadOk = true;
   } catch (err) {
     warnings.push(
@@ -118,7 +127,11 @@ export async function handler(
   if (configReadOk && raw.version === 2) {
     try {
       raw.brief = merged;
-      writeFileSync(context.configPath, yaml.dump(raw), 'utf-8');
+      context.configIdentity = atomicWriteFile(
+        context.configPath,
+        yaml.dump(raw),
+        configReadIdentity,
+      );
       savedConfig = true;
       warnings.push(
         'Saved the brief into brandkit.config.yaml. Note: rewriting the YAML drops any comments or custom formatting in that file.',

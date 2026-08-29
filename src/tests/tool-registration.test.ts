@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { lstatSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { allowWriteToolsForTransport } from '../index.js';
 import { registerAllTools } from '../tools/index.js';
+import type { SyncContext } from '../tools/sync-brand-docs.js';
 import { buildFixtureIndex } from './helpers.js';
 
 interface HandlerResult {
@@ -25,7 +26,11 @@ type RequestHandler = (request?: {
   params: { name: string; arguments?: Record<string, unknown> };
 }) => Promise<HandlerResult>;
 
-function captureToolHandlers(options: { allowWriteTools?: boolean; withContext?: boolean } = {}) {
+function captureToolHandlers(options: {
+  allowWriteTools?: boolean;
+  withContext?: boolean;
+  context?: SyncContext;
+} = {}) {
   const handlers: RequestHandler[] = [];
   const fakeServer = {
     setRequestHandler: (_schema: unknown, handler: RequestHandler) => handlers.push(handler),
@@ -35,11 +40,17 @@ function captureToolHandlers(options: { allowWriteTools?: boolean; withContext?:
   tempDirs.push(dir);
   const configPath = join(dir, 'brandkit.config.yaml');
   writeFileSync(configPath, 'version: 2\nbrand:\n  name: Test\n  root: ./\n');
+  const configEntry = lstatSync(configPath);
 
+  const context = options.context ?? {
+    configPath,
+    outputDir: dir,
+    configIdentity: { dev: configEntry.dev, ino: configEntry.ino },
+  };
   registerAllTools(
     fakeServer,
     () => index,
-    options.withContext ? { configPath, outputDir: dir } : undefined,
+    options.withContext || options.context ? context : undefined,
     { allowWriteTools: options.allowWriteTools },
   );
 
@@ -86,6 +97,35 @@ describe('write-capable tool registration', () => {
     const { listTools, callTool } = captureToolHandlers({ allowWriteTools: true });
     expect((await listTools()).tools?.map((tool) => tool.name)).not.toContain('sync_brand_docs');
     expect((await callTool({ params: { name: 'sync_brand_docs' } })).isError).toBe(true);
+  });
+
+  it('shares updated config identity across fresh privileged server registrations', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-tool-registration-shared-'));
+    tempDirs.push(dir);
+    const configPath = join(dir, 'brandkit.config.yaml');
+    writeFileSync(configPath, 'version: 2\nbrand:\n  name: Test\n  root: ./\n');
+    const entry = lstatSync(configPath);
+    const context: SyncContext = {
+      configPath,
+      outputDir: dir,
+      configIdentity: { dev: entry.dev, ino: entry.ino },
+    };
+    const args = {
+      audience: 'a',
+      voiceWords: 'b',
+      visualReferences: 'c',
+      antiReferences: 'd',
+    };
+
+    const firstServer = captureToolHandlers({ allowWriteTools: true, context });
+    const first = await firstServer.callTool({ params: { name: 'sync_brand_docs', arguments: args } });
+    expect(JSON.parse(first.content?.[0].text ?? '{}').savedConfig).toBe(true);
+
+    const secondServer = captureToolHandlers({ allowWriteTools: true, context });
+    const second = await secondServer.callTool({
+      params: { name: 'sync_brand_docs', arguments: { ...args, audience: 'updated' } },
+    });
+    expect(JSON.parse(second.content?.[0].text ?? '{}').savedConfig).toBe(true);
   });
 });
 

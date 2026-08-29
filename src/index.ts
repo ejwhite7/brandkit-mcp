@@ -67,7 +67,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   // Log to stderr (stdout is reserved for MCP protocol in stdio mode)
   console.error('[brandkit-mcp] Starting server...');
 
-  const { config: rawConfig, filePath } = loadConfigWithPath(options.configPath);
+  const { config: rawConfig, filePath, fileIdentity } = loadConfigWithPath(options.configPath);
   // Always resolve relative paths in the config against the config file's
   // own directory. This makes the server portable across cwd values --
   // e.g. when spawned by mcp-proxy, Claude Desktop, or via Glama, which
@@ -76,6 +76,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   const config = resolveConfigPaths(rawConfig, configDir);
   const transport = options.transport ?? config.server.transport;
   const allowWriteTools = allowWriteToolsForTransport(transport, options.allowWriteTools);
+  const syncContext = { configPath: filePath, outputDir: configDir, configIdentity: fileIdentity };
   console.error(`[brandkit-mcp] Loaded config for "${config.brand.name}" from ${filePath}`);
 
   console.error('[brandkit-mcp] Building design system index...');
@@ -112,7 +113,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     registerAllTools(
       server,
       () => currentIndex,
-      { configPath: filePath, outputDir: configDir },
+      syncContext,
       { allowWriteTools },
     );
     return server;

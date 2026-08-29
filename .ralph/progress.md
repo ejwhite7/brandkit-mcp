@@ -178,3 +178,20 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; generated files would return to direct non-atomic writes.
 - Commit: Pending at time of entry.
 - Next eligible story: FS-005.
+
+## 2026-08-29 01:01 EDT — FS-005
+
+- Objective: Prevent `sync_brand_docs` config reads and persistence from being redirected after startup.
+- Defect reproduced: Replacing `brandkit.config.yaml` with a symlink after server startup redirected both YAML reads and direct writes and could overwrite a valid-v2 `magic_trick.md` or external file.
+- Changes: Added safe single-link regular-file reads with `O_NOFOLLOW`, descriptor identity checks, and optional trusted identity; config loader captures startup identity; sync uses identity-bound reads and FS-003 atomic writes; one shared mutable context carries new identities across fresh HTTP/SSE Server instances; startup rejects symlink, hard-linked, and non-regular configs.
+- Files changed: `README.md`, config loader, atomic writer, startServer/standalone registration, tool registry/sync handler, and config/tool/sync tests.
+- Tests added: Unsafe config types at startup; post-registration relative/absolute symlinks, hard links, directories, and regular replacement; protected-byte and warning redaction checks; permissions and inode replacement; two successful saves across fresh tool registrations.
+- Verification commands: Focused 35 and 51-test runs, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 252 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Redirected content is not parsed or echoed, final config paths are never opened for writing, and protected targets remain unchanged.
+- Compatibility review: Regular configs retain their permissions and can be saved repeatedly; replacement of the trusted config while running intentionally fails closed with `savedConfig: false`.
+- Discovered-bug status: FS-005 resolved with regression evidence.
+- Remaining risks: Generated delimiter injection remains for FS-004.
+- Rollback: Revert this story commit; config symlink protection and startup identity binding would be removed.
+- Commit: Pending at time of entry.
+- Next eligible story: FS-004.

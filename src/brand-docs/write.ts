@@ -31,6 +31,16 @@ export class GeneratedWriteError extends Error {
   }
 }
 
+export interface RegularFileIdentity {
+  dev: number;
+  ino: number;
+}
+
+export interface SafeRegularFileRead {
+  content: string;
+  identity: RegularFileIdentity;
+}
+
 interface PreparedWrite {
   targetPath: string;
   tempPath: string;
@@ -90,38 +100,62 @@ function assertDirectoryUnchanged(path: string, expected: Pick<Stats, 'dev' | 'i
   }
 }
 
-function inspectTarget(targetPath: string): Stats | undefined {
+function inspectTarget(targetPath: string, kind = 'output'): Stats | undefined {
   try {
     const entry = lstatSync(targetPath);
     if (entry.isSymbolicLink()) {
-      throw new GeneratedWriteError(`Refusing to replace symbolic-link output ${basename(targetPath)}`);
+      throw new GeneratedWriteError(`Refusing to use symbolic-link ${kind} ${basename(targetPath)}`);
     }
     if (!entry.isFile()) {
-      throw new GeneratedWriteError(`Refusing to replace non-regular output ${basename(targetPath)}`);
+      throw new GeneratedWriteError(`Refusing to use non-regular ${kind} ${basename(targetPath)}`);
     }
     if (entry.nlink > 1) {
-      throw new GeneratedWriteError(`Refusing to replace hard-linked output ${basename(targetPath)}`);
+      throw new GeneratedWriteError(`Refusing to use hard-linked ${kind} ${basename(targetPath)}`);
     }
     return entry;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     if (err instanceof GeneratedWriteError) throw err;
-    throw new GeneratedWriteError(`Could not inspect output ${basename(targetPath)}: ${(err as Error).message}`);
+    throw new GeneratedWriteError(`Could not inspect ${kind} ${basename(targetPath)}: ${(err as Error).message}`);
   }
 }
 
-function readExistingFile(targetPath: string, expected: Stats): string {
+/**
+ * Read a single-link regular file without following its final path.
+ * When an identity is supplied, the opened file must be the same file that
+ * was trusted earlier in the process lifetime.
+ */
+export function safeReadRegularFile(
+  filePath: string,
+  expected?: RegularFileIdentity,
+): SafeRegularFileRead {
+  const targetPath = resolve(filePath);
+  const entry = inspectTarget(targetPath, 'file');
+  if (!entry) {
+    throw new GeneratedWriteError(`Could not inspect file ${basename(targetPath)}: file does not exist`);
+  }
+  if (expected && !sameFile(entry, expected)) {
+    throw new GeneratedWriteError(`Refusing to read replaced file ${basename(targetPath)}`);
+  }
+
+  return {
+    content: readExistingFile(targetPath, entry, 'File'),
+    identity: { dev: entry.dev, ino: entry.ino },
+  };
+}
+
+function readExistingFile(targetPath: string, expected: Stats, label = 'Output'): string {
   let fd: number | undefined;
   try {
     fd = openSync(targetPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     const opened = fstatSync(fd);
-    if (!opened.isFile() || !sameFile(opened, expected)) {
-      throw new GeneratedWriteError(`Output ${basename(targetPath)} changed while being read`);
+    if (!opened.isFile() || opened.nlink > 1 || !sameFile(opened, expected)) {
+      throw new GeneratedWriteError(`${label} ${basename(targetPath)} changed while being read`);
     }
     return readFileSync(fd, 'utf-8');
   } catch (err) {
     if (err instanceof GeneratedWriteError) throw err;
-    throw new GeneratedWriteError(`Could not safely read output ${basename(targetPath)}: ${(err as Error).message}`);
+    throw new GeneratedWriteError(`Could not safely read ${label.toLowerCase()} ${basename(targetPath)}: ${(err as Error).message}`);
   } finally {
     if (fd !== undefined) closeSync(fd);
   }
@@ -183,16 +217,24 @@ function cleanupPreparedWrite(prepared: PreparedWrite): void {
 }
 
 /** Atomically replace a regular file without ever following the final path. */
-export function atomicWriteFile(filePath: string, content: string): void {
+export function atomicWriteFile(
+  filePath: string,
+  content: string,
+  expected?: RegularFileIdentity,
+): RegularFileIdentity {
   const directory = inspectOutputDirectory(dirname(filePath));
   const targetPath = resolve(directory.path, basename(filePath));
   if (!isWithin(directory.path, targetPath)) {
     throw new GeneratedWriteError('Generated output is outside the output directory');
   }
   const existing = inspectTarget(targetPath);
+  if (expected && (!existing || !sameFile(existing, expected))) {
+    throw new GeneratedWriteError(`Refusing to replace changed output ${basename(targetPath)}`);
+  }
   const prepared = prepareAtomicWrite(directory.path, directory.identity, targetPath, content, existing);
   try {
     commitPreparedWrite(prepared);
+    return { dev: prepared.tempIdentity.dev, ino: prepared.tempIdentity.ino };
   } finally {
     cleanupPreparedWrite(prepared);
   }

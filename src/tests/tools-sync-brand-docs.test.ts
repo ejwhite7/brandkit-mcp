@@ -1,22 +1,39 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, symlinkSync } from 'fs';
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import yaml from 'js-yaml';
-import { handler, TOOL_NAME } from '../tools/sync-brand-docs.js';
+import { handler, TOOL_NAME, type SyncContext } from '../tools/sync-brand-docs.js';
 import { buildFixtureIndex } from './helpers.js';
 
-function setup(): { configPath: string; outputDir: string } {
+function setup(): SyncContext {
   const dir = mkdtempSync(join(tmpdir(), 'bk-sync-'));
   const configPath = join(dir, 'brandkit.config.yaml');
   writeFileSync(configPath, 'version: 2\nbrand:\n  name: Acme\n  root: ./\n', 'utf-8');
-  return { configPath, outputDir: dir };
+  const entry = lstatSync(configPath);
+  return {
+    configPath,
+    outputDir: dir,
+    configIdentity: { dev: entry.dev, ino: entry.ino },
+  };
 }
 
 function call(
   index: ReturnType<typeof buildFixtureIndex>,
   args: Record<string, string>,
-  ctx: { configPath: string; outputDir: string },
+  ctx: SyncContext,
 ) {
   return handler(index, args, ctx);
 }
@@ -59,6 +76,30 @@ describe('sync_brand_docs', () => {
     expect(savedBrief.voice_words).toBe('warm, mechanical, opinionated');
 
     expect((payload._warnings as string[]).join(' ')).toContain('comments');
+  });
+
+  it('atomically replaces a regular config, preserves permissions, and supports another sync', async () => {
+    const index = buildFixtureIndex('v2/full');
+    const ctx = setup();
+    chmodSync(ctx.configPath, 0o640);
+    const before = lstatSync(ctx.configPath);
+    const args = {
+      audience: 'first audience',
+      voiceWords: 'warm, mechanical, opinionated',
+      visualReferences: 'Klim specimen pages',
+      antiReferences: 'generic SaaS dashboards',
+    };
+
+    const first = JSON.parse((await call(index, args, ctx))[0].text) as Record<string, unknown>;
+    const afterFirst = lstatSync(ctx.configPath);
+    expect(first.savedConfig).toBe(true);
+    expect(afterFirst.ino).not.toBe(before.ino);
+    expect(afterFirst.mode & 0o777).toBe(0o640);
+
+    const second = JSON.parse((await call(index, { ...args, audience: 'second audience' }, ctx))[0].text) as Record<string, unknown>;
+    expect(second.savedConfig).toBe(true);
+    const savedCfg = yaml.load(readFileSync(ctx.configPath, 'utf-8')) as Record<string, unknown>;
+    expect((savedCfg.brief as Record<string, string>).audience).toBe('second audience');
   });
 
   it('merges new answers over a brief already in the config', async () => {
@@ -138,5 +179,64 @@ describe('sync_brand_docs', () => {
     expect(existsSync(join(ctx.outputDir, 'DESIGN.md'))).toBe(true);
     expect(existsSync(join(ctx.outputDir, 'PRODUCT.md'))).toBe(true);
     expect((payload._warnings as string[]).join(' ')).toContain('refusing to overwrite');
+  });
+
+  it.each([
+    ['magic_trick.md', false],
+    ['external.yaml', true],
+  ])('rejects a post-registration config symlink to %s without importing or changing it', async (name, externalTarget) => {
+    const index = buildFixtureIndex('v2/full');
+    const ctx = setup();
+    const externalDir = mkdtempSync(join(tmpdir(), 'bk-sync-protected-'));
+    const target = externalTarget ? join(externalDir, name) : join(ctx.outputDir, name);
+    const protectedConfig =
+      'version: 2\nbrand:\n  name: Redirected\n  root: ./\nbrief:\n  audience: OUTSIDE SECRET\n  voice_words: outside\n  visual_references: outside\n  anti_references: outside\n';
+    writeFileSync(target, protectedConfig);
+    unlinkSync(ctx.configPath);
+    symlinkSync(target, ctx.configPath);
+
+    const content = await call(
+      index,
+      { audience: 'a', voiceWords: 'b', visualReferences: 'c', antiReferences: 'd' },
+      ctx,
+    );
+    const payload = JSON.parse(content[0].text) as Record<string, unknown>;
+    expect(payload.status).toBe('written');
+    expect(payload.savedConfig).toBe(false);
+    expect(payload.brief).toEqual({
+      audience: 'a',
+      voice_words: 'b',
+      visual_references: 'c',
+      anti_references: 'd',
+    });
+    expect(readFileSync(target, 'utf-8')).toBe(protectedConfig);
+    expect(content[0].text).not.toContain('OUTSIDE SECRET');
+    expect(content[0].text).not.toContain(externalDir);
+  });
+
+  it('rejects post-registration hard links, non-regular files, and regular replacements', async () => {
+    const index = buildFixtureIndex('v2/full');
+    const args = { audience: 'a', voiceWords: 'b', visualReferences: 'c', antiReferences: 'd' };
+
+    for (const replacement of ['hard-link', 'directory', 'regular-replacement'] as const) {
+      const ctx = setup();
+      const protectedDir = mkdtempSync(join(tmpdir(), 'bk-sync-protected-'));
+      const protectedFile = join(protectedDir, 'outside.yaml');
+      const protectedBytes = 'version: 2\nbrand:\n  name: Protected\n  root: ./\n';
+      writeFileSync(protectedFile, protectedBytes);
+      unlinkSync(ctx.configPath);
+      if (replacement === 'hard-link') linkSync(protectedFile, ctx.configPath);
+      if (replacement === 'directory') mkdirSync(ctx.configPath);
+      if (replacement === 'regular-replacement') renameSync(protectedFile, ctx.configPath);
+
+      const payload = JSON.parse((await call(index, args, ctx))[0].text) as Record<string, unknown>;
+      expect(payload.status).toBe('written');
+      expect(payload.savedConfig).toBe(false);
+      if (replacement === 'hard-link') {
+        expect(readFileSync(protectedFile, 'utf-8')).toBe(protectedBytes);
+      } else if (replacement === 'regular-replacement') {
+        expect(readFileSync(ctx.configPath, 'utf-8')).toBe(protectedBytes);
+      }
+    }
   });
 });

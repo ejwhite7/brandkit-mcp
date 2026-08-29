@@ -1,6 +1,21 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
+import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { BrandKitConfigSchema, BrandkitV1ConfigError } from '../types/config.js';
-import { loadConfigFromString } from '../config/loader.js';
+import { loadConfigFromString, loadConfigWithPath } from '../config/loader.js';
+
+const configTempDirs: string[] = [];
+
+function configTempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  configTempDirs.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  for (const dir of configTempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 describe('config v2 schema', () => {
   it('accepts a minimal v2 config', () => {
@@ -83,5 +98,31 @@ describe('config loader v1 rejection', () => {
   it('throws BrandkitV1ConfigError on a non-2 version', () => {
     const yaml = `version: 3\nbrand:\n  name: Acme\n`;
     expect(() => loadConfigFromString(yaml, '/tmp/fake.yaml')).toThrow(BrandkitV1ConfigError);
+  });
+});
+
+describe('config loader file safety', () => {
+  it('rejects symlink, hard-linked, and non-regular config entries', () => {
+    const yaml = 'version: 2\nbrand:\n  name: Acme\n';
+
+    const symlinkDir = configTempDir('bk-config-link-');
+    writeFileSync(join(symlinkDir, 'target.yaml'), yaml);
+    symlinkSync('target.yaml', join(symlinkDir, 'brandkit.config.yaml'));
+    expect(() => loadConfigWithPath(join(symlinkDir, 'brandkit.config.yaml'))).toThrow(
+      /symbolic-link file/,
+    );
+
+    const hardLinkDir = configTempDir('bk-config-hardlink-');
+    writeFileSync(join(hardLinkDir, 'target.yaml'), yaml);
+    linkSync(join(hardLinkDir, 'target.yaml'), join(hardLinkDir, 'brandkit.config.yaml'));
+    expect(() => loadConfigWithPath(join(hardLinkDir, 'brandkit.config.yaml'))).toThrow(
+      /hard-linked file/,
+    );
+
+    const directoryDir = configTempDir('bk-config-directory-');
+    mkdirSync(join(directoryDir, 'brandkit.config.yaml'));
+    expect(() => loadConfigWithPath(join(directoryDir, 'brandkit.config.yaml'))).toThrow(
+      /non-regular file/,
+    );
   });
 });

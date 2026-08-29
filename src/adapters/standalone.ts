@@ -52,7 +52,7 @@ export async function startStandaloneServer(
 ): Promise<HttpServer> {
   // Resolve relative paths against the config file's own directory (same
   // portability fix as startServer in src/index.ts).
-  const { config: rawConfig, filePath } = loadConfigWithPath(configPath);
+  const { config: rawConfig, filePath, fileIdentity } = loadConfigWithPath(configPath);
   const configDir = dirname(filePath);
   const config = resolveConfigPaths(rawConfig, configDir);
   const listenPort = port ?? config.server.port;
@@ -67,6 +67,7 @@ export async function startStandaloneServer(
   );
   const limits = resolveNetworkLimits(networkLimits);
   const index = await buildDesignSystemIndex(config);
+  const syncContext = { configPath: filePath, outputDir: configDir, configIdentity: fileIdentity };
 
   // One transport per connected client, keyed by sessionId.
   const sessions = new Map<string, SSEServerTransport>();
@@ -123,7 +124,7 @@ export async function startStandaloneServer(
         registerAllTools(
           sessionServer,
           () => index,
-          { configPath: filePath, outputDir: configDir },
+          syncContext,
           { allowWriteTools },
         );
         const transport = new SSEServerTransport(
