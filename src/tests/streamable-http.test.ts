@@ -9,6 +9,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { startServer } from '../index.js';
+import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from '../tools/search-brand.js';
 
 const fixtureRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -75,6 +76,49 @@ describe('stateless Streamable HTTP lifecycle', () => {
     expect(first.tools.length).toBeGreaterThan(0);
     expect(second.tools.map((tool) => tool.name)).toEqual(first.tools.map((tool) => tool.name));
     expect(first.tools.map((tool) => tool.name)).not.toContain('sync_brand_docs');
+    await client.close();
+  });
+
+  it('advertises and enforces bounded search limits at the MCP boundary', async () => {
+    const { endpoint } = await startHttpServer();
+    const client = new Client({ name: 'http-search-limit-test', version: '1.0.0' });
+
+    await client.connect(new StreamableHTTPClientTransport(endpoint));
+    const listed = await client.listTools();
+    const searchTool = listed.tools.find(({ name }) => name === 'search_brand');
+    expect(searchTool?.inputSchema.properties?.limit).toMatchObject({
+      type: 'integer',
+      minimum: 1,
+      maximum: MAX_SEARCH_LIMIT,
+      default: DEFAULT_SEARCH_LIMIT,
+    });
+
+    for (const limit of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '20', 0, MAX_SEARCH_LIMIT + 1, 1e100]) {
+      const result = await client.callTool({
+        name: 'search_brand',
+        arguments: { query: 'brand', limit },
+      });
+      expect(result.isError, `limit ${String(limit)}`).toBe(true);
+      expect(result.content).toEqual([{
+        type: 'text',
+        text: `Error executing search_brand: Invalid "limit" argument: expected an integer from 1 to ${MAX_SEARCH_LIMIT}`,
+      }]);
+    }
+
+    for (const limit of [undefined, 1, MAX_SEARCH_LIMIT]) {
+      const result = await client.callTool({
+        name: 'search_brand',
+        arguments: limit === undefined ? { query: 'brand' } : { query: 'brand', limit },
+      }) as { isError?: boolean; content: Array<{ type: string; text?: string }> };
+      expect(result.isError).not.toBe(true);
+      const content = result.content.find((item) => item.type === 'text');
+      if (content?.type !== 'text' || typeof content.text !== 'string') {
+        throw new Error('missing search response');
+      }
+      const payload = JSON.parse(content.text) as { results: unknown[] };
+      expect(payload.results.length).toBeLessThanOrEqual(limit ?? DEFAULT_SEARCH_LIMIT);
+    }
+
     await client.close();
   });
 

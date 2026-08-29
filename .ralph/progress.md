@@ -475,3 +475,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores outside/ignored reload triggers.
 - Commit: Pending at time of entry.
 - Next eligible story: TOOL-001.
+
+## 2026-08-29 03:59 EDT — TOOL-001
+
+- Objective: Give `search_brand` a finite, consistent result contract at schema, direct-handler, and MCP boundaries.
+- Defect reproduced: Negative limits used JavaScript's negative `slice` semantics, fractional/zero values behaved inconsistently, and huge limits defeated response bounding because the SDK does not guarantee tool-schema validation.
+- Changes: Define default 20 and maximum 100; advertise an integer schema with minimum/maximum; independently accept only runtime integers 1–100; default only when the field is absent; return registry-consistent tool errors for invalid values; retain a sorted top-k set during scanning so intermediate and response hit arrays stay bounded without losing later higher-ranked matches.
+- Files changed: `src/tools/search-brand.ts`, `src/tests/search-brand.test.ts`, and `src/tests/streamable-http.test.ts`.
+- Tests added: Negative, fractional, NaN, both infinities, string, zero, above-max, and huge values; default and exact 1/100 boundaries; 120 matches across all contexts; advertised real MCP schema; real HTTP error and success responses.
+- Verification commands: Focused 35-test search/HTTP/overview matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 43 files / 387 tests pass; typecheck, lint, build/DTS, and diff check pass.
+- Security review: Direct invocation cannot bypass the bound; serialized non-finite values become invalid null rather than the default; intermediate hit storage is finite.
+- Compatibility review: The existing default remains 20; valid positive limits up to 100 retain score ordering; invalid values now fail explicitly instead of producing surprising slices.
+- Rollback: Revert this story commit; that restores unbounded/negative response behavior.
+- Commit: Pending at time of entry.
+- Next eligible story: QA-001 (restart consecutive clean-pass count at zero).

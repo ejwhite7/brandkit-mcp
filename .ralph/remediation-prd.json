@@ -256,7 +256,7 @@
       "title": "Bound search_brand result limits",
       "dependencies": ["HTTP-002"],
       "acceptance": ["limit is an integer within a conservative bound", "invalid limits fail predictably", "response size remains bounded"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "RELEASE-001",

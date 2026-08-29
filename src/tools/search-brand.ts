@@ -11,11 +11,20 @@ export const TOOL_NAME = 'search_brand';
 export const TOOL_DESCRIPTION =
   'Full-text search across all brand atomic system content: verbal docs, magic_trick, components, tokens, assets, fonts, motion, and CSS files.';
 
+export const DEFAULT_SEARCH_LIMIT = 20;
+export const MAX_SEARCH_LIMIT = 100;
+
 export const INPUT_SCHEMA = {
   type: 'object' as const,
   properties: {
     query: { type: 'string', description: 'Search query (case-insensitive substring)' },
-    limit: { type: 'number', default: 20 },
+    limit: {
+      type: 'integer',
+      minimum: 1,
+      maximum: MAX_SEARCH_LIMIT,
+      default: DEFAULT_SEARCH_LIMIT,
+      description: `Maximum results to return (1-${MAX_SEARCH_LIMIT})`,
+    },
   },
   required: ['query'],
 };
@@ -28,10 +37,23 @@ interface SearchHit {
   context?: string;
 }
 
+function resolveSearchLimit(value: unknown): number {
+  const limit = value === undefined ? DEFAULT_SEARCH_LIMIT : value;
+  if (typeof limit !== 'number') {
+    throw new Error(`Invalid "limit" argument: expected an integer from 1 to ${MAX_SEARCH_LIMIT}`);
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_SEARCH_LIMIT) {
+    throw new Error(`Invalid "limit" argument: expected an integer from 1 to ${MAX_SEARCH_LIMIT}`);
+  }
+  return limit;
+}
+
 export function handler(
   index: DesignSystemIndex,
-  args: { query?: unknown; limit?: number },
+  args: { query?: unknown; limit?: unknown },
 ) {
+  const limit = resolveSearchLimit(args.limit);
+
   if (typeof args.query !== 'string' || args.query.length === 0) {
     return [
       {
@@ -45,7 +67,6 @@ export function handler(
     ];
   }
   const q = args.query.toLowerCase();
-  const limit = args.limit ?? 20;
   const warnings: string[] = [];
   const hits: SearchHit[] = [];
 
@@ -61,6 +82,14 @@ export function handler(
       snippet: (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : ''),
       score: 1 - idx / Math.max(1, text.length),
     });
+
+    // Retain only candidates that can appear in the response. This bounds
+    // intermediate memory even when a large structured source contains many
+    // matching components or tokens.
+    if (hits.length > limit) {
+      hits.sort((a, b) => b.score - a.score);
+      hits.length = limit;
+    }
   }
 
   // Verbal docs
@@ -102,7 +131,7 @@ export function handler(
   }
 
   hits.sort((a, b) => b.score - a.score);
-  const results = hits.slice(0, limit);
+  const results = hits;
 
   if (results.length === 0) warnings.push(`No matches for "${args.query}"`);
 

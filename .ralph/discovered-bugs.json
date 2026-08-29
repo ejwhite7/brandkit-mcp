@@ -102,10 +102,11 @@
     {
       "id": "TOOL-001",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "title": "search_brand accepts negative and unbounded limits",
       "evidence": "Tool schema and runtime pass an unconstrained numeric limit directly to Array.slice.",
-      "story": "TOOL-001"
+      "story": "TOOL-001",
+      "resolution": "Search schema and runtime require an integer from 1 to 100, default 20, and maintain a bounded top-k candidate set."
     }
   ]
 }
