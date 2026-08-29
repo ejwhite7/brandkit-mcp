@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, symlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import yaml from 'js-yaml';
@@ -87,6 +87,27 @@ describe('sync_brand_docs', () => {
       ctx,
     );
     expect(existsSync(join(ctx.outputDir, 'magic_trick.md'))).toBe(false);
+  });
+
+  it('reports output symlinks and never changes magic_trick.md', async () => {
+    const index = buildFixtureIndex('v2/full');
+    const ctx = setup();
+    const magic = join(ctx.outputDir, 'magic_trick.md');
+    writeFileSync(magic, 'PROTECTED MAGIC\n');
+    symlinkSync('magic_trick.md', join(ctx.outputDir, 'DESIGN.md'));
+
+    const content = await call(
+      index,
+      { audience: 'a', voiceWords: 'b', visualReferences: 'c', antiReferences: 'd' },
+      ctx,
+    );
+    const payload = JSON.parse(content[0].text) as Record<string, unknown>;
+    expect(payload.ok).toBe(false);
+    expect(payload.status).toBe('write_failed');
+    expect(payload.savedConfig).toBe(true);
+    expect(String(payload.error)).toContain('symbolic-link output DESIGN.md');
+    expect(readFileSync(magic, 'utf-8')).toBe('PROTECTED MAGIC\n');
+    expect(existsSync(join(ctx.outputDir, 'PRODUCT.md'))).toBe(false);
   });
 
   it('reports unavailable when no config path is bound', async () => {

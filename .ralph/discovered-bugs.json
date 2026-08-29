@@ -1,3 +1,12 @@
 {
-  "bugs": []
+  "bugs": [
+    {
+      "id": "FS-005",
+      "severity": "high",
+      "status": "open",
+      "title": "sync_brand_docs follows a replaced config symlink",
+      "evidence": "After startup, replacing brandkit.config.yaml with a symlink redirects the tool's direct readFileSync/writeFileSync persistence and can overwrite magic_trick.md or another writable target.",
+      "story": "FS-005"
+    }
+  ]
 }

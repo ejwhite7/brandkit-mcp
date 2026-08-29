@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'fs';
+import {
+  chmodSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  symlinkSync,
+  writeFileSync,
+  existsSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { BrandKitConfigSchema } from '../types/config.js';
@@ -107,6 +118,69 @@ describe('updateFileWithDelimiters', () => {
     expect(text).toContain('USER CONTENT');
     expect(text).toContain('GENERATED');
   });
+
+  it('atomically replaces regular files while preserving their permissions', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+    const file = join(dir, 'DESIGN.md');
+    writeFileSync(file, 'USER CONTENT\n', { mode: 0o640 });
+    const before = lstatSync(file);
+
+    updateFileWithDelimiters(file, 'GENERATED');
+
+    const after = lstatSync(file);
+    expect(after.ino).not.toBe(before.ino);
+    expect(after.mode & 0o777).toBe(0o640);
+    expect(readFileSync(file, 'utf-8')).toContain('USER CONTENT');
+    expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it('refuses output symlinks without changing their relative or absolute targets', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+    const externalDir = mkdtempSync(join(tmpdir(), 'bk-protected-'));
+    const magic = join(dir, 'magic_trick.md');
+    const external = join(externalDir, 'external.md');
+    writeFileSync(magic, 'MAGIC MUST STAY\n');
+    writeFileSync(external, 'EXTERNAL MUST STAY\n');
+
+    symlinkSync('magic_trick.md', join(dir, 'DESIGN.md'));
+    expect(() => updateFileWithDelimiters(join(dir, 'DESIGN.md'), 'PWNED')).toThrow(
+      /symbolic-link output/,
+    );
+    symlinkSync(external, join(dir, 'PRODUCT.md'));
+    expect(() => updateFileWithDelimiters(join(dir, 'PRODUCT.md'), 'PWNED')).toThrow(
+      /symbolic-link output/,
+    );
+
+    expect(readFileSync(magic, 'utf-8')).toBe('MAGIC MUST STAY\n');
+    expect(readFileSync(external, 'utf-8')).toBe('EXTERNAL MUST STAY\n');
+    expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it('refuses non-regular outputs and a symlink output directory', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+    mkdirSync(join(dir, 'DESIGN.md'));
+    expect(() => updateFileWithDelimiters(join(dir, 'DESIGN.md'), 'NO')).toThrow(
+      /non-regular output/,
+    );
+
+    const parent = mkdtempSync(join(tmpdir(), 'bk-write-parent-'));
+    symlinkSync(dir, join(parent, 'linked-output'));
+    expect(() =>
+      updateFileWithDelimiters(join(parent, 'linked-output', 'PRODUCT.md'), 'NO'),
+    ).toThrow(/symbolic link as the output directory/);
+  });
+
+  it('refuses a hard-linked output without changing protected content', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+    const protectedFile = join(dir, 'magic_trick.md');
+    writeFileSync(protectedFile, 'PROTECTED\n');
+    linkSync(protectedFile, join(dir, 'DESIGN.md'));
+
+    expect(() => updateFileWithDelimiters(join(dir, 'DESIGN.md'), 'PWNED')).toThrow(
+      /hard-linked output/,
+    );
+    expect(readFileSync(protectedFile, 'utf-8')).toBe('PROTECTED\n');
+  });
 });
 
 describe('writeBrandDocs', () => {
@@ -120,6 +194,22 @@ describe('writeBrandDocs', () => {
     expect(existsSync(productPath)).toBe(true);
     expect(readFileSync(designPath, 'utf-8')).toContain('D');
     expect(readFileSync(productPath, 'utf-8')).toContain('P');
+  });
+
+  it('preflights both protected outputs before changing either file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+    const magic = join(dir, 'magic_trick.md');
+    writeFileSync(join(dir, 'DESIGN.md'), 'ORIGINAL DESIGN\n');
+    chmodSync(join(dir, 'DESIGN.md'), 0o644);
+    writeFileSync(magic, 'ORIGINAL MAGIC\n');
+    symlinkSync('magic_trick.md', join(dir, 'PRODUCT.md'));
+
+    expect(() => writeBrandDocs(dir, { design: 'NEW', product: 'PWNED' })).toThrow(
+      /symbolic-link output PRODUCT\.md/,
+    );
+    expect(readFileSync(join(dir, 'DESIGN.md'), 'utf-8')).toBe('ORIGINAL DESIGN\n');
+    expect(readFileSync(magic, 'utf-8')).toBe('ORIGINAL MAGIC\n');
+    expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });
 });
 
@@ -200,6 +290,20 @@ describe('regenerateBrandDocsIfReady', () => {
     expect(result.written).toBe(false);
     expect(result.reason).toBe('brief-incomplete');
     expect(existsSync(join(dir, 'DESIGN.md'))).toBe(false);
+  });
+
+  it('refuses a startup regeneration symlink without changing its protected target', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-regen-'));
+    const index = buildFixtureIndex('v2/full');
+    const magic = join(dir, 'magic_trick.md');
+    writeFileSync(magic, 'STARTUP PROTECTED\n');
+    symlinkSync('magic_trick.md', join(dir, 'DESIGN.md'));
+
+    expect(() => regenerateBrandDocsIfReady(index, fullBrief, dir)).toThrow(
+      /symbolic-link output DESIGN\.md/,
+    );
+    expect(readFileSync(magic, 'utf-8')).toBe('STARTUP PROTECTED\n');
+    expect(existsSync(join(dir, 'PRODUCT.md'))).toBe(false);
   });
 });
 

@@ -135,7 +135,19 @@ export async function handler(
   }
 
   const outputDir = context.outputDir || dirname(context.configPath);
-  const { designPath, productPath } = writeBrandDocs(outputDir, generateBrandDocs(index, merged));
+  let designPath: string;
+  let productPath: string;
+  try {
+    ({ designPath, productPath } = writeBrandDocs(outputDir, generateBrandDocs(index, merged)));
+  } catch (err) {
+    return text({
+      ok: false,
+      status: 'write_failed',
+      savedConfig,
+      error: err instanceof Error ? err.message : String(err),
+      _warnings: warnings,
+    });
+  }
 
   return text({
     ok: true,

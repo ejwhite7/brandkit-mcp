@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync, symlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { docsCommand } from '../cli/commands/docs.js';
@@ -32,5 +32,16 @@ describe('docs command path resolution', () => {
     expect(existsSync(join(outDir, 'PRODUCT.md'))).toBe(true);
     const product = readFileSync(join(outDir, 'PRODUCT.md'), 'utf-8');
     expect(product).toContain('PathTest — Product Brief');
+  });
+
+  it('refuses a protected generated-document symlink without following it', async () => {
+    const magic = join(outDir, 'magic_trick.md');
+    writeFileSync(magic, 'PROTECTED\n');
+    symlinkSync('magic_trick.md', join(outDir, 'DESIGN.md'));
+
+    await expect(
+      docsCommand({ config: join(configDir, 'brandkit.config.yaml'), output: outDir }),
+    ).rejects.toThrow(/symbolic-link output DESIGN\.md/);
+    expect(readFileSync(magic, 'utf-8')).toBe('PROTECTED\n');
   });
 });

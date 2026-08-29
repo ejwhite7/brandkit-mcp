@@ -161,3 +161,20 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; remove brand-root-relative ignore entries added under the documented contract.
 - Commit: Pending at time of entry.
 - Next eligible story: FS-003.
+
+## 2026-08-29 00:54 EDT — FS-003
+
+- Objective: Make generated-document writes atomic and prevent indirect writes to protected targets.
+- Defect reproduced: Existing `DESIGN.md` and `PRODUCT.md` symlinks were followed by direct writes during startup, CLI docs, and `sync_brand_docs`.
+- Changes: Added a shared atomic writer using restrictive same-directory temporary files, safe existing-file reads, fsync, permission preservation, and rename; reject symlink, hard-linked, non-regular, and unsafe output-directory entries; preflight both brand docs; clean staged files; return a structured sync `write_failed` result.
+- Files changed: `src/brand-docs/write.ts`, `src/tools/sync-brand-docs.ts`, and brand-doc/startup/CLI/sync tests.
+- Tests added: Atomic inode replacement and mode preservation; relative and absolute output symlinks; hard links; non-regular outputs; symlink output directories; pair preflight/cleanup; startup, CLI, and sync protected-target workflows.
+- Verification commands: Focused 34 tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 246 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: `magic_trick.md` and external targets remain byte-for-byte unchanged; final output paths are never opened for writing and rename replaces any post-check symlink rather than following it.
+- Compatibility review: Existing regular-file permissions and human content outside delimiters are preserved; new files begin with restrictive permissions.
+- Newly discovered: FS-005 records that config persistence in `sync_brand_docs` still follows a post-startup config symlink. It is a separate failing story and was not hidden in this checkpoint.
+- Remaining risks: FS-005 config persistence and FS-004 delimiter parsing remain open.
+- Rollback: Revert this story commit; generated files would return to direct non-atomic writes.
+- Commit: Pending at time of entry.
+- Next eligible story: FS-005.

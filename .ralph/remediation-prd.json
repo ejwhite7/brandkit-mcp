@@ -96,6 +96,14 @@
       "title": "Make generated writes atomic and symlink-safe",
       "dependencies": ["FS-001"],
       "acceptance": ["output symlinks and non-regular files are rejected", "writes use same-directory temporary files and atomic rename", "magic_trick cannot be changed indirectly"],
+      "passes": true
+    },
+    {
+      "id": "FS-005",
+      "priority": 0,
+      "title": "Make sync config persistence atomic and symlink-safe",
+      "dependencies": ["FS-003"],
+      "acceptance": ["config symlinks hard links and non-regular files are rejected", "config reads and writes cannot be redirected after startup", "protected targets remain unchanged and sync reports savedConfig false"],
       "passes": false
     },
     {
