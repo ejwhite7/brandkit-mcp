@@ -12,7 +12,7 @@ import type { BrandKitConfig } from '../types/config.js';
 import type { DesignSystemIndex } from './types.js';
 import { loadConfigWithPath } from '../config/loader.js';
 import { scanBrandRoot } from '../scanner/directory-scanner.js';
-import { resolveAll } from '../context-resolver.js';
+import { materializeAll, resolveContexts } from '../context-resolver.js';
 
 /**
  * Convenience wrapper: loads a config file by path, scans the brand root, and
@@ -43,8 +43,9 @@ export async function buildDesignSystemIndex(
 ): Promise<DesignSystemIndex> {
   const brandRoot = brandRootOverride ?? config.brand.root;
 
-  const scan = scanBrandRoot(brandRoot, { ignore: config.ignore });
-  const resolved = resolveAll(scan, {
+  const scan = scanBrandRoot(brandRoot, { ignore: config.ignore, limits: config.ingestion });
+  const contexts = resolveContexts(scan);
+  const resolved = materializeAll(contexts, {
     brandName: config.brand.name,
     brandDescription: config.brand.description,
   });
@@ -59,6 +60,7 @@ export async function buildDesignSystemIndex(
     base: scan.base,
     web: scan.web,
     product: scan.product,
+    contexts,
     resolved,
     warnings: scan.warnings,
   };

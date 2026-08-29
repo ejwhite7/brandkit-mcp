@@ -3,6 +3,7 @@ import { writeFileSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { parseVerbalDoc } from '../parsers/verbal-parser.js';
+import { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 function md(content: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'bk-verbal-'));
@@ -14,27 +15,35 @@ function md(content: string): string {
 describe('parseVerbalDoc', () => {
   it('parses markdown with frontmatter', () => {
     const path = md('---\nowner: ej\n---\n# Positioning\n\nWe help solo founders.\n');
-    const doc = parseVerbalDoc(path);
+    const doc = parseVerbalDoc(path, new BrandReadPolicy(join(path, '..')));
     expect(doc?.frontmatter.owner).toBe('ej');
     expect(doc?.body).toContain('We help solo founders');
   });
 
   it('parses markdown without frontmatter', () => {
     const path = md('# Positioning\n\nWe help solo founders.\n');
-    const doc = parseVerbalDoc(path);
+    const doc = parseVerbalDoc(path, new BrandReadPolicy(join(path, '..')));
     expect(doc?.frontmatter).toEqual({});
     expect(doc?.body).toContain('We help solo founders');
   });
 
   it('returns undefined on missing file', () => {
-    expect(parseVerbalDoc('/nonexistent/file.md')).toBeUndefined();
+    const root = mkdtempSync(join(tmpdir(), 'bk-verbal-'));
+    expect(parseVerbalDoc(join(root, 'missing.md'), new BrandReadPolicy(root))).toBeUndefined();
   });
 
   it('degrades gracefully on malformed frontmatter (tolerance principle)', () => {
     const path = md('---\nbad: : :\n---\n# Positioning\n\nBody text survives.\n');
-    const doc = parseVerbalDoc(path);
+    const doc = parseVerbalDoc(path, new BrandReadPolicy(join(path, '..')));
     expect(doc).toBeDefined();
     expect(doc?.frontmatter).toEqual({});
+    expect(doc?.body).toContain('Body text survives');
+  });
+
+  it('supports the YAML document terminator as a frontmatter boundary', () => {
+    const path = md('---\nowner: design\n...\n# Positioning\n\nBody text survives.\n');
+    const doc = parseVerbalDoc(path, new BrandReadPolicy(join(path, '..')));
+    expect(doc?.frontmatter).toEqual({ owner: 'design' });
     expect(doc?.body).toContain('Body text survives');
   });
 });

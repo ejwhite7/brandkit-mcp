@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org)
 [![ejwhite7/brandkit-mcp MCP server](https://glama.ai/mcp/servers/ejwhite7/brandkit-mcp/badges/score.svg)](https://glama.ai/mcp/servers/ejwhite7/brandkit-mcp)
 
-BrandKit MCP v2 is an open-source MCP server that exposes a company's complete **brand atomic system** -- verbal identity (positioning, audience, messaging, differentiation, concepts, voice) and visual identity (colors, typography, components, tokens, motion, assets) -- to Claude and other AI tools via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). It ships 18 tools and 14 resources. When an LLM helps build a website, app, or marketing asset, it has instant structured access to the exact brand language and visual rules it needs -- including a human-authored taste primer that carries the brand's instincts, not just its specs.
+BrandKit MCP v2 is an open-source MCP server that exposes a company's complete **brand atomic system** -- verbal identity (positioning, audience, messaging, differentiation, concepts, voice) and visual identity (colors, typography, components, tokens, motion, assets) -- to Claude and other AI tools via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). It ships 18 read-only tools, one local write tool, and 14 resources. When an LLM helps build a website, app, or marketing asset, it has instant structured access to the exact brand language and visual rules it needs -- including a human-authored taste primer that carries the brand's instincts, not just its specs.
 
 ## Quick Start
 
@@ -32,6 +32,11 @@ brandkit-mcp init
 #      }
 #    }
 ```
+
+`init` refuses to change an existing `brandkit.config.yaml` or
+`brand_atomic_system/` unless `--force` is explicit. Force performs a clean
+replacement only for a regular single-link config and a real directory;
+symbolic links, hard-linked configs, and special-file destinations are rejected.
 
 ## Repository Structure
 
@@ -93,6 +98,8 @@ BrandKit MCP exposes 18 tools to AI assistants:
 | `validate_usage` | Validate brand compliance |
 | `get_context_diff` | Diff base vs web vs product |
 
+The stdio transport also exposes `sync_brand_docs`, which updates `brandkit.config.yaml`, `DESIGN.md`, and `PRODUCT.md`. Network transports hide and refuse this write-capable tool by default.
+
 ### Taste primer
 
 Seven creative/verbal tools (`get_brand_overview`, `get_positioning`, `get_audience`, `get_messaging`, `get_differentiation`, `get_concepts`, `get_voice`) inject a `_taste_primer` field carrying `magic_trick.md` verbatim. `get_magic_trick` returns the primer directly without wrapping.
@@ -131,7 +138,28 @@ brand:
 contexts: [base, web, product]
 ignore:
   - human/
+ingestion:
+  maxFileBytes: 16777216
+  maxTotalBytes: 134217728
+  maxFiles: 1000
+  maxDepth: 16
 ```
+
+Ignore entries are paths relative to `brand.root`. They match the named path and its descendants
+on directory boundaries, so `human/` does not match `humanity/`.
+
+Brand ingestion is bounded before file content is read. The defaults allow a
+maximum of 16 MiB per file, 128 MiB across all unique inputs, 1,000 unique
+files, and 16 path segments below `brand.root`. Fixed documents, discovered
+components and tokens, manifests, fonts, and image assets all share the same
+budget. Directory enumeration is also capped at four times the configured file
+limit, so a tree of empty or unsupported entries cannot create unbounded work
+before file counting. In-root symlink and hard-link aliases count once by canonical file
+identity; an alias cannot bypass containment or a limit. Exact boundaries are
+accepted and the next byte, file, or path segment fails startup with a
+brand-relative error. Large brands can raise these typed `ingestion` values up
+to the built-in safety caps (64 MiB per file, 512 MiB total, 10,000 files, and
+64 segments); `maxTotalBytes` must be at least `maxFileBytes`.
 
 `version: 2` is required. A config file missing this field or declaring `version: 1` causes the server to throw `BrandkitV1ConfigError` at startup.
 
@@ -166,11 +194,65 @@ Your `brandkit.config.yaml` must also be updated to declare `version: 2` and use
 
 ## Conventions
 
-**`magic_trick.md` is human-authored.** The MCP reads it but no tool writes to it. If write tools are added in a future version, they must denylist this path. The taste primer is the brand's instincts -- it must stay human.
+**`magic_trick.md` is human-authored.** The MCP reads it, but `sync_brand_docs` never writes to it. The taste primer is the brand's instincts -- it must stay human.
 
 **Token output formats.** The `get_tokens` tool supports CSS custom properties, SCSS variables, Tailwind config, W3C Design Tokens, and flat JSON.
 
-**Transports.** The server supports stdio (recommended for Claude Desktop), SSE (legacy HTTP), and Streamable HTTP (current MCP spec).
+**Brand files stay inside `brand.root`.** Every fixed and discovered brand input is resolved and opened under the configured root. A symlink is accepted when its final target remains inside that root; symlinks and manifest paths that escape the root are ignored with a warning, and their content is never indexed or exposed through tools, resources, or preview pages.
+
+**The config must be a regular, single-link file.** `brandkit.config.yaml` cannot be a symbolic link, hard link, directory, or other non-regular entry. The server binds config persistence to the file loaded at startup; if that path is replaced while the server is running, `sync_brand_docs` refuses to read or overwrite the replacement. Successful config updates use an atomic same-directory replacement and preserve existing permissions.
+
+**Transports.** The server supports stdio (recommended for Claude Desktop), SSE (legacy HTTP), and Streamable HTTP (current MCP spec). Network transports remain unauthenticated when bound to loopback for local development. Before binding SSE or HTTP to any non-loopback host, set `BRANDKIT_AUTH_TOKEN`; clients must send it as `Authorization: Bearer <token>` on every request.
+
+Network transports are read-only by default, including loopback, standalone, and Vercel deployments. To deliberately expose `sync_brand_docs` over SSE or Streamable HTTP, start the CLI with `brandkit-mcp serve --transport http --allow-write-tools` (or set `allowWriteTools: true` in the programmatic `startServer` options). Treat this as privileged mode: authentication is still mandatory for non-loopback binds. Stdio keeps the intended local write workflow without this flag. Adapters without a writable config context never advertise the tool, even if privileged mode is requested.
+
+Every network transport rejects untrusted `Host` and `Origin` headers with HTTP 403. Loopback listeners automatically trust loopback hostnames and origins, including IPv4, IPv6, and ephemeral ports. A concrete non-loopback `server.host` derives trust for that exact hostname. Wildcard bindings (`0.0.0.0` or `::`) fail at startup unless `server.allowedHosts` is explicit:
+
+```yaml
+server:
+  transport: http
+  host: 0.0.0.0
+  port: 3001
+  allowedHosts:
+    - mcp.example.com       # hostname only; Host-header ports are ignored
+  allowedOrigins:
+    - https://app.example.com
+```
+
+`allowedOrigins` entries are exact HTTP(S) origins, including the port when it is non-default. If the list is empty, requests without an `Origin` header remain valid for MCP clients, while a supplied Origin must use a trusted Host hostname. Configure `allowedOrigins` explicitly when a browser application is hosted on a different origin. IPv6 entries in `allowedHosts` use brackets, for example `[2001:db8::10]`.
+
+The preview UI is deliberately loopback-only and refuses any wildcard, LAN, or
+public bind host. It also applies the same Host and Origin validation to every
+page and static asset. Use the authenticated MCP HTTP transport when data must
+be available beyond the local machine.
+
+### Docker Compose
+
+The default Compose service runs the supported Streamable HTTP transport on `http://127.0.0.1:3001/mcp`. It uses the bundled Acme example, so a fresh checkout does not require host-side brand files. Set a bearer token before starting it:
+
+```bash
+export BRANDKIT_AUTH_TOKEN="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")"
+docker compose up --build --wait --wait-timeout 60
+npm run test:docker-smoke
+```
+
+The token is injected at runtime and is also required by the authenticated health check. Compose refuses to start when it is absent. To use your own brand, mount a regular config file and brand directory, set `BRANDKIT_CONFIG` to the container path of that config, and keep `server.allowedHosts` limited to the hostnames clients actually use. Do not put the token in the image or config file. Compose intentionally exposes only the authenticated MCP service; run the preview CLI separately on a trusted local machine. Existing stdio container integrations can override the image command with `node /app/dist/cli/index.js serve --transport stdio --config <path>` and do not need to publish a port.
+
+### Vercel
+
+The repository includes one stateless Node.js Function at `/api/mcp`. Set
+`BRANDKIT_AUTH_TOKEN` in every Vercel environment and send it as a Bearer token.
+Vercel's `VERCEL_URL` and `VERCEL_PROJECT_PRODUCTION_URL` are trusted
+automatically. For a custom domain, set `BRANDKIT_ALLOWED_HOSTS` to a
+comma-separated hostname list, without schemes or paths.
+
+The default deployment explicitly bundles `templates/starter/**` and serves
+that data read-only. To deploy another brand, set `BRANDKIT_CONFIG` to its
+repository-relative config path and update `functions.api/mcp.js.includeFiles`
+in `vercel.json` to include both that config and its complete brand root. Vercel
+runtime files are immutable; the function never advertises `sync_brand_docs`.
+Each request creates and closes its own MCP server and transport, so requests do
+not depend on a warm instance or session affinity.
 
 ## CLI Reference
 
@@ -188,6 +270,8 @@ Global Options:
   --version             Show version number
   --help                Show help
 ```
+
+`serve` accepts `--transport <stdio|sse|http>`, `--host <host>`, `--port <number>`, `--config <path>`, `--watch`, and the privileged network option `--allow-write-tools`.
 
 ## Contributing
 

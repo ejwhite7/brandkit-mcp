@@ -10,22 +10,26 @@
   },
   "files": [
     "dist",
+    "api",
     "templates",
+    "vercel.json",
     "README.md",
     "LICENSE",
     "server.json"
   ],
   "scripts": {
-    "build": "tsup && chmod +x dist/cli/index.js dist/cli/index.cjs 2>/dev/null || true",
+    "build": "tsup && (chmod +x dist/cli/index.js dist/cli/index.cjs 2>/dev/null || true)",
     "dev": "tsup --watch",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:docker-smoke": "node scripts/docker-smoke.mjs",
+    "audit:prod": "npm audit --omit=dev",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "preview": "node dist/cli/index.js preview",
     "serve": "node dist/cli/index.js serve",
-    "prepublishOnly": "npm run build && npm run test && npm run lint"
+    "prepublishOnly": "npm run audit:prod && npm run build && npm run test && npm run lint"
   },
   "keywords": [
     "mcp",
@@ -58,33 +62,30 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "chokidar": "^3.6.0",
     "commander": "^12.0.0",
     "css-tree": "^2.3.1",
-    "express": "^4.18.2",
     "ejs": "^3.1.9",
-    "gray-matter": "^4.0.3",
-    "js-yaml": "^4.1.0",
-    "marked": "^12.0.0",
-    "pdf-parse": "^1.1.1",
-    "sharp": "^0.33.0",
-    "zod": "^3.22.4",
-    "chokidar": "^3.6.0",
-    "chalk": "^5.3.0",
-    "ora": "^8.0.1"
+    "express": "^4.22.2",
+    "js-yaml": "^4.3.2",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/css-tree": "^2.3.4",
     "@types/ejs": "^3.1.5",
     "@types/express": "^4.17.21",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
-    "@types/pdf-parse": "^1.1.4",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "eslint": "^8.57.0",
+    "eslint": "^10.9.1",
+    "globals": "^17.11.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
-    "vitest": "^1.4.0"
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
   }
 }

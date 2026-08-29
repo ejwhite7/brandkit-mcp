@@ -1,0 +1,139 @@
+{
+  "bugs": [
+    {
+      "id": "FS-005",
+      "severity": "high",
+      "status": "resolved",
+      "title": "sync_brand_docs follows a replaced config symlink",
+      "evidence": "After startup, replacing brandkit.config.yaml with a symlink redirects the tool's direct readFileSync/writeFileSync persistence and can overwrite magic_trick.md or another writable target.",
+      "story": "FS-005",
+      "resolution": "Config loading and sync persistence now use identity-bound no-follow reads and atomic replacement; protected-target regressions pass."
+    },
+    {
+      "id": "STATE-001",
+      "severity": "high",
+      "status": "resolved",
+      "title": "Process-global index leaks brand data across server instances",
+      "evidence": "src/index.ts stores currentIndex at module scope; starting server B overwrites the index read by live server A and its tools.",
+      "story": "STATE-001",
+      "resolution": "Every startServer invocation now owns a captured mutable index reference; concurrent-server and watcher-isolation regressions pass."
+    },
+    {
+      "id": "PREVIEW-001",
+      "severity": "high",
+      "status": "resolved",
+      "title": "Preview lacks Host Origin and non-loopback authentication protection",
+      "evidence": "src/preview/server.ts exposes brand pages without shared request policy while preview accepts arbitrary bind hosts.",
+      "story": "PREVIEW-001",
+      "resolution": "Preview is loopback-only and applies the shared Host/Origin policy before all page and static routes."
+    },
+    {
+      "id": "INIT-001",
+      "severity": "high",
+      "status": "resolved",
+      "title": "init overwrites existing or symlinked configuration",
+      "evidence": "src/cli/commands/init.ts checks only the brand directory then unconditionally writes brandkit.config.yaml.",
+      "story": "INIT-001",
+      "resolution": "Init now preflights both destinations, rejects unsafe entries, stages all content, and atomically commits or rolls back the config and brand pair."
+    },
+    {
+      "id": "HTTP-003",
+      "severity": "high",
+      "status": "resolved",
+      "title": "startServer resolves before network listen succeeds",
+      "evidence": "HTTP and SSE branches return immediately after app.listen; occupied ports resolve successfully then emit an uncaught EADDRINUSE.",
+      "story": "HTTP-003",
+      "resolution": "HTTP and SSE startup now await listening, reject initial errors, defer watcher creation, and clean watcher/signal resources on failure or server close."
+    },
+    {
+      "id": "CI-001",
+      "severity": "high",
+      "status": "resolved",
+      "title": "Manual publish version permits shell injection",
+      "evidence": ".github/workflows/publish.yml interpolates workflow_dispatch version expressions directly into privileged shell scripts.",
+      "story": "CI-001",
+      "resolution": "Publish scripts receive dynamic values only through env and a dedicated resolver accepts only strict SemVer from manual inputs or v-tags."
+    },
+    {
+      "id": "CI-002",
+      "severity": "high",
+      "status": "resolved",
+      "title": "Publish executes mutable unverified latest binary",
+      "evidence": ".github/workflows/publish.yml downloads and executes the latest mcp-publisher without a pinned version or integrity check.",
+      "story": "CI-002",
+      "resolution": "Release tooling uses a fixed mcp-publisher release with verified per-architecture SHA-256 values, and every external workflow action is pinned to a full commit SHA."
+    },
+    {
+      "id": "FMT-001",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Token formatting permits prototype pollution",
+      "evidence": "src/formatters/token-formatters.ts indexes normal objects with unvalidated token types and names including __proto__.",
+      "story": "FMT-001",
+      "resolution": "Tailwind and W3C serializers use null-prototype dictionaries, preserving reserved-looking keys as data without inherited setters or properties."
+    },
+    {
+      "id": "SCAN-001",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Brand ingestion has no size or traversal budget",
+      "evidence": "Scanner reads complete files synchronously and bounds neither file size, total bytes, file count, nor traversal depth.",
+      "story": "SCAN-001",
+      "resolution": "A shared read policy now enforces bounded per-file, aggregate, canonical-file, lexical/canonical depth, and directory-enumeration budgets before returning content."
+    },
+    {
+      "id": "DOCS-001",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Docs generation can partially update its five-file set",
+      "evidence": "docs command writes CLAUDE.md AGENTS.md and SKILLS.md before DESIGN.md and PRODUCT.md preflight can fail.",
+      "story": "DOCS-001",
+      "resolution": "All five generated documents now share one complete preflight, staging, commit, backup, and rollback transaction."
+    },
+    {
+      "id": "WATCH-001",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Hot reload follows ignored and outside-root symlinks",
+      "evidence": "Chokidar watcher retains followSymlinks true and does not apply normalized scanner ignore rules.",
+      "story": "WATCH-001",
+      "resolution": "Watcher and scanner share one normalized ignore matcher, descendant symlink following is disabled, and residual symlink change events are filtered."
+    },
+    {
+      "id": "TOOL-001",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "search_brand accepts negative and unbounded limits",
+      "evidence": "Tool schema and runtime pass an unconstrained numeric limit directly to Array.slice.",
+      "story": "TOOL-001",
+      "resolution": "Search schema and runtime require an integer from 1 to 100, default 20, and maintain a bounded top-k candidate set."
+    },
+    {
+      "id": "YAML-001",
+      "severity": "high",
+      "status": "resolved",
+      "title": "YAML aliases and cycles amplify or break serialized tool data",
+      "evidence": "A 233-byte alias graph parsed by YAML/frontmatter expanded to 5,273,436 JSON bytes, while a self-alias produced a cycle that throws during JSON serialization.",
+      "story": "YAML-001",
+      "resolution": "Every production YAML load crosses a source-derived node/text/depth budget into an acyclic JSON-safe copy; unsafe frontmatter consumers fall back or skip with warnings."
+    },
+    {
+      "id": "MANIFEST-001",
+      "severity": "high",
+      "status": "resolved",
+      "title": "Null font and asset manifest entries crash scanning",
+      "evidence": "Valid YAML list entries with no value parse as null; scanner manifest loops dereference item.file and abort startup.",
+      "story": "MANIFEST-001",
+      "resolution": "Font and asset manifests now validate mapping/array/item shapes and typed own data properties before access, warning and continuing on invalid entries."
+    },
+    {
+      "id": "TOOL-002",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "search_brand query length amplifies response bytes",
+      "evidence": "A 200 KB matching query across 100 hits generated a roughly 20 MB response because every snippet includes query.length bytes.",
+      "story": "TOOL-002",
+      "resolution": "Search queries, snippets, sources, and final serialized payloads now have independent Unicode-safe character/UTF-8/byte ceilings."
+    }
+  ]
+}

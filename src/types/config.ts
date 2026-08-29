@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  DEFAULT_BRAND_INGESTION_LIMITS,
+  MAX_BRAND_INGESTION_LIMITS,
+} from '../filesystem/brand-read-policy.js';
 
 export class BrandkitV1ConfigError extends Error {
   constructor(message: string) {
@@ -35,17 +39,34 @@ export const BrandKitConfigSchema = z.object({
     .array(z.enum(['base', 'web', 'product']))
     .default(['base', 'web', 'product']),
   ignore: z.array(z.string()).default(['human/']),
+  ingestion: z
+    .object({
+      maxFileBytes: z.number().int().min(1).max(MAX_BRAND_INGESTION_LIMITS.maxFileBytes)
+        .default(DEFAULT_BRAND_INGESTION_LIMITS.maxFileBytes),
+      maxTotalBytes: z.number().int().min(1).max(MAX_BRAND_INGESTION_LIMITS.maxTotalBytes)
+        .default(DEFAULT_BRAND_INGESTION_LIMITS.maxTotalBytes),
+      maxFiles: z.number().int().min(1).max(MAX_BRAND_INGESTION_LIMITS.maxFiles)
+        .default(DEFAULT_BRAND_INGESTION_LIMITS.maxFiles),
+      maxDepth: z.number().int().min(1).max(MAX_BRAND_INGESTION_LIMITS.maxDepth)
+        .default(DEFAULT_BRAND_INGESTION_LIMITS.maxDepth),
+    })
+    .refine((limits) => limits.maxTotalBytes >= limits.maxFileBytes, {
+      message: 'ingestion.maxTotalBytes must be at least ingestion.maxFileBytes',
+    })
+    .default({}),
   preview: z
     .object({
       port: z.number().int().min(1).max(65535).default(3000),
-      host: z.string().default('localhost'),
+      host: z.string().min(1).default('127.0.0.1'),
     })
     .default({}),
   server: z
     .object({
-      transport: z.enum(['stdio', 'sse']).default('stdio'),
+      transport: z.enum(['stdio', 'sse', 'http']).default('stdio'),
       port: z.number().int().min(1).max(65535).default(3001),
-      host: z.string().default('localhost'),
+      host: z.string().min(1).default('127.0.0.1'),
+      allowedHosts: z.array(z.string().min(1)).default([]),
+      allowedOrigins: z.array(z.string().min(1)).default([]),
     })
     .default({}),
 });

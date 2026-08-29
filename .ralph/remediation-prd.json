@@ -1,0 +1,294 @@
+{
+  "project": "BrandKit MCP production remediation",
+  "branchName": "tidebreak/calm-pine",
+  "completionSignal": "<promise>PRODUCTION_COMPLETE</promise>",
+  "globalChecks": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build",
+    "git diff --check"
+  ],
+  "stories": [
+    {
+      "id": "BASE-001",
+      "priority": 0,
+      "title": "Capture reproducible baseline",
+      "dependencies": [],
+      "acceptance": ["Clean install succeeds", "Baseline quality and audit results are recorded", "All review findings are represented as stories"],
+      "passes": true
+    },
+    {
+      "id": "BASE-002",
+      "priority": 0,
+      "title": "Stop masking build failures",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["tsup failure makes npm run build fail", "optional chmod failure remains non-fatal", "build regression test passes"],
+      "passes": true
+    },
+    {
+      "id": "SEC-001",
+      "priority": 0,
+      "title": "Enforce loopback defaults and honor configured hosts",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["HTTP SSE preview and standalone bind to loopback by default", "server.host and preview.host are honored", "stdio remains compatible"],
+      "passes": true
+    },
+    {
+      "id": "SEC-002",
+      "priority": 0,
+      "title": "Authenticate non-loopback network transports",
+      "dependencies": ["SEC-001"],
+      "acceptance": ["non-loopback mode requires a bearer token", "missing or invalid authentication returns 401", "credentials are not logged"],
+      "passes": true
+    },
+    {
+      "id": "SEC-003",
+      "priority": 0,
+      "title": "Enable Host Origin and DNS rebinding protection",
+      "dependencies": ["SEC-001"],
+      "acceptance": ["invalid Host and Origin return 403", "all network transports use equivalent protection", "regression tests cover hostile headers"],
+      "passes": true
+    },
+    {
+      "id": "SEC-004",
+      "priority": 0,
+      "title": "Gate write-capable tools on network transports",
+      "dependencies": ["SEC-002"],
+      "acceptance": ["sync_brand_docs is hidden on network transports by default", "explicit privileged mode is required", "stdio write workflow remains available"],
+      "passes": true
+    },
+    {
+      "id": "HTTP-001",
+      "priority": 0,
+      "title": "Use a fresh stateless Streamable HTTP transport per request",
+      "dependencies": ["SEC-002"],
+      "acceptance": ["initialize followed by multiple requests succeeds", "concurrent clients do not share transport state", "transports close after requests"],
+      "passes": true
+    },
+    {
+      "id": "HTTP-002",
+      "priority": 1,
+      "title": "Normalize HTTP errors health checks and resource limits",
+      "dependencies": ["HTTP-001"],
+      "acceptance": ["errors never leave requests hanging", "health reports readiness without brand data", "request and session resources are bounded"],
+      "passes": true
+    },
+    {
+      "id": "FS-001",
+      "priority": 0,
+      "title": "Contain every brand file read within the brand root",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["all fixed and discovered reads share one containment policy", "outside-root symlinks are rejected", "symlink escape tests pass"],
+      "passes": true
+    },
+    {
+      "id": "FS-002",
+      "priority": 1,
+      "title": "Prevent scanner symlink cycles and correct ignore semantics",
+      "dependencies": ["FS-001"],
+      "acceptance": ["cycles cannot hang or crash scans", "ignore paths are brand-root relative", "directory boundaries are respected"],
+      "passes": true
+    },
+    {
+      "id": "FS-003",
+      "priority": 0,
+      "title": "Make generated writes atomic and symlink-safe",
+      "dependencies": ["FS-001"],
+      "acceptance": ["output symlinks and non-regular files are rejected", "writes use same-directory temporary files and atomic rename", "magic_trick cannot be changed indirectly"],
+      "passes": true
+    },
+    {
+      "id": "FS-005",
+      "priority": 0,
+      "title": "Make sync config persistence atomic and symlink-safe",
+      "dependencies": ["FS-003"],
+      "acceptance": ["config symlinks hard links and non-regular files are rejected", "config reads and writes cannot be redirected after startup", "protected targets remain unchanged and sync reports savedConfig false"],
+      "passes": true
+    },
+    {
+      "id": "FS-004",
+      "priority": 1,
+      "title": "Harden generated document delimiters",
+      "dependencies": ["FS-003"],
+      "acceptance": ["source content cannot inject delimiters", "ambiguous markers fail safely", "repeated generation is idempotent"],
+      "passes": true
+    },
+    {
+      "id": "CTX-001",
+      "priority": 0,
+      "title": "Create and consume canonical merged contexts",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["partial overrides preserve unrelated base items", "tools preview search and diffs use equivalent resolved data", "all mergeable asset types have regression tests"],
+      "passes": true
+    },
+    {
+      "id": "DEP-001",
+      "priority": 1,
+      "title": "Remove dead runtime dependencies and parsers",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["every production dependency has a reachable use", "public behavior remains compatible", "package size and install remain healthy"],
+      "passes": true
+    },
+    {
+      "id": "DEP-002",
+      "priority": 0,
+      "title": "Upgrade vulnerable dependencies and add audit gates",
+      "dependencies": ["DEP-001", "HTTP-001"],
+      "acceptance": ["no unreviewed critical or high production advisory remains", "test tooling is patched", "CI audits production dependencies"],
+      "passes": true
+    },
+    {
+      "id": "DOCKER-001",
+      "priority": 0,
+      "title": "Make Docker Compose healthy and MCP-capable",
+      "dependencies": ["HTTP-002", "SEC-004"],
+      "acceptance": ["Compose explicitly runs a supported transport", "health becomes ready", "container MCP handshake passes in CI"],
+      "passes": true
+    },
+    {
+      "id": "VERCEL-001",
+      "priority": 1,
+      "title": "Implement a production Vercel Streamable HTTP entry point or remove support claims",
+      "dependencies": ["HTTP-001", "SEC-002"],
+      "acceptance": ["default handler exists", "cold start authentication initialize and tool call pass", "otherwise Vercel configuration and claims are removed"],
+      "passes": true
+    },
+    {
+      "id": "CLOUDFLARE-001",
+      "priority": 1,
+      "title": "Implement Cloudflare MCP or remove the broken adapter",
+      "dependencies": ["SEC-002"],
+      "acceptance": ["advertised endpoints do not return 404", "Worker handshake passes or all Cloudflare support claims are removed"],
+      "passes": true
+    },
+    {
+      "id": "QA-001",
+      "priority": 0,
+      "title": "Complete two clean adversarial discovery passes",
+      "dependencies": ["BASE-002", "SEC-003", "SEC-004", "HTTP-002", "FS-002", "FS-004", "CTX-001", "DEP-002", "DOCKER-001", "VERCEL-001", "CLOUDFLARE-001", "STATE-001", "PREVIEW-001", "INIT-001", "HTTP-003", "CI-001", "CI-002", "FMT-001", "SCAN-001", "DOCS-001", "WATCH-001", "TOOL-001", "YAML-001", "MANIFEST-001", "TOOL-002"],
+      "acceptance": ["two consecutive passes find no new actionable issue", "all discovered issues become failing stories", "no known actionable bug remains open"],
+      "passes": false
+    },
+    {
+      "id": "STATE-001",
+      "priority": 0,
+      "title": "Isolate mutable indexes per server instance",
+      "dependencies": ["HTTP-001"],
+      "acceptance": ["concurrent servers never share brand indexes", "watcher updates remain instance-local", "two-live-server isolation regression passes"],
+      "passes": true
+    },
+    {
+      "id": "PREVIEW-001",
+      "priority": 0,
+      "title": "Protect preview from rebinding and network disclosure",
+      "dependencies": ["SEC-003"],
+      "acceptance": ["hostile Host and Origin are rejected", "non-loopback preview requires authentication or is refused", "loopback preview remains usable"],
+      "passes": true
+    },
+    {
+      "id": "INIT-001",
+      "priority": 0,
+      "title": "Make init preflight and writes non-destructive",
+      "dependencies": ["FS-003"],
+      "acceptance": ["existing destinations require explicit force", "symlink hard-link and non-regular targets are rejected", "failed preflight preserves every destination"],
+      "passes": true
+    },
+    {
+      "id": "HTTP-003",
+      "priority": 0,
+      "title": "Make network startup await listening and reject failures",
+      "dependencies": ["HTTP-002"],
+      "acceptance": ["startServer resolves only after listening", "occupied ports reject without uncaught errors", "partial startup resources are cleaned up"],
+      "passes": true
+    },
+    {
+      "id": "CI-001",
+      "priority": 0,
+      "title": "Remove publish workflow shell injection",
+      "dependencies": ["BASE-002"],
+      "acceptance": ["dynamic workflow values enter scripts only through env", "manual versions are strict SemVer", "hostile input cannot execute shell syntax"],
+      "passes": true
+    },
+    {
+      "id": "CI-002",
+      "priority": 0,
+      "title": "Pin and verify release tooling",
+      "dependencies": ["CI-001"],
+      "acceptance": ["mcp-publisher uses an immutable version", "download integrity is verified before execution", "third-party actions are pinned immutably"],
+      "passes": true
+    },
+    {
+      "id": "FMT-001",
+      "priority": 1,
+      "title": "Prevent prototype pollution in token formatting",
+      "dependencies": ["CTX-001"],
+      "acceptance": ["reserved token keys cannot mutate prototypes", "valid reserved-looking names have explicit behavior", "hostile token regressions pass"],
+      "passes": true
+    },
+    {
+      "id": "SCAN-001",
+      "priority": 1,
+      "title": "Bound brand ingestion work and memory",
+      "dependencies": ["FS-002"],
+      "acceptance": ["per-file and aggregate byte limits are enforced", "file-count and traversal-depth limits are enforced", "limit failures are clear and deterministic"],
+      "passes": true
+    },
+    {
+      "id": "DOCS-001",
+      "priority": 1,
+      "title": "Make five-file docs generation transactional",
+      "dependencies": ["FS-004"],
+      "acceptance": ["all five outputs preflight before any mutation", "one unsafe target preserves every output byte", "successful generation remains idempotent"],
+      "passes": true
+    },
+    {
+      "id": "WATCH-001",
+      "priority": 1,
+      "title": "Align hot reload containment and ignore semantics",
+      "dependencies": ["FS-002"],
+      "acceptance": ["watcher does not follow symlinks", "scanner ignore rules also exclude watcher events", "valid non-ignored changes still reload"],
+      "passes": true
+    },
+    {
+      "id": "TOOL-001",
+      "priority": 1,
+      "title": "Bound search_brand result limits",
+      "dependencies": ["HTTP-002"],
+      "acceptance": ["limit is an integer within a conservative bound", "invalid limits fail predictably", "response size remains bounded"],
+      "passes": true
+    },
+    {
+      "id": "YAML-001",
+      "priority": 0,
+      "title": "Reject cyclic or amplifying YAML object graphs",
+      "dependencies": ["DEP-002", "SCAN-001"],
+      "acceptance": ["cycles cannot reach tool serialization", "aliases cannot amplify parsed output beyond a finite structural budget", "normal nested YAML and frontmatter remain compatible"],
+      "passes": true
+    },
+    {
+      "id": "MANIFEST-001",
+      "priority": 0,
+      "title": "Validate tolerant manifest entry shapes",
+      "dependencies": ["FS-001"],
+      "acceptance": ["null scalar and array manifest entries never crash scanning", "invalid entries become deterministic warnings", "valid asset and font entries remain indexed"],
+      "passes": true
+    },
+    {
+      "id": "TOOL-002",
+      "priority": 1,
+      "title": "Bound search query and snippet response bytes",
+      "dependencies": ["TOOL-001"],
+      "acceptance": ["query length is bounded in schema and runtime", "snippet length is independent of hostile query length", "maximum search response remains within a tested byte ceiling"],
+      "passes": true
+    },
+    {
+      "id": "RELEASE-001",
+      "priority": 0,
+      "title": "Clean-room production certification",
+      "dependencies": ["QA-001"],
+      "acceptance": ["clean checkout install and complete gates pass", "all advertised transports complete an MCP handshake", "rollback is documented", "human approves release"],
+      "passes": false
+    }
+  ]
+}

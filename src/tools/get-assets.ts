@@ -17,7 +17,7 @@ export const INPUT_SCHEMA = {
 export function handler(index: DesignSystemIndex, args: { context?: BrandContext }) {
   const warnings: string[] = [];
   const ctx = coerceContext(args.context, warnings);
-  const list = index[ctx].assets.length ? index[ctx].assets : index.base.assets;
+  const list = index.contexts[ctx].assets;
   if (list.length === 0) warnings.push('No assets found');
   return [
     {

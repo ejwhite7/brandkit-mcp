@@ -43,7 +43,7 @@ export function handler(
   const ctx = coerceContext(args.context, warnings);
   const format = args.format ?? 'json';
 
-  let tokens = index[ctx].tokens.length ? index[ctx].tokens : index.base.tokens;
+  let tokens = index.contexts[ctx].tokens;
   if (args.type) {
     tokens = tokens.filter((t) => t.type === args.type);
   }
@@ -84,4 +84,3 @@ export function handler(
 
   return [{ type: 'text' as const, text }];
 }
-

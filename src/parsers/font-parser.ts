@@ -40,7 +40,6 @@ export function parseFontFile(filePath: string): DesignFont {
   const format = ext as DesignFont['format'];
   const parts = name.split(/[-_]+/);
 
-  let family = '';
   let weight: string | number | undefined;
   let style: 'normal' | 'italic' = 'normal';
 
@@ -72,7 +71,7 @@ export function parseFontFile(filePath: string): DesignFont {
     familyParts.push(part.charAt(0).toUpperCase() + part.slice(1));
   }
 
-  family = familyParts.join(' ') || 'Unknown';
+  const family = familyParts.join(' ') || 'Unknown';
   weight = weight ?? 400;
 
   return { family, weight, style, filePath, format };
@@ -96,4 +95,3 @@ export function inferFontWeight(filename: string): string | number | undefined {
 
   return undefined;
 }
-

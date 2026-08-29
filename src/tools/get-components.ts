@@ -32,8 +32,7 @@ export function handler(
   const warnings: string[] = [];
   const ctx = coerceContext(args.context, warnings);
 
-  // Use override layer if it has components; otherwise fall through to base.
-  const list = index[ctx].components.length ? index[ctx].components : index.base.components;
+  const list = index.contexts[ctx].components;
 
   let filtered = list;
   if (typeof args.name === 'string' && args.name.length > 0) {
@@ -55,4 +54,3 @@ export function handler(
     },
   ];
 }
-

@@ -4,17 +4,19 @@ import { tmpdir } from 'os';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { Server } from 'http';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { startStandaloneServer } from '../adapters/standalone.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureRoot = resolve(__dirname, '../..', '__test_fixtures__', 'v2', 'full');
 
-function writeTempConfig(): string {
+function writeTempConfig(host?: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'bk-standalone-'));
   const configPath = join(dir, 'brandkit.config.yaml');
   writeFileSync(
     configPath,
-    `version: 2\nbrand:\n  name: Test Brand\n  root: ${JSON.stringify(fixtureRoot)}\n`,
+    `version: 2\nbrand:\n  name: Test Brand\n  root: ${JSON.stringify(fixtureRoot)}\n${host ? `server:\n  host: ${JSON.stringify(host)}\n` : ''}`,
   );
   return configPath;
 }
@@ -33,10 +35,13 @@ describe('startStandaloneServer', () => {
     server = await startStandaloneServer(0, writeTempConfig());
     const address = server.address();
     if (typeof address !== 'object' || address === null) throw new Error('no address');
+    expect(address.address).toBe('127.0.0.1');
     const base = `http://127.0.0.1:${address.port}`;
 
     const health = await fetch(`${base}/health`);
     expect(health.status).toBe(200);
+    expect(health.headers.get('cache-control')).toBe('no-store');
+    await expect(health.json()).resolves.toEqual({ status: 'ready' });
 
     const messages = await fetch(`${base}/messages?sessionId=nope`, {
       method: 'POST',
@@ -46,6 +51,13 @@ describe('startStandaloneServer', () => {
     expect(messages.status).toBe(400);
     const body = (await messages.json()) as { error: string };
     expect(body.error).toContain('No active SSE session');
+  });
+
+  it('honors server.host from config', async () => {
+    server = await startStandaloneServer(0, writeTempConfig('::1'));
+    const address = server.address();
+    if (typeof address !== 'object' || address === null) throw new Error('no address');
+    expect(address.address).toBe('::1');
   });
 
   it('supports two concurrent SSE clients without crashing', async () => {
@@ -86,5 +98,68 @@ describe('startStandaloneServer', () => {
 
     c1.abort();
     c2.abort();
+  });
+
+  it('bounds SSE sessions and message bodies', async () => {
+    server = await startStandaloneServer(
+      0,
+      writeTempConfig(),
+      undefined,
+      undefined,
+      false,
+      { maxSseSessions: 1, jsonBodyBytes: 128 },
+    );
+    const address = server.address();
+    if (typeof address !== 'object' || address === null) throw new Error('no address');
+    const base = `http://127.0.0.1:${address.port}`;
+    const controller = new AbortController();
+    const connection = await fetch(`${base}/sse`, {
+      headers: { Accept: 'text/event-stream' },
+      signal: controller.signal,
+    });
+    const reader = connection.body!.getReader();
+    const { value } = await reader.read();
+    const match = /sessionId=([a-z0-9-]+)/i.exec(new TextDecoder().decode(value));
+    if (!match) throw new Error('no session id');
+
+    const capacity = await fetch(`${base}/sse`, { headers: { Accept: 'text/event-stream' } });
+    expect(capacity.status).toBe(503);
+    await expect(capacity.json()).resolves.toMatchObject({ code: 'session_capacity' });
+
+    const oversized = await fetch(`${base}/messages?sessionId=${match[1]}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload: 'x'.repeat(256) }),
+    });
+    expect(oversized.status).toBe(413);
+    await expect(oversized.json()).resolves.toEqual({
+      error: 'Request body too large',
+      code: 'body_too_large',
+    });
+    controller.abort();
+  });
+
+  it('does not advertise sync_brand_docs by default', async () => {
+    server = await startStandaloneServer(0, writeTempConfig());
+    const address = server.address();
+    if (typeof address !== 'object' || address === null) throw new Error('no address');
+    const client = new Client({ name: 'standalone-test', version: '1.0.0' });
+
+    await client.connect(new SSEClientTransport(new URL(`http://127.0.0.1:${address.port}/sse`)));
+    const result = await client.listTools();
+    expect(result.tools.map((tool) => tool.name)).not.toContain('sync_brand_docs');
+    await client.close();
+  });
+
+  it('advertises sync_brand_docs only in explicit privileged mode', async () => {
+    server = await startStandaloneServer(0, writeTempConfig(), undefined, undefined, true);
+    const address = server.address();
+    if (typeof address !== 'object' || address === null) throw new Error('no address');
+    const client = new Client({ name: 'standalone-test', version: '1.0.0' });
+
+    await client.connect(new SSEClientTransport(new URL(`http://127.0.0.1:${address.port}/sse`)));
+    const result = await client.listTools();
+    expect(result.tools.map((tool) => tool.name)).toContain('sync_brand_docs');
+    await client.close();
   });
 });

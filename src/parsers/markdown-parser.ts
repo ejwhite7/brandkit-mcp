@@ -1,48 +1,16 @@
 /**
  * @file markdown-parser.ts
- * @description Parses markdown files to extract guidelines, component specifications,
- * color palette documentation, typography docs, and brand voice content.
- * Supports YAML frontmatter via gray-matter.
+ * @description Parses component specifications and token specimens from markdown.
+ * Supports YAML frontmatter.
  */
 
-import matter from 'gray-matter';
-import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
-import type { DesignGuideline, DesignComponent, DesignColor, BrandContext, TokenSpecimen } from '../types/design-system.js';
-
-/**
- * Parses a markdown file as a design guideline.
- * @param filePath - Absolute path to the markdown file
- * @param context - Design context
- * @returns Parsed guideline with title, content, and section metadata
- */
-export function parseGuidelineMarkdown(filePath: string, context: BrandContext): DesignGuideline {
-  let raw: string;
-  try {
-    raw = readFileSync(filePath, 'utf-8');
-  } catch {
-    console.error(`[markdown-parser] Could not read file: ${filePath}`);
-    return { title: basename(filePath, extname(filePath)), content: '', context, source: filePath };
-  }
-
-  const { data: frontmatter, content } = matter(raw);
-
-  const title =
-    (frontmatter.title as string) ??
-    extractFirstHeading(content) ??
-    basename(filePath, extname(filePath));
-
-  const section =
-    (frontmatter.section as string) ?? inferSectionFromPath(filePath);
-
-  return {
-    title,
-    content: content.trim(),
-    section,
-    context,
-    source: filePath,
-  };
-}
+import type { DesignComponent, BrandContext, TokenSpecimen } from '../types/design-system.js';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
+import { frontmatterBody, parseFrontmatter } from './frontmatter.js';
 
 /**
  * Parses a markdown file as component documentation.
@@ -51,16 +19,32 @@ export function parseGuidelineMarkdown(filePath: string, context: BrandContext):
  * @param context - Design context
  * @returns Array of parsed components
  */
-export function parseComponentMarkdown(filePath: string, context: BrandContext): DesignComponent[] {
+export function parseComponentMarkdown(
+  filePath: string,
+  context: BrandContext,
+  reader: BrandReadPolicy,
+  warnings?: string[],
+): DesignComponent[] {
   let raw: string;
   try {
-    raw = readFileSync(filePath, 'utf-8');
-  } catch {
+    raw = reader.readFile(filePath, 'utf-8');
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     console.error(`[markdown-parser] Could not read file: ${filePath}`);
     return [];
   }
 
-  const { data: frontmatter, content } = matter(raw);
+  let frontmatter: Record<string, unknown> = {};
+  let content: string;
+  try {
+    ({ data: frontmatter, content } = parseFrontmatter(raw));
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
+    content = frontmatterBody(raw);
+    warnings?.push(
+      `Invalid component frontmatter in ${filePath}: ${err instanceof Error ? err.message : String(err)}; using markdown body`,
+    );
+  }
 
   const name =
     (frontmatter.name as string) ??
@@ -83,71 +67,6 @@ export function parseComponentMarkdown(filePath: string, context: BrandContext):
   };
 
   return [component];
-}
-
-/**
- * Parses a markdown file as color palette documentation.
- * Extracts color names, hex values, and usage notes from structured content.
- * @param filePath - Absolute path to the markdown file
- * @param context - Design context
- * @returns Array of DesignColor objects
- */
-export function parsePaletteMarkdown(filePath: string, context: BrandContext): DesignColor[] {
-  let raw: string;
-  try {
-    raw = readFileSync(filePath, 'utf-8');
-  } catch {
-    console.error(`[markdown-parser] Could not read file: ${filePath}`);
-    return [];
-  }
-
-  const { content } = matter(raw);
-  const colors: DesignColor[] = [];
-
-  // Match hex values with their labels
-  const hexRe = /([\w\s-]+?):\s*(#[0-9a-fA-F]{3,8})/g;
-  let match: RegExpExecArray | null;
-  while ((match = hexRe.exec(content)) !== null) {
-    const name = match[1].trim();
-    const value = match[2];
-    colors.push({
-      name,
-      token: `--color-${name.toLowerCase().replace(/\s+/g, '-')}`,
-      value,
-      hex: value,
-      context,
-      source: filePath,
-    });
-  }
-
-  // Also look for table rows: | name | #hex | description |
-  const tableRowRe = /\|\s*([^|]+?)\s*\|\s*(#[0-9a-fA-F]{3,8})\s*\|\s*([^|]*?)\s*\|/g;
-  while ((match = tableRowRe.exec(content)) !== null) {
-    const name = match[1].trim();
-    if (name.toLowerCase() === 'name' || name.startsWith('---')) continue;
-    const value = match[2];
-    const usage = match[3]?.trim();
-    colors.push({
-      name,
-      token: `--color-${name.toLowerCase().replace(/\s+/g, '-')}`,
-      value,
-      hex: value,
-      usage,
-      context,
-      source: filePath,
-    });
-  }
-
-  return colors;
-}
-
-/**
- * Infers a guideline section label from a file path.
- * e.g., agent/verbal/voice.md -> "voice"
- */
-export function inferSectionFromPath(filePath: string): string {
-  const base = basename(filePath, extname(filePath));
-  return base.toLowerCase();
 }
 
 // ---------------------------------------------------------------------------
@@ -243,15 +162,28 @@ export interface TokenSpecimenResult {
  * @param filePath - Absolute path to the token specimen markdown file
  * @returns Parse result with specimen, warnings
  */
-export function parseTokenSpecimen(filePath: string): TokenSpecimenResult {
+export function parseTokenSpecimen(filePath: string, reader: BrandReadPolicy): TokenSpecimenResult {
   const warnings: string[] = [];
   let raw: string;
   try {
-    raw = readFileSync(filePath, 'utf-8');
-  } catch {
+    raw = reader.readFile(filePath, 'utf-8');
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     return { specimen: null, warnings: [`Could not read ${filePath}`] };
   }
-  const { data, content } = matter(raw);
+  let data: Record<string, unknown>;
+  let content: string;
+  try {
+    ({ data, content } = parseFrontmatter(raw));
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
+    return {
+      specimen: null,
+      warnings: [
+        `Invalid token frontmatter in ${filePath}: ${err instanceof Error ? err.message : String(err)}; skipping`,
+      ],
+    };
+  }
   const name = data.name as string | undefined;
   const type = data.type as string | undefined;
   // value may legitimately be falsy (0, false) — check presence, not truthiness.

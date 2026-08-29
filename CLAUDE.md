@@ -76,13 +76,13 @@ it needs -- including the brand's instincts, not just its specs.
 
 ```
 src/
-├── adapters/          # Cloudflare Workers + Vercel + standalone HTTP wrappers
+├── adapters/          # Vercel and standalone HTTP wrappers
 ├── cli/               # init, serve, validate, docs commands
 ├── config/            # zod schema loader (v2)
 ├── context-resolver.ts # base/web/product merge
 ├── formatters/        # token output formatters (css, scss, tailwind, w3c)
 ├── indexer/           # buildIndex + hot-reload
-├── parsers/           # css, font, image, markdown, motion, pdf, verbal, yaml
+├── parsers/           # css, font, markdown, motion, verbal, yaml
 ├── preview/           # local preview HTTP server
 ├── prompts/           # MCP prompt templates
 ├── resources/         # MCP resource handlers (brand:// URIs)

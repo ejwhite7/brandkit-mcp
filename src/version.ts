@@ -3,9 +3,6 @@
  * @description Single source of truth for the package version at runtime.
  * Walks up from the compiled module location looking for package.json so it
  * works from src/ (vitest), dist/ (tsup output), and bundled CLI layouts.
- *
- * NOTE: src/adapters/cloudflare-worker.ts cannot use this module (Workers
- * have no fs); it carries a hardcoded version updated at release time.
  */
 
 import { readFileSync, existsSync } from 'fs';

@@ -62,6 +62,13 @@ const ALL_TOOLS = [
   syncBrandDocs,
 ] as const;
 
+const READ_ONLY_TOOLS = ALL_TOOLS.filter((tool) => tool.TOOL_NAME !== syncBrandDocs.TOOL_NAME);
+
+export interface ToolRegistrationOptions {
+  /** Expose and dispatch tools that can modify files. Disabled by default. */
+  allowWriteTools?: boolean;
+}
+
 /**
  * Registers all design system tools, resources, and prompts on the MCP server.
  *
@@ -72,12 +79,19 @@ const ALL_TOOLS = [
 export function registerAllTools(
   server: Server,
   getIndex: () => DesignSystemIndex,
-  context?: { configPath: string; outputDir: string },
+  context?: syncBrandDocs.SyncContext,
+  options: ToolRegistrationOptions = {},
 ): void {
   // ---- Tools --------------------------------------------------------------
 
+  // A write tool must have both an explicit privilege grant and a concrete
+  // writable context. This keeps serverless and other context-free adapters
+  // read-only even if they accidentally pass the privilege flag.
+  const writeToolsEnabled = options.allowWriteTools === true && context !== undefined;
+  const enabledTools = writeToolsEnabled ? ALL_TOOLS : READ_ONLY_TOOLS;
+
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: ALL_TOOLS.map((t) => ({
+    tools: enabledTools.map((t) => ({
       name: t.TOOL_NAME,
       description: t.TOOL_DESCRIPTION,
       inputSchema: t.INPUT_SCHEMA,
@@ -89,8 +103,12 @@ export function registerAllTools(
     const index = getIndex();
 
     try {
+      if (writeToolsEnabled && name === syncBrandDocs.TOOL_NAME) {
+        return { content: await syncBrandDocs.handler(index, args as never, context) };
+      }
+
       switch (name) {
-        case brandOverview.TOOL_NAME:    return { content: brandOverview.handler(index) };
+        case brandOverview.TOOL_NAME:    return { content: brandOverview.handler(index, writeToolsEnabled) };
         case magicTrick.TOOL_NAME:       return { content: magicTrick.handler(index) };
         case positioning.TOOL_NAME:      return { content: positioning.handler(index) };
         case audience.TOOL_NAME:         return { content: audience.handler(index) };
@@ -108,7 +126,6 @@ export function registerAllTools(
         case searchBrand.TOOL_NAME:      return { content: searchBrand.handler(index, args as never) };
         case validateUsage.TOOL_NAME:    return { content: validateUsage.handler(index, args as never) };
         case contextDiff.TOOL_NAME:      return { content: contextDiff.handler(index, args as never) };
-        case syncBrandDocs.TOOL_NAME:    return { content: await syncBrandDocs.handler(index, args as never, context) };
         default:
           return {
             content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],

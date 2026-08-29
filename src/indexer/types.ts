@@ -49,6 +49,8 @@ export interface DesignSystemIndex {
   base: RawContextData;
   web: RawContextData;
   product: RawContextData;
+  /** Canonical merged raw context data. Public consumers should read this view. */
+  contexts: Record<BrandContext, RawContextData>;
   resolved: Record<BrandContext, ResolvedDesignSystem>;
   warnings: string[];
 }

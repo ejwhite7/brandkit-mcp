@@ -4,8 +4,11 @@
  * and missing files without throwing.
  */
 
-import { readFileSync } from 'fs';
-import { load } from 'js-yaml';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
+import { loadSafeYaml } from './safe-yaml.js';
 
 export interface YamlParseResult {
   data: unknown;
@@ -18,11 +21,12 @@ export interface YamlParseResult {
  * @param path - Absolute path to the YAML file
  * @returns Parse result with data, warnings, and source metadata
  */
-export function parseYamlFile(path: string): YamlParseResult {
+export function parseYamlFile(path: string, reader: BrandReadPolicy): YamlParseResult {
   let text: string;
   try {
-    text = readFileSync(path, 'utf-8');
+    text = reader.readFile(path, 'utf-8');
   } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     return {
       data: null,
       warnings: [`Could not read YAML file: ${path} (${(err as Error).message})`],
@@ -31,7 +35,7 @@ export function parseYamlFile(path: string): YamlParseResult {
   }
 
   try {
-    const data = load(text);
+    const data = loadSafeYaml(text);
     return { data: data ?? null, warnings: [], source: path };
   } catch (err) {
     return {

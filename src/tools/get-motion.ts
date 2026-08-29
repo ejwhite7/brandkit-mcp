@@ -17,7 +17,7 @@ export const INPUT_SCHEMA = {
 export function handler(index: DesignSystemIndex, args: { context?: BrandContext }) {
   const warnings: string[] = [];
   const ctx = coerceContext(args.context, warnings);
-  const motion = index[ctx].motion ?? index.base.motion;
+  const motion = index.contexts[ctx].motion;
   if (!motion) warnings.push('No motion system found at agent/visual/motion/');
   return [
     {

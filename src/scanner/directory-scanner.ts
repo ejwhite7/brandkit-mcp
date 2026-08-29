@@ -17,8 +17,7 @@
  *   <root>/agent/visual/artifacts/product/ (same)
  */
 
-import { readdirSync, statSync, existsSync, readFileSync, realpathSync } from 'fs';
-import { join, extname, relative, sep, basename } from 'path';
+import { join, extname, relative, basename, posix, resolve, isAbsolute } from 'path';
 import type {
   MagicTrick,
   AudienceDoc,
@@ -34,6 +33,10 @@ import { parseTokenSpecimen } from '../parsers/markdown-parser.js';
 import { parseComponentMarkdown } from '../parsers/markdown-parser.js';
 import { parseCSSFile } from '../parsers/css-parser.js';
 import { parseFontFile } from '../parsers/font-parser.js';
+import {
+  BrandReadPolicy,
+  type BrandIngestionLimits,
+} from '../filesystem/brand-read-policy.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -49,9 +52,17 @@ export interface ScanResult {
 }
 
 export interface ScanOptions {
-  /** Directory prefix patterns to skip (relative to rootDir). Defaults to ['human/']. */
+  /** Paths to skip, relative to the configured brand root. Defaults to ['human/']. */
   ignore?: string[];
+  /** Bounded ingestion budget. Omitted fields retain production defaults. */
+  limits?: Partial<BrandIngestionLimits>;
 }
+
+export interface BrandPathIgnoreMatcher {
+  matches(path: string): boolean;
+}
+
+type IgnoreMatcher = BrandPathIgnoreMatcher;
 
 // ---------------------------------------------------------------------------
 // Main export
@@ -65,37 +76,43 @@ export interface ScanOptions {
  * @param options - Optional scan configuration
  */
 export function scanBrandRoot(rootDir: string, options?: ScanOptions): ScanResult {
-  const ignore = options?.ignore ?? ['human/'];
   const warnings: string[] = [];
+  const reader = new BrandReadPolicy(rootDir, options?.limits);
+  const ignore = createBrandPathIgnoreMatcher(
+    reader.configuredRoot,
+    options?.ignore ?? ['human/'],
+    () => warnings.push('Ignored invalid ignore pattern: paths must stay relative to the brand root'),
+  );
 
   // ---------------------------------------------------------------------------
   // 1. magic_trick.md
   // ---------------------------------------------------------------------------
-  const magicTrick = parseMagicTrick(rootDir, warnings);
+  const magicTrick = parseMagicTrick(rootDir, ignore, reader, warnings);
 
   // ---------------------------------------------------------------------------
   // 2. Verbal layer
   // ---------------------------------------------------------------------------
-  const verbal = parseVerbalLayer(rootDir, warnings);
+  const verbal = parseVerbalLayer(rootDir, ignore, reader, warnings);
 
   // ---------------------------------------------------------------------------
   // 3. Base visual layer (agent/visual/)
   // ---------------------------------------------------------------------------
   const baseVisualDir = join(rootDir, 'agent', 'visual');
-  const base = parseVisualDir(baseVisualDir, 'base', ignore, warnings);
+  const base = parseVisualDir(baseVisualDir, 'base', ignore, reader, warnings);
 
   // ---------------------------------------------------------------------------
   // 4. Web overrides (agent/visual/artifacts/web/)
   // ---------------------------------------------------------------------------
   const webVisualDir = join(rootDir, 'agent', 'visual', 'artifacts', 'web');
-  const web = parseVisualDir(webVisualDir, 'web', ignore, warnings);
+  const web = parseVisualDir(webVisualDir, 'web', ignore, reader, warnings);
 
   // ---------------------------------------------------------------------------
   // 5. Product overrides (agent/visual/artifacts/product/)
   // ---------------------------------------------------------------------------
   const productVisualDir = join(rootDir, 'agent', 'visual', 'artifacts', 'product');
-  const product = parseVisualDir(productVisualDir, 'product', ignore, warnings);
+  const product = parseVisualDir(productVisualDir, 'product', ignore, reader, warnings);
 
+  reader.assertWithinLimits();
   return { magicTrick, verbal, base, web, product, warnings };
 }
 
@@ -103,11 +120,17 @@ export function scanBrandRoot(rootDir: string, options?: ScanOptions): ScanResul
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function parseMagicTrick(rootDir: string, warnings: string[]): MagicTrick | undefined {
+function parseMagicTrick(
+  rootDir: string,
+  ignore: IgnoreMatcher,
+  reader: BrandReadPolicy,
+  warnings: string[],
+): MagicTrick | undefined {
   const filePath = join(rootDir, 'magic_trick.md');
-  if (!existsSync(filePath)) return undefined;
   try {
-    const content = readFileSync(filePath, 'utf-8');
+    if (ignore.matches(filePath)) return undefined;
+    if (!reader.isFile(filePath)) return undefined;
+    const content = reader.readFile(filePath, 'utf-8');
     return { content: content.trim(), source: filePath };
   } catch (err) {
     warnings.push(`Could not read magic_trick.md: ${(err as Error).message}`);
@@ -115,36 +138,60 @@ function parseMagicTrick(rootDir: string, warnings: string[]): MagicTrick | unde
   }
 }
 
-function parseVerbalLayer(rootDir: string, warnings: string[]): VerbalLayer {
+function parseVerbalLayer(
+  rootDir: string,
+  ignore: IgnoreMatcher,
+  reader: BrandReadPolicy,
+  warnings: string[],
+): VerbalLayer {
   const verbalDir = join(rootDir, 'agent', 'verbal');
 
   // positioning
-  const positioning = parseVerbalDoc(join(verbalDir, 'positioning.md'));
+  const positioning = parseFixedVerbal(join(verbalDir, 'positioning.md'), ignore, reader, warnings);
 
   // messaging
-  const messaging = parseVerbalDoc(join(verbalDir, 'messaging.md'));
+  const messaging = parseFixedVerbal(join(verbalDir, 'messaging.md'), ignore, reader, warnings);
 
   // differentiation
-  const differentiation = parseVerbalDoc(join(verbalDir, 'differentiation.md'));
+  const differentiation = parseFixedVerbal(join(verbalDir, 'differentiation.md'), ignore, reader, warnings);
 
   // concepts
-  const concepts = parseVerbalDoc(join(verbalDir, 'concepts.md'));
+  const concepts = parseFixedVerbal(join(verbalDir, 'concepts.md'), ignore, reader, warnings);
 
   // voice
-  const voice = parseVerbalDoc(join(verbalDir, 'voice.md'));
+  const voice = parseFixedVerbal(join(verbalDir, 'voice.md'), ignore, reader, warnings);
 
   // audience (YAML)
   let audience: AudienceDoc | undefined;
   const audiencePath = join(verbalDir, 'audience.yaml');
-  if (existsSync(audiencePath)) {
-    const result = parseYamlFile(audiencePath);
-    warnings.push(...result.warnings);
-    if (result.data !== null) {
-      audience = { data: result.data, source: result.source };
+  try {
+    if (!ignore.matches(audiencePath) && reader.isFile(audiencePath)) {
+      const result = parseYamlFile(audiencePath, reader);
+      warnings.push(...result.warnings);
+      if (result.data !== null) {
+        audience = { data: result.data, source: result.source };
+      }
     }
+  } catch (err) {
+    warnings.push(`Rejected audience.yaml: ${(err as Error).message}`);
   }
 
   return { positioning, messaging, differentiation, concepts, voice, audience };
+}
+
+function parseFixedVerbal(
+  path: string,
+  ignore: IgnoreMatcher,
+  reader: BrandReadPolicy,
+  warnings: string[],
+) {
+  if (ignore.matches(path)) return undefined;
+  try {
+    return parseVerbalDoc(path, reader);
+  } catch (err) {
+    warnings.push(`Rejected verbal document ${path}: ${(err as Error).message}`);
+    return undefined;
+  }
 }
 
 function emptyRawContextData(): RawContextData {
@@ -161,18 +208,25 @@ function emptyRawContextData(): RawContextData {
 function parseVisualDir(
   visualDir: string,
   _contextLabel: string,
-  ignore: string[],
+  ignore: IgnoreMatcher,
+  reader: BrandReadPolicy,
   warnings: string[],
 ): RawContextData {
-  if (!existsSync(visualDir)) return emptyRawContextData();
+  if (ignore.matches(visualDir)) return emptyRawContextData();
+  try {
+    if (!reader.isDirectory(visualDir)) return emptyRawContextData();
+  } catch (err) {
+    warnings.push(`Rejected visual directory ${visualDir}: ${(err as Error).message}`);
+    return emptyRawContextData();
+  }
 
   const data = emptyRawContextData();
 
   // colors_and_type.css
   const cssPath = join(visualDir, 'colors_and_type.css');
-  if (existsSync(cssPath)) {
+  if (!ignore.matches(cssPath) && safeIsFile(cssPath, reader, warnings)) {
     try {
-      data.colorsAndType = parseCSSFile(cssPath, 'base');
+      data.colorsAndType = parseCSSFile(cssPath, 'base', reader);
     } catch (err) {
       warnings.push(`Failed to parse ${cssPath}: ${(err as Error).message}`);
     }
@@ -180,10 +234,10 @@ function parseVisualDir(
 
   // components/*.md
   const componentsDir = join(visualDir, 'components');
-  if (existsSync(componentsDir) && isDirectory(componentsDir)) {
-    for (const file of listFiles(componentsDir, ['.md'], ignore, visualDir)) {
+  if (!ignore.matches(componentsDir) && safeIsDirectory(componentsDir, reader, warnings)) {
+    for (const file of listFiles(componentsDir, ['.md'], ignore, reader, warnings)) {
       try {
-        const parsed = parseComponentMarkdown(file, 'base');
+        const parsed = parseComponentMarkdown(file, 'base', reader, warnings);
         data.components.push(...parsed);
       } catch (err) {
         warnings.push(`Failed to parse component ${file}: ${(err as Error).message}`);
@@ -193,10 +247,10 @@ function parseVisualDir(
 
   // tokens/*.md
   const tokensDir = join(visualDir, 'tokens');
-  if (existsSync(tokensDir) && isDirectory(tokensDir)) {
-    for (const file of listFiles(tokensDir, ['.md'], ignore, visualDir)) {
+  if (!ignore.matches(tokensDir) && safeIsDirectory(tokensDir, reader, warnings)) {
+    for (const file of listFiles(tokensDir, ['.md'], ignore, reader, warnings)) {
       try {
-        const { specimen, warnings: w } = parseTokenSpecimen(file);
+        const { specimen, warnings: w } = parseTokenSpecimen(file, reader);
         warnings.push(...w);
         if (specimen !== null) {
           data.tokens.push(specimen);
@@ -209,9 +263,9 @@ function parseVisualDir(
 
   // motion/
   const motionDir = join(visualDir, 'motion');
-  if (existsSync(motionDir) && isDirectory(motionDir)) {
+  if (!ignore.matches(motionDir) && safeIsDirectory(motionDir, reader, warnings)) {
     try {
-      const result = parseMotionDir(motionDir);
+      const result = parseMotionDir(motionDir, reader);
       // A CSS-only motion system is valid: suppress the "No motion.json"
       // warning when motion.css is present.
       const filtered = result.css
@@ -233,14 +287,14 @@ function parseVisualDir(
 
   // fonts/
   const fontsDir = join(visualDir, 'fonts');
-  if (existsSync(fontsDir) && isDirectory(fontsDir)) {
-    data.fonts = parseFontsDir(fontsDir, ignore, visualDir, warnings);
+  if (!ignore.matches(fontsDir) && safeIsDirectory(fontsDir, reader, warnings)) {
+    data.fonts = parseFontsDir(fontsDir, ignore, reader, warnings);
   }
 
   // assets/
   const assetsDir = join(visualDir, 'assets');
-  if (existsSync(assetsDir) && isDirectory(assetsDir)) {
-    data.assets = parseAssetsDir(assetsDir, ignore, visualDir, warnings);
+  if (!ignore.matches(assetsDir) && safeIsDirectory(assetsDir, reader, warnings)) {
+    data.assets = parseAssetsDir(assetsDir, ignore, reader, warnings);
   }
 
   return data;
@@ -252,43 +306,182 @@ const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.otf', '.ttf']);
 // Image extensions
 const IMAGE_EXTENSIONS = new Set(['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']);
 
+type ManifestRecord = Record<string, unknown>;
+
+interface FontManifestEntry {
+  file: string;
+  family?: string;
+  weight?: string | number;
+  style?: 'normal' | 'italic';
+}
+
+interface AssetManifestEntry {
+  file: string;
+  id?: string;
+  purpose?: string;
+}
+
+const ACCESSOR_PROPERTY = Symbol('accessor-property');
+
+function isManifestRecord(value: unknown): value is ManifestRecord {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+/** Read only an own data property, without consulting prototypes or invoking accessors. */
+function ownManifestValue(record: ManifestRecord, key: string): unknown | typeof ACCESSOR_PROPERTY {
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  if (descriptor === undefined) return undefined;
+  return 'value' in descriptor ? descriptor.value : ACCESSOR_PROPERTY;
+}
+
+function manifestSource(reader: BrandReadPolicy, path: string): string {
+  return relative(reader.configuredRoot, path).replace(/\\/g, '/');
+}
+
+function optionalString(
+  record: ManifestRecord,
+  key: string,
+): { valid: true; value?: string } | { valid: false; reason: string } {
+  const value = ownManifestValue(record, key);
+  if (value === undefined) return { valid: true };
+  if (typeof value !== 'string') return { valid: false, reason: `${key} must be a string` };
+  return { valid: true, value };
+}
+
+function validateFontManifestEntry(
+  value: unknown,
+): { valid: true; entry: FontManifestEntry } | { valid: false; reason: string } {
+  if (!isManifestRecord(value)) return { valid: false, reason: 'expected an object' };
+
+  const file = ownManifestValue(value, 'file');
+  if (typeof file !== 'string' || file.trim().length === 0) {
+    return { valid: false, reason: 'file must be a non-empty string' };
+  }
+  const family = optionalString(value, 'family');
+  if (!family.valid) return family;
+
+  const weight = ownManifestValue(value, 'weight');
+  if (
+    weight !== undefined &&
+    !(typeof weight === 'string' || (typeof weight === 'number' && Number.isFinite(weight)))
+  ) {
+    return { valid: false, reason: 'weight must be a finite number or string' };
+  }
+
+  const style = ownManifestValue(value, 'style');
+  if (style !== undefined && style !== 'normal' && style !== 'italic') {
+    return { valid: false, reason: 'style must be normal or italic' };
+  }
+
+  return {
+    valid: true,
+    entry: {
+      file,
+      family: family.value,
+      weight: weight as string | number | undefined,
+      style,
+    },
+  };
+}
+
+function validateAssetManifestEntry(
+  value: unknown,
+): { valid: true; entry: AssetManifestEntry } | { valid: false; reason: string } {
+  if (!isManifestRecord(value)) return { valid: false, reason: 'expected an object' };
+
+  const file = ownManifestValue(value, 'file');
+  if (typeof file !== 'string' || file.trim().length === 0) {
+    return { valid: false, reason: 'file must be a non-empty string' };
+  }
+  const id = optionalString(value, 'id');
+  if (!id.valid) return id;
+  const purpose = optionalString(value, 'purpose');
+  if (!purpose.valid) return purpose;
+
+  return { valid: true, entry: { file, id: id.value, purpose: purpose.value } };
+}
+
+function validatedManifestEntries<T>(options: {
+  data: unknown;
+  collection: 'faces' | 'assets';
+  kind: 'font' | 'asset';
+  path: string;
+  reader: BrandReadPolicy;
+  warnings: string[];
+  validate: (value: unknown) => { valid: true; entry: T } | { valid: false; reason: string };
+}): T[] {
+  const source = manifestSource(options.reader, options.path);
+  if (!isManifestRecord(options.data)) {
+    options.warnings.push(`Rejected ${options.kind} manifest ${source}: expected a mapping`);
+    return [];
+  }
+
+  const collection = ownManifestValue(options.data, options.collection);
+  if (collection === undefined) return [];
+  if (!Array.isArray(collection)) {
+    options.warnings.push(
+      `Rejected ${options.kind} manifest ${source}: ${options.collection} must be an array`,
+    );
+    return [];
+  }
+
+  const entries: T[] = [];
+  collection.forEach((value, index) => {
+    const result = options.validate(value);
+    if (result.valid) {
+      entries.push(result.entry);
+    } else {
+      options.warnings.push(
+        `Rejected ${options.kind} manifest entry ${source} ${options.collection}[${index}]: ${result.reason}`,
+      );
+    }
+  });
+  return entries;
+}
+
 function parseFontsDir(
   fontsDir: string,
-  ignore: string[],
-  visualRoot: string,
+  ignore: IgnoreMatcher,
+  reader: BrandReadPolicy,
   warnings: string[],
 ): FontFace[] {
   const fonts: FontFace[] = [];
 
   // Load optional fonts.yaml for metadata overrides
   const fontsYamlPath = join(fontsDir, 'fonts.yaml');
-  let fontsYamlData: Record<string, unknown> | null = null;
-  if (existsSync(fontsYamlPath)) {
-    const result = parseYamlFile(fontsYamlPath);
+  let yamlFaces: FontManifestEntry[] = [];
+  if (!ignore.matches(fontsYamlPath) && safeIsFile(fontsYamlPath, reader, warnings)) {
+    const result = parseYamlFile(fontsYamlPath, reader);
     warnings.push(...result.warnings);
-    if (result.data && typeof result.data === 'object') {
-      fontsYamlData = result.data as Record<string, unknown>;
+    if (result.warnings.length === 0) {
+      yamlFaces = validatedManifestEntries({
+        data: result.data,
+        collection: 'faces',
+        kind: 'font',
+        path: fontsYamlPath,
+        reader,
+        warnings,
+        validate: validateFontManifestEntry,
+      });
     }
   }
 
   // Build a lookup from file name -> metadata from YAML
   // Expected YAML shape: { faces: [{ family, weight, style, file }] }
   const yamlFaceMap = new Map<string, { family?: string; weight?: string | number; style?: string }>();
-  if (fontsYamlData?.faces && Array.isArray(fontsYamlData.faces)) {
-    for (const face of fontsYamlData.faces as Array<Record<string, unknown>>) {
-      if (typeof face.file === 'string') {
-        yamlFaceMap.set(face.file, {
-          family: face.family as string | undefined,
-          weight: face.weight as string | number | undefined,
-          style: face.style as string | undefined,
-        });
-      }
-    }
+  for (const face of yamlFaces) {
+    yamlFaceMap.set(face.file, {
+      family: face.family,
+      weight: face.weight,
+      style: face.style,
+    });
   }
 
   // If we have YAML faces but no physical font files (metadata-only approach),
   // create FontFace entries from the YAML directly
-  const physicalFontFiles = listFiles(fontsDir, [...FONT_EXTENSIONS], ignore, visualRoot);
+  const physicalFontFiles = listFiles(fontsDir, [...FONT_EXTENSIONS], ignore, reader, warnings);
 
   if (physicalFontFiles.length > 0) {
     // Parse physical font files, merging YAML metadata
@@ -321,12 +514,26 @@ function parseFontsDir(
         continue;
       }
       const ext = rawExt as FontFace['format'];
+      const filePath = join(fontsDir, file);
+      try {
+        reader.assertPath(filePath);
+        if (reader.isDirectory(filePath)) {
+          warnings.push(`Rejected font manifest entry that is not a file: ${file}`);
+          continue;
+        }
+        // Existing manifest-declared binaries share the same ingestion budget
+        // even though the index stores metadata rather than file contents.
+        reader.isFile(filePath);
+      } catch (err) {
+        warnings.push(`Rejected font manifest entry ${file}: ${(err as Error).message}`);
+        continue;
+      }
       fonts.push({
         family: meta.family ?? 'Unknown',
         weight: meta.weight,
         style: (meta.style as 'normal' | 'italic' | undefined) ?? 'normal',
         file,
-        filePath: join(fontsDir, file),
+        filePath,
         format: ext || 'woff2',
       });
     }
@@ -337,38 +544,39 @@ function parseFontsDir(
 
 function parseAssetsDir(
   assetsDir: string,
-  ignore: string[],
-  visualRoot: string,
+  ignore: IgnoreMatcher,
+  reader: BrandReadPolicy,
   warnings: string[],
 ): AssetEntry[] {
   const assets: AssetEntry[] = [];
 
   // Load optional assets.yaml for metadata
   const assetsYamlPath = join(assetsDir, 'assets.yaml');
-  let assetsYamlData: Record<string, unknown> | null = null;
-  if (existsSync(assetsYamlPath)) {
-    const result = parseYamlFile(assetsYamlPath);
+  let yamlAssets: AssetManifestEntry[] = [];
+  if (!ignore.matches(assetsYamlPath) && safeIsFile(assetsYamlPath, reader, warnings)) {
+    const result = parseYamlFile(assetsYamlPath, reader);
     warnings.push(...result.warnings);
-    if (result.data && typeof result.data === 'object') {
-      assetsYamlData = result.data as Record<string, unknown>;
+    if (result.warnings.length === 0) {
+      yamlAssets = validatedManifestEntries({
+        data: result.data,
+        collection: 'assets',
+        kind: 'asset',
+        path: assetsYamlPath,
+        reader,
+        warnings,
+        validate: validateAssetManifestEntry,
+      });
     }
   }
 
   // Build a lookup from file name -> YAML metadata
   // Expected shape: { assets: [{ id, file, purpose }] }
   const yamlAssetMap = new Map<string, { id?: string; purpose?: string }>();
-  if (assetsYamlData?.assets && Array.isArray(assetsYamlData.assets)) {
-    for (const asset of assetsYamlData.assets as Array<Record<string, unknown>>) {
-      if (typeof asset.file === 'string') {
-        yamlAssetMap.set(asset.file, {
-          id: asset.id as string | undefined,
-          purpose: asset.purpose as string | undefined,
-        });
-      }
-    }
+  for (const asset of yamlAssets) {
+    yamlAssetMap.set(asset.file, { id: asset.id, purpose: asset.purpose });
   }
 
-  const physicalAssetFiles = listFiles(assetsDir, [...IMAGE_EXTENSIONS], ignore, visualRoot);
+  const physicalAssetFiles = listFiles(assetsDir, [...IMAGE_EXTENSIONS], ignore, reader, warnings);
 
   if (physicalAssetFiles.length > 0) {
     for (const filePath of physicalAssetFiles) {
@@ -387,12 +595,27 @@ function parseAssetsDir(
     // No physical files — create entries from YAML only
     for (const [file, meta] of yamlAssetMap) {
       const ext = extname(file).toLowerCase().replace('.', '');
+      const filePath = join(assetsDir, file);
+      try {
+        reader.assertPath(filePath);
+        if (reader.isDirectory(filePath)) {
+          warnings.push(`Rejected asset manifest entry that is not a file: ${file}`);
+          continue;
+        }
+        // Count an existing declared asset even when its extension is not one
+        // of the auto-discovered image formats. Missing metadata-only entries
+        // remain compatible and do not consume a file budget.
+        reader.isFile(filePath);
+      } catch (err) {
+        warnings.push(`Rejected asset manifest entry ${file}: ${(err as Error).message}`);
+        continue;
+      }
       assets.push({
         id: meta.id,
         file,
         purpose: meta.purpose,
         format: ext,
-        filePath: join(assetsDir, file),
+        filePath,
       });
     }
   }
@@ -403,85 +626,141 @@ function parseAssetsDir(
 /**
  * List all files in a directory (non-recursive for flat directories,
  * but uses walkDir for nested cases) matching given extensions.
- * Files whose relative path from `rootDir` starts with any ignore prefix are skipped.
+ * Files matching a brand-root-relative ignore path are skipped.
  */
 function listFiles(
   dir: string,
   extensions: string[],
-  ignore: string[],
-  rootDir: string,
+  ignore: IgnoreMatcher,
+  reader: BrandReadPolicy,
+  warnings: string[],
 ): string[] {
   const results: string[] = [];
-  walkDir(dir, extensions, ignore, rootDir, results);
+  walkDir(dir, extensions, ignore, reader, warnings, results, new Set());
   return results;
 }
 
 function walkDir(
   dir: string,
   extensions: string[],
-  ignore: string[],
-  rootDir: string,
+  ignore: IgnoreMatcher,
+  reader: BrandReadPolicy,
+  warnings: string[],
   results: string[],
+  visited: Set<string>,
 ): void {
+  if (ignore.matches(dir)) return;
+
+  let identity: string | undefined;
+  try {
+    identity = reader.directoryIdentity(dir);
+  } catch (err) {
+    warnings.push(`Rejected brand directory ${dir}: ${(err as Error).message}`);
+    return;
+  }
+  if (identity === undefined || visited.has(identity)) return;
+  visited.add(identity);
+
   let entries: string[];
   try {
-    entries = readdirSync(dir);
-  } catch {
+    entries = reader.readDirectory(dir);
+  } catch (err) {
+    warnings.push(`Rejected brand directory ${dir}: ${(err as Error).message}`);
     return;
   }
 
-  for (const entry of entries) {
+  for (const entry of entries.sort()) {
     if (entry.startsWith('.')) continue;
 
     const fullPath = join(dir, entry);
 
-    // Symlink containment check
-    let realPath: string;
+    if (ignore.matches(fullPath)) continue;
+
     try {
-      realPath = realpathSync(fullPath);
-    } catch {
-      continue; // broken symlink
-    }
-
-    let realRoot: string;
-    try {
-      realRoot = realpathSync(rootDir);
-    } catch {
-      realRoot = rootDir;
-    }
-
-    if (realPath !== realRoot && !realPath.startsWith(realRoot + sep)) {
-      continue; // symlink escape
-    }
-
-    // Check ignore list against relative path from rootDir
-    const relPath = relative(rootDir, fullPath).replace(/\\/g, '/');
-    if (ignore.some((prefix) => relPath === prefix || relPath.startsWith(prefix))) {
-      continue;
-    }
-
-    let stat;
-    try {
-      stat = statSync(fullPath);
-    } catch {
-      continue;
-    }
-
-    if (stat.isDirectory()) {
-      walkDir(fullPath, extensions, ignore, rootDir, results);
-    } else if (stat.isFile()) {
-      const ext = extname(entry).toLowerCase();
-      if (extensions.includes(ext)) {
-        results.push(fullPath);
+      if (reader.isDirectory(fullPath)) {
+        walkDir(fullPath, extensions, ignore, reader, warnings, results, visited);
+      } else if (reader.isFile(fullPath)) {
+        const ext = extname(entry).toLowerCase();
+        if (extensions.includes(ext)) {
+          results.push(fullPath);
+        }
       }
+    } catch (err) {
+      warnings.push(`Rejected brand path ${fullPath}: ${(err as Error).message}`);
+      continue;
     }
   }
 }
 
-function isDirectory(p: string): boolean {
+/**
+ * Create the canonical matcher for configured brand-root-relative ignore
+ * paths. Both scanning and hot reload use this function so an ignored path
+ * cannot be reintroduced by a watcher event.
+ */
+export function createBrandPathIgnoreMatcher(
+  rootDir: string,
+  patterns: string[],
+  onInvalidPattern?: (pattern: string) => void,
+): BrandPathIgnoreMatcher {
+  const configuredRoot = resolve(rootDir);
+  const normalized = new Set<string>();
+
+  for (const pattern of patterns) {
+    const slashPattern = pattern.replace(/\\/g, '/');
+    const isAbsolutePattern = slashPattern.startsWith('/') || /^[A-Za-z]:\//.test(slashPattern);
+    const segments: string[] = [];
+    let escapesRoot = false;
+
+    for (const segment of slashPattern.split('/')) {
+      if (segment === '' || segment === '.') continue;
+      if (segment === '..') {
+        if (segments.length === 0) {
+          escapesRoot = true;
+          break;
+        }
+        segments.pop();
+      } else {
+        segments.push(segment);
+      }
+    }
+
+    if (isAbsolutePattern || escapesRoot || segments.length === 0 || pattern.includes('\0')) {
+      onInvalidPattern?.(pattern);
+      continue;
+    }
+    normalized.add(posix.join(...segments));
+  }
+  const normalizedPatterns = [...normalized];
+
+  return {
+    matches(path: string): boolean {
+      // Chokidar emits native separators, but tests and adapter layers can
+      // supply paths with the other platform's separator. Ignore patterns
+      // already treat both slash styles as separators, so event paths do too.
+      const candidate = resolve(path.replace(/\\/g, '/'));
+      const brandPath = relative(configuredRoot, candidate).replace(/\\/g, '/');
+      if (brandPath === '..' || brandPath.startsWith('../') || isAbsolute(brandPath)) return false;
+      return normalizedPatterns.some(
+        (pattern) => brandPath === pattern || brandPath.startsWith(`${pattern}/`),
+      );
+    },
+  };
+}
+
+function safeIsFile(p: string, reader: BrandReadPolicy, warnings: string[]): boolean {
   try {
-    return statSync(p).isDirectory();
-  } catch {
+    return reader.isFile(p);
+  } catch (err) {
+    warnings.push(`Rejected brand file ${p}: ${(err as Error).message}`);
+    return false;
+  }
+}
+
+function safeIsDirectory(p: string, reader: BrandReadPolicy, warnings: string[]): boolean {
+  try {
+    return reader.isDirectory(p);
+  } catch (err) {
+    warnings.push(`Rejected brand directory ${p}: ${(err as Error).message}`);
     return false;
   }
 }

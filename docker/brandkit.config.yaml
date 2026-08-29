@@ -1,0 +1,13 @@
+version: 2
+brand:
+  name: Acme Corp
+  description: Plumbing for builders.
+  root: ../examples/acme-corp/brand_atomic_system
+server:
+  transport: http
+  host: 0.0.0.0
+  port: 3001
+  allowedHosts:
+    - 127.0.0.1
+    - localhost
+    - brandkit-mcp

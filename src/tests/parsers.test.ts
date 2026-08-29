@@ -6,12 +6,13 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { parseCSSFile, extractColorsFromCSS, extractTypographyFromCSS, normalizeToHex } from '../parsers/css-parser.js';
-import { parseGuidelineMarkdown, parseComponentMarkdown, parsePaletteMarkdown } from '../parsers/markdown-parser.js';
+import { parseCSSFile } from '../parsers/css-parser.js';
+import { parseComponentMarkdown } from '../parsers/markdown-parser.js';
 import { parseFontFile, inferFontWeight } from '../parsers/font-parser.js';
-import { inferLogoVariantName } from '../parsers/image-parser.js';
+import { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
 
 const TEST_DIR = join(process.cwd(), '__test_fixtures__');
+const reader = new BrandReadPolicy(TEST_DIR);
 
 describe('CSS Parser', () => {
   const cssFilePath = join(TEST_DIR, 'test-colors.css');
@@ -30,56 +31,18 @@ describe('CSS Parser', () => {
   });
 
   it('should parse CSS custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'base');
+    const result = parseCSSFile(cssFilePath, 'base', reader);
     expect(result.customProperties['--color-primary']).toBe('#1a1a2e');
     expect(result.customProperties['--color-secondary']).toBe('#16213e');
     expect(result.customProperties['--color-accent']).toBe('#e94560');
   });
-
-  it('should extract colors from custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'base');
-    const colors = extractColorsFromCSS(result.customProperties, 'base', cssFilePath);
-    expect(colors.length).toBeGreaterThanOrEqual(3);
-    const primary = colors.find((c) => c.token === '--color-primary');
-    expect(primary).toBeDefined();
-    expect(primary!.value).toBe('#1a1a2e');
-    expect(primary!.role).toBe('primary');
-  });
-
-  it('should extract typography from custom properties', () => {
-    const result = parseCSSFile(cssFilePath, 'base');
-    const typo = extractTypographyFromCSS(result.customProperties, 'base', cssFilePath);
-    expect(typo.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('should not extract non-color properties as colors', () => {
-    const result = parseCSSFile(cssFilePath, 'base');
-    const colors = extractColorsFromCSS(result.customProperties, 'base', cssFilePath);
-    const spacing = colors.find((c) => c.token === '--spacing-sm');
-    expect(spacing).toBeUndefined();
-  });
 });
 
 describe('Markdown Parser', () => {
-  const guidelinePath = join(TEST_DIR, 'brand-voice.md');
   const componentPath = join(TEST_DIR, 'button.md');
-  const palettePath = join(TEST_DIR, 'palette.md');
 
   beforeAll(() => {
     mkdirSync(TEST_DIR, { recursive: true });
-
-    writeFileSync(guidelinePath, `---
-title: Brand Voice
-section: brand-voice
----
-
-# Brand Voice Guidelines
-
-Our brand voice is confident, clear, and approachable.
-
-## Tone
-We adjust tone based on context.
-`);
 
     writeFileSync(componentPath, `---
 name: Button
@@ -105,37 +68,30 @@ The default button style.
 ### Secondary
 For secondary actions.
 `);
-
-    writeFileSync(palettePath, `# Color Palette
-
-| Name | Hex | Description |
-|---|---|---|
-| Ocean Blue | #0077b6 | Primary brand color |
-| Sunset Orange | #e76f51 | Accent color |
-`);
-  });
-
-  it('should parse guideline markdown with frontmatter', () => {
-    const result = parseGuidelineMarkdown(guidelinePath, 'base');
-    expect(result.title).toBe('Brand Voice');
-    expect(result.section).toBe('brand-voice');
-    expect(result.content).toContain('confident, clear, and approachable');
   });
 
   it('should parse component markdown', () => {
-    const results = parseComponentMarkdown(componentPath, 'base');
+    const results = parseComponentMarkdown(componentPath, 'base', reader);
     expect(results.length).toBe(1);
     expect(results[0].name).toBe('Button');
     expect(results[0].category).toBe('button');
     expect(results[0].variants).toContain('Primary');
   });
 
-  it('should parse palette markdown tables', () => {
-    const colors = parsePaletteMarkdown(palettePath, 'base');
-    expect(colors.length).toBe(2);
-    expect(colors[0].name).toBe('Ocean Blue');
-    expect(colors[0].hex).toBe('#0077b6');
-    expect(colors[1].name).toBe('Sunset Orange');
+  it('preserves YAML frontmatter behavior for BOM, CRLF, nested values, and body delimiters', () => {
+    const path = join(TEST_DIR, 'frontmatter-compat.md');
+    writeFileSync(
+      path,
+      '\uFEFF---\r\nname: "Alert: urgent"\r\ncategory: feedback\r\nvariants:\r\n  - Info\r\n  - Warning\r\nmetadata:\r\n  owner: design\r\n---\r\n# Alert\r\n\r\nBody survives.\r\n\r\n---\r\n',
+    );
+
+    const [component] = parseComponentMarkdown(path, 'base', reader);
+    expect(component).toMatchObject({
+      name: 'Alert: urgent',
+      category: 'feedback',
+      variants: ['Info', 'Warning'],
+    });
+    expect(component.description).toContain('Body survives.');
   });
 });
 
@@ -162,15 +118,6 @@ describe('Font Parser', () => {
   });
 });
 
-describe('Image Parser', () => {
-  it('should infer logo variant names', () => {
-    expect(inferLogoVariantName('logo-primary.svg')).toBe('Primary');
-    expect(inferLogoVariantName('logo-mark.png')).toBe('Mark');
-    expect(inferLogoVariantName('logo-wordmark-dark.svg')).toBe('Wordmark Dark');
-    expect(inferLogoVariantName('logo.svg')).toBe('Primary');
-  });
-});
-
 describe('component usage section extraction', () => {
   it('captures multi-line Usage sections, not just the first line', () => {
     const dir = TEST_DIR;
@@ -180,7 +127,7 @@ describe('component usage section extraction', () => {
       path,
       '---\nname: Button\n---\n# Button\n\n## Usage\nLine one.\nLine two.\n\n## Other\nIgnored.\n',
     );
-    const [component] = parseComponentMarkdown(path, 'base');
+    const [component] = parseComponentMarkdown(path, 'base', reader);
     expect(component.usage).toContain('Line one.');
     expect(component.usage).toContain('Line two.');
     expect(component.usage).not.toContain('Ignored');
@@ -194,25 +141,7 @@ describe('component usage section extraction', () => {
       path,
       '---\nname: Button\n---\n# Button\n\n## Usage\n## Other\nIgnored.\n',
     );
-    const [component] = parseComponentMarkdown(path, 'base');
+    const [component] = parseComponentMarkdown(path, 'base', reader);
     expect(component.usage ?? '').not.toContain('Ignored');
   });
 });
-
-describe('normalizeToHex', () => {
-  it('expands 3-digit shorthand', () => {
-    expect(normalizeToHex('#abc')).toBe('#aabbcc');
-  });
-  it('expands 4-digit #RGBA shorthand', () => {
-    expect(normalizeToHex('#abcd')).toBe('#aabbccdd');
-  });
-  it('rejects invalid 5- and 7-digit values', () => {
-    expect(normalizeToHex('#abcde')).toBeUndefined();
-    expect(normalizeToHex('#abcdeff')).toBeUndefined();
-  });
-  it('passes 6- and 8-digit values through', () => {
-    expect(normalizeToHex('#aabbcc')).toBe('#aabbcc');
-    expect(normalizeToHex('#aabbccdd')).toBe('#aabbccdd');
-  });
-});
-

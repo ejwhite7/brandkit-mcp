@@ -4,8 +4,11 @@
  * Tolerant: handles missing or malformed files gracefully.
  */
 
-import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
 
 export interface MotionParseResult {
   tokens: unknown;
@@ -19,16 +22,17 @@ export interface MotionParseResult {
  * @param dir - Absolute path to the directory containing motion files
  * @returns Parse result with tokens, CSS, warnings, and source metadata
  */
-export function parseMotionDir(dir: string): MotionParseResult {
+export function parseMotionDir(dir: string, reader: BrandReadPolicy): MotionParseResult {
   const warnings: string[] = [];
   const jsonPath = join(dir, 'motion.json');
   const cssPath = join(dir, 'motion.css');
 
   let tokens: unknown = null;
-  if (existsSync(jsonPath)) {
+  if (reader.isFile(jsonPath)) {
     try {
-      tokens = JSON.parse(readFileSync(jsonPath, 'utf-8'));
+      tokens = JSON.parse(reader.readFile(jsonPath, 'utf-8'));
     } catch (err) {
+      if (err instanceof BrandIngestionLimitError) throw err;
       warnings.push(`Invalid motion.json: ${(err as Error).message}`);
     }
   } else {
@@ -36,10 +40,11 @@ export function parseMotionDir(dir: string): MotionParseResult {
   }
 
   let css = '';
-  if (existsSync(cssPath)) {
+  if (reader.isFile(cssPath)) {
     try {
-      css = readFileSync(cssPath, 'utf-8');
+      css = reader.readFile(cssPath, 'utf-8');
     } catch (err) {
+      if (err instanceof BrandIngestionLimitError) throw err;
       warnings.push(`Could not read motion.css: ${(err as Error).message}`);
     }
   }

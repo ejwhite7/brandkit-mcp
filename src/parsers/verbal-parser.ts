@@ -3,21 +3,25 @@
  * @description Parses verbal/agent markdown documents with optional YAML frontmatter.
  */
 
-import matter from 'gray-matter';
-import { readFileSync, existsSync } from 'fs';
 import type { VerbalDoc } from '../types/design-system.js';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
+import { parseFrontmatter } from './frontmatter.js';
 
 /**
  * Parse a verbal/agent markdown document with frontmatter support.
  * @param path - Absolute path to the markdown file
  * @returns Parsed verbal document or undefined if file doesn't exist
  */
-export function parseVerbalDoc(path: string): VerbalDoc | undefined {
-  if (!existsSync(path)) return undefined;
+export function parseVerbalDoc(path: string, reader: BrandReadPolicy): VerbalDoc | undefined {
+  if (!reader.isFile(path)) return undefined;
   let raw: string;
   try {
-    raw = readFileSync(path, 'utf-8');
-  } catch {
+    raw = reader.readFile(path, 'utf-8');
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     return undefined;
   }
   // Tolerance principle: malformed frontmatter must not abort the scan.
@@ -25,8 +29,8 @@ export function parseVerbalDoc(path: string): VerbalDoc | undefined {
   let data: Record<string, unknown> = {};
   let content = raw;
   try {
-    const parsed = matter(raw);
-    data = parsed.data as Record<string, unknown>;
+    const parsed = parseFrontmatter(raw);
+    data = parsed.data;
     content = parsed.content;
   } catch {
     // keep defaults: empty frontmatter, full raw body

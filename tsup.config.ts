@@ -2,9 +2,10 @@
  * tsup build configuration for BrandKit MCP.
  *
  * Produces both CommonJS and ESM outputs with TypeScript declarations.
- * Two entry points:
+ * Three entry points:
  *   - index: Main library entry (MCP server, parsers, types)
  *   - cli/index: CLI binary entry for the `brandkit-mcp` command
+ *   - adapters/vercel: stateless Vercel Node.js Function implementation
  */
 import { defineConfig } from 'tsup';
 import { execSync } from 'child_process';
@@ -14,6 +15,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'cli/index': 'src/cli/index.ts',
+    'adapters/vercel': 'src/adapters/vercel.ts',
   },
   format: ['cjs', 'esm'],
   dts: true,

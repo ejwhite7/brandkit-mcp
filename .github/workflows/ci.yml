@@ -16,14 +16,15 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         node: [20, 22]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: ${{ matrix.node }}
           cache: npm
 
       - run: npm ci
+      - run: npm run audit:prod
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -34,8 +35,8 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: npm
@@ -59,3 +60,32 @@ jobs:
           p.stdin.write(JSON.stringify(req) + '\n');
           setTimeout(() => { console.error('Timed out waiting for initialize response'); p.kill(); process.exit(1); }, 15000);
           "
+
+  smoke-docker:
+    name: Docker Compose MCP smoke test
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build, start, and exercise Compose service
+        shell: bash
+        run: |
+          BRANDKIT_AUTH_TOKEN="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")"
+          echo "::add-mask::$BRANDKIT_AUTH_TOKEN"
+          export BRANDKIT_AUTH_TOKEN
+          cleanup() {
+            docker compose down --volumes --remove-orphans
+          }
+          trap cleanup EXIT
+          docker compose config --quiet
+          docker compose build
+          if ! docker compose up --detach --wait --wait-timeout 60; then
+            docker compose logs --no-color
+            exit 1
+          fi
+          npm run test:docker-smoke

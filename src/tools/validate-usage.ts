@@ -44,7 +44,7 @@ export function handler(
   const violations: Violation[] = [];
 
   // Collect canonical color values from v2 tokens
-  const colorTokens = index.base.tokens.filter((t) => t.type === 'color');
+  const colorTokens = index.contexts.base.tokens.filter((t) => t.type === 'color');
   const knownColorValues = new Set(colorTokens.map((t) => t.value.toLowerCase()));
 
   // Rule 1: flag literal hex colors that do not correspond to a known canonical token value.
@@ -66,7 +66,7 @@ export function handler(
 
   // Rule 2: HTML data-component values reference known components (HTML mode only)
   if (args.format === 'html') {
-    const knownComponents = new Set(index.base.components.map((c) => c.name.toLowerCase()));
+    const knownComponents = new Set(index.contexts.base.components.map((c) => c.name.toLowerCase()));
     const dataRe = /data-component=["']([^"']+)["']/g;
     for (const m of args.snippet.matchAll(dataRe)) {
       if (!knownComponents.has(m[1].toLowerCase())) {
@@ -75,7 +75,7 @@ export function handler(
     }
   }
 
-  if (index.base.tokens.length === 0) warnings.push('No tokens indexed; color validation degraded.');
+  if (index.contexts.base.tokens.length === 0) warnings.push('No tokens indexed; color validation degraded.');
 
   return [
     {

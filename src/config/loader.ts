@@ -9,12 +9,16 @@
  *   4. Resolving relative directory paths to absolute paths
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import yaml from 'js-yaml';
 import { BrandKitConfigSchema, BrandkitV1ConfigError, type BrandKitConfig } from '../types/config.js';
 import { DEFAULT_CONFIG_FILENAMES } from './defaults.js';
+import { loadSafeYaml } from '../parsers/safe-yaml.js';
+import {
+  safeReadRegularFile,
+  type RegularFileIdentity,
+} from '../brand-docs/write.js';
 
 /**
  * Returns the directories that should be searched (in order) when no
@@ -124,9 +128,12 @@ function isV1Config(parsed: Record<string, unknown>): boolean {
 export function loadConfigFromString(yamlText: string, sourcePath: string): BrandKitConfig {
   let parsed: unknown;
   try {
-    parsed = yaml.load(yamlText);
+    parsed = loadSafeYaml(yamlText);
   } catch (err) {
-    throw new Error(`Failed to parse YAML at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(
+      `Failed to parse YAML at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`,
+      { cause: err },
+    );
   }
 
   if (!parsed || typeof parsed !== 'object') {
@@ -171,12 +178,16 @@ export function loadConfigFromString(yamlText: string, sourcePath: string): Bran
  * relative paths in the config against the config's directory rather
  * than the current working directory.
  */
-export function loadConfigWithPath(configPath?: string): { config: BrandKitConfig; filePath: string } {
+export function loadConfigWithPath(configPath?: string): {
+  config: BrandKitConfig;
+  filePath: string;
+  fileIdentity: RegularFileIdentity;
+} {
   const filePath = resolveConfigFilePath(configPath);
-  const raw = readFileSync(filePath, 'utf-8');
-  const config = loadConfigFromString(raw, filePath);
+  const { content, identity } = safeReadRegularFile(filePath);
+  const config = loadConfigFromString(content, filePath);
 
-  return { config, filePath };
+  return { config, filePath, fileIdentity: identity };
 }
 
 function resolveConfigFilePath(configPath?: string): string {

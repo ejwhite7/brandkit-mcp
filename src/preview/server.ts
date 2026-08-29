@@ -14,6 +14,11 @@ import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandKitConfig } from '../types/config.js';
 import type { BrandContext } from '../types/design-system.js';
 import { handler as searchBrandHandler } from '../tools/search-brand.js';
+import {
+  createNetworkRequestPolicy,
+  getDistinctRequestHeader,
+  isLoopbackHost,
+} from '../network.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,7 +28,21 @@ export interface IndexRef {
   current: DesignSystemIndex;
 }
 
+export interface PreviewServerOptions {
+  host?: string;
+  port?: number;
+}
+
 const CONTEXTS = ['base', 'web', 'product'] as const;
+
+/** Preview is a local development surface and must never bind beyond loopback. */
+export function assertPreviewLoopbackHost(host: string): void {
+  if (!isLoopbackHost(host)) {
+    throw new Error(
+      'Preview only supports loopback hosts; use 127.0.0.1, localhost, or ::1',
+    );
+  }
+}
 
 /** Coerce a ?context= query value to a valid BrandContext (default base). */
 function pickContext(value: unknown): BrandContext {
@@ -75,7 +94,12 @@ function resolvePreviewDirs(): { templatesDir: string; staticDir: string } {
 export function createPreviewServer(
   indexOrRef: DesignSystemIndex | IndexRef,
   config: BrandKitConfig,
+  options: PreviewServerOptions = {},
 ): express.Application {
+  const host = options.host ?? config.preview.host;
+  const port = options.port ?? config.preview.port;
+  assertPreviewLoopbackHost(host);
+  const requestPolicy = createNetworkRequestPolicy(host, port);
   const app = express();
 
   // Normalise to a ref object so route handlers always read the latest index
@@ -84,6 +108,19 @@ export function createPreviewServer(
     : { current: indexOrRef };
 
   const { templatesDir, staticDir } = resolvePreviewDirs();
+
+  // Validate authority before every route, including static assets. This
+  // prevents a browser on the local machine from being used for DNS rebinding.
+  app.use((req, res, next) => {
+    if (!requestPolicy.validate(
+      getDistinctRequestHeader(req, 'host'),
+      getDistinctRequestHeader(req, 'origin'),
+    )) {
+      res.status(403).type('text/plain').send('Forbidden');
+      return;
+    }
+    next();
+  });
 
   // Serve static files
   app.use('/static', express.static(staticDir));
@@ -167,15 +204,14 @@ export function createPreviewServer(
   app.get('/assets', (req, res) => {
     const ctx = pickContext(req.query.context);
     const index = ref.current;
-    // Override layer falls through to base when empty (same rule as get_assets).
-    const assets = index[ctx].assets.length ? index[ctx].assets : index.base.assets;
+    const assets = index.contexts[ctx].assets;
     res.send(renderPage('assets', { title: 'Assets', ctx, assets }));
   });
 
   app.get('/fonts', (req, res) => {
     const ctx = pickContext(req.query.context);
     const index = ref.current;
-    const fonts = index[ctx].fonts.length ? index[ctx].fonts : index.base.fonts;
+    const fonts = index.contexts[ctx].fonts;
     res.send(renderPage('fonts', { title: 'Fonts', ctx, fonts }));
   });
 
@@ -185,7 +221,7 @@ export function createPreviewServer(
     res.send(renderPage('motion', {
       title: 'Motion',
       ctx,
-      motion: index[ctx].motion ?? index.base.motion,
+      motion: index.contexts[ctx].motion,
     }));
   });
 
@@ -199,9 +235,8 @@ export function createPreviewServer(
     res.send(renderPage('css', {
       title: 'CSS',
       ctx,
-      colorsAndTypeCss:
-        index[ctx].colorsAndType?.rawContent ?? index.base.colorsAndType?.rawContent ?? '',
-      motionCss: index[ctx].motion?.css ?? index.base.motion?.css ?? '',
+      colorsAndTypeCss: index.contexts[ctx].colorsAndType?.rawContent ?? '',
+      motionCss: index.contexts[ctx].motion?.css ?? '',
     }));
   });
 
