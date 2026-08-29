@@ -1,0 +1,174 @@
+{
+  "project": "BrandKit MCP production remediation",
+  "branchName": "tidebreak/calm-pine",
+  "completionSignal": "<promise>PRODUCTION_COMPLETE</promise>",
+  "globalChecks": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build",
+    "git diff --check"
+  ],
+  "stories": [
+    {
+      "id": "BASE-001",
+      "priority": 0,
+      "title": "Capture reproducible baseline",
+      "dependencies": [],
+      "acceptance": ["Clean install succeeds", "Baseline quality and audit results are recorded", "All review findings are represented as stories"],
+      "passes": true
+    },
+    {
+      "id": "BASE-002",
+      "priority": 0,
+      "title": "Stop masking build failures",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["tsup failure makes npm run build fail", "optional chmod failure remains non-fatal", "build regression test passes"],
+      "passes": false
+    },
+    {
+      "id": "SEC-001",
+      "priority": 0,
+      "title": "Enforce loopback defaults and honor configured hosts",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["HTTP SSE preview and standalone bind to loopback by default", "server.host and preview.host are honored", "stdio remains compatible"],
+      "passes": false
+    },
+    {
+      "id": "SEC-002",
+      "priority": 0,
+      "title": "Authenticate non-loopback network transports",
+      "dependencies": ["SEC-001"],
+      "acceptance": ["non-loopback mode requires a bearer token", "missing or invalid authentication returns 401", "credentials are not logged"],
+      "passes": false
+    },
+    {
+      "id": "SEC-003",
+      "priority": 0,
+      "title": "Enable Host Origin and DNS rebinding protection",
+      "dependencies": ["SEC-001"],
+      "acceptance": ["invalid Host and Origin return 403", "all network transports use equivalent protection", "regression tests cover hostile headers"],
+      "passes": false
+    },
+    {
+      "id": "SEC-004",
+      "priority": 0,
+      "title": "Gate write-capable tools on network transports",
+      "dependencies": ["SEC-002"],
+      "acceptance": ["sync_brand_docs is hidden on network transports by default", "explicit privileged mode is required", "stdio write workflow remains available"],
+      "passes": false
+    },
+    {
+      "id": "HTTP-001",
+      "priority": 0,
+      "title": "Use a fresh stateless Streamable HTTP transport per request",
+      "dependencies": ["SEC-002"],
+      "acceptance": ["initialize followed by multiple requests succeeds", "concurrent clients do not share transport state", "transports close after requests"],
+      "passes": false
+    },
+    {
+      "id": "HTTP-002",
+      "priority": 1,
+      "title": "Normalize HTTP errors health checks and resource limits",
+      "dependencies": ["HTTP-001"],
+      "acceptance": ["errors never leave requests hanging", "health reports readiness without brand data", "request and session resources are bounded"],
+      "passes": false
+    },
+    {
+      "id": "FS-001",
+      "priority": 0,
+      "title": "Contain every brand file read within the brand root",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["all fixed and discovered reads share one containment policy", "outside-root symlinks are rejected", "symlink escape tests pass"],
+      "passes": false
+    },
+    {
+      "id": "FS-002",
+      "priority": 1,
+      "title": "Prevent scanner symlink cycles and correct ignore semantics",
+      "dependencies": ["FS-001"],
+      "acceptance": ["cycles cannot hang or crash scans", "ignore paths are brand-root relative", "directory boundaries are respected"],
+      "passes": false
+    },
+    {
+      "id": "FS-003",
+      "priority": 0,
+      "title": "Make generated writes atomic and symlink-safe",
+      "dependencies": ["FS-001"],
+      "acceptance": ["output symlinks and non-regular files are rejected", "writes use same-directory temporary files and atomic rename", "magic_trick cannot be changed indirectly"],
+      "passes": false
+    },
+    {
+      "id": "FS-004",
+      "priority": 1,
+      "title": "Harden generated document delimiters",
+      "dependencies": ["FS-003"],
+      "acceptance": ["source content cannot inject delimiters", "ambiguous markers fail safely", "repeated generation is idempotent"],
+      "passes": false
+    },
+    {
+      "id": "CTX-001",
+      "priority": 0,
+      "title": "Create and consume canonical merged contexts",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["partial overrides preserve unrelated base items", "tools preview search and diffs use equivalent resolved data", "all mergeable asset types have regression tests"],
+      "passes": false
+    },
+    {
+      "id": "DEP-001",
+      "priority": 1,
+      "title": "Remove dead runtime dependencies and parsers",
+      "dependencies": ["BASE-001"],
+      "acceptance": ["every production dependency has a reachable use", "public behavior remains compatible", "package size and install remain healthy"],
+      "passes": false
+    },
+    {
+      "id": "DEP-002",
+      "priority": 0,
+      "title": "Upgrade vulnerable dependencies and add audit gates",
+      "dependencies": ["DEP-001", "HTTP-001"],
+      "acceptance": ["no unreviewed critical or high production advisory remains", "test tooling is patched", "CI audits production dependencies"],
+      "passes": false
+    },
+    {
+      "id": "DOCKER-001",
+      "priority": 0,
+      "title": "Make Docker Compose healthy and MCP-capable",
+      "dependencies": ["HTTP-002", "SEC-004"],
+      "acceptance": ["Compose explicitly runs a supported transport", "health becomes ready", "container MCP handshake passes in CI"],
+      "passes": false
+    },
+    {
+      "id": "VERCEL-001",
+      "priority": 1,
+      "title": "Implement a production Vercel Streamable HTTP entry point or remove support claims",
+      "dependencies": ["HTTP-001", "SEC-002"],
+      "acceptance": ["default handler exists", "cold start authentication initialize and tool call pass", "otherwise Vercel configuration and claims are removed"],
+      "passes": false
+    },
+    {
+      "id": "CLOUDFLARE-001",
+      "priority": 1,
+      "title": "Implement Cloudflare MCP or remove the broken adapter",
+      "dependencies": ["SEC-002"],
+      "acceptance": ["advertised endpoints do not return 404", "Worker handshake passes or all Cloudflare support claims are removed"],
+      "passes": false
+    },
+    {
+      "id": "QA-001",
+      "priority": 0,
+      "title": "Complete two clean adversarial discovery passes",
+      "dependencies": ["BASE-002", "SEC-003", "SEC-004", "HTTP-002", "FS-002", "FS-004", "CTX-001", "DEP-002", "DOCKER-001", "VERCEL-001", "CLOUDFLARE-001"],
+      "acceptance": ["two consecutive passes find no new actionable issue", "all discovered issues become failing stories", "no known actionable bug remains open"],
+      "passes": false
+    },
+    {
+      "id": "RELEASE-001",
+      "priority": 0,
+      "title": "Clean-room production certification",
+      "dependencies": ["QA-001"],
+      "acceptance": ["clean checkout install and complete gates pass", "all advertised transports complete an MCP handshake", "rollback is documented", "human approves release"],
+      "passes": false
+    }
+  ]
+}
