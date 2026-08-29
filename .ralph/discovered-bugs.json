@@ -30,10 +30,11 @@
     {
       "id": "INIT-001",
       "severity": "high",
-      "status": "open",
+      "status": "resolved",
       "title": "init overwrites existing or symlinked configuration",
       "evidence": "src/cli/commands/init.ts checks only the brand directory then unconditionally writes brandkit.config.yaml.",
-      "story": "INIT-001"
+      "story": "INIT-001",
+      "resolution": "Init now preflights both destinations, rejects unsafe entries, stages all content, and atomically commits or rolls back the config and brand pair."
     },
     {
       "id": "HTTP-003",

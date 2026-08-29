@@ -353,3 +353,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores confirmed unauthenticated brand disclosure.
 - Commit: Pending at time of entry.
 - Next eligible story: INIT-001.
+
+## 2026-08-29 02:37 EDT — INIT-001
+
+- Objective: Make project initialization non-destructive for existing and redirected destinations.
+- Defect reproduced: `init` checked only `brand_atomic_system/`, then unconditionally wrote `brandkit.config.yaml`; a config-only project was overwritten and a config symlink redirected the write outside the target.
+- Changes: Preflight target, brand, and config identities before mutation; require explicit `--force` for either safe existing destination; reject symlink, hard-linked config, non-regular config, and unsafe brand targets; validate bundled template entries with no-follow identity checks; stage the full scaffold; commit brand/config through same-directory rename backups with rollback; use the shared atomic writer for config bytes.
+- Files changed: `README.md`, `src/cli/commands/init.ts`, `src/cli/index.ts`, and `src/tests/init-safety.test.ts`.
+- Tests added: Existing config-only and brand-only conflicts; external config symlink preservation; hard-link preservation; non-regular config; brand symlink; fresh init; clean force replacement; deterministic fourth-rename failure after both originals are backed up, proving byte-identical rollback and no temp/backup artifacts.
+- Verification commands: Focused 16-test init/CLI matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 39 files / 307 tests pass; typecheck, lint, build/DTS, rollback injection, and diff check pass.
+- Security review: Final destination symlinks are never followed; hard-linked config and special files are refused; template source opens use no-follow and inode revalidation.
+- Compatibility review: Fresh init output and brand-name YAML quoting remain compatible; `--force` now has explicit safe replacement semantics and the Commander-facing function signature remains two arguments.
+- Rollback: Revert this story commit; that restores destructive config writes and symlink redirection.
+- Commit: Pending at time of entry.
+- Next eligible story: HTTP-003.

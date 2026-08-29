@@ -192,7 +192,7 @@
       "title": "Make init preflight and writes non-destructive",
       "dependencies": ["FS-003"],
       "acceptance": ["existing destinations require explicit force", "symlink hard-link and non-regular targets are rejected", "failed preflight preserves every destination"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "HTTP-003",

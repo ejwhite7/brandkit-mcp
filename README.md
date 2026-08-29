@@ -33,6 +33,11 @@ brandkit-mcp init
 #    }
 ```
 
+`init` refuses to change an existing `brandkit.config.yaml` or
+`brand_atomic_system/` unless `--force` is explicit. Force performs a clean
+replacement only for a regular single-link config and a real directory;
+symbolic links, hard-linked configs, and special-file destinations are rejected.
+
 ## Repository Structure
 
 A brand atomic system lives under a single `<brand-root>/` directory (default: `./brand_atomic_system`):

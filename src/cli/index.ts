@@ -27,7 +27,7 @@ program
   .description('Initialize a new brand directory with starter files and configuration')
   .argument('[directory]', 'Target directory', '.')
   .option('--name <name>', 'Brand name')
-  .option('--force', 'Overwrite existing files')
+  .option('--force', 'Replace an existing regular config and brand directory')
   .action(initCommand);
 
 program
