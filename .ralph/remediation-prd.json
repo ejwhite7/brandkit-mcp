@@ -24,7 +24,7 @@
       "title": "Stop masking build failures",
       "dependencies": ["BASE-001"],
       "acceptance": ["tsup failure makes npm run build fail", "optional chmod failure remains non-fatal", "build regression test passes"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "SEC-001",

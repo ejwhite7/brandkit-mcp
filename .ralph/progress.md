@@ -17,3 +17,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert the baseline-state commit; runtime behavior is unaffected.
 - Commit: Pending at time of entry.
 - Next eligible story: BASE-002.
+
+## 2026-08-28 23:17 EDT — BASE-002
+
+- Objective: Ensure a failed TypeScript bundle makes the build and release pipeline fail.
+- Defect reproduced: The prior `tsup && chmod ... || true` command returned success when `tsup` failed.
+- Changes: Grouped the non-fatal fallback around `chmod` only and added a contract test that executes the actual package build script with controlled fake binaries.
+- Files changed: `package.json`, `src/tests/build-command.test.ts`.
+- Tests added: Build returns the `tsup` failure code and does not run `chmod`; failed optional `chmod` leaves a successful build successful.
+- Verification commands: Focused Vitest file, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `git diff --check`.
+- Verification results: Focused 2 tests pass; full 192 tests pass; typecheck, lint, production build, and diff check pass.
+- Security review: Release automation can no longer publish stale output after a masked bundler failure.
+- Compatibility review: Successful build behavior and optional executable-bit fallback are unchanged.
+- Remaining risks: Network, filesystem, context, dependency, and deployment stories remain open.
+- Rollback: Restore the previous package script and remove the contract test.
+- Commit: Pending at time of entry.
+- Next eligible story: SEC-001.

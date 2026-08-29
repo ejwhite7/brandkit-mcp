@@ -16,7 +16,7 @@
     "server.json"
   ],
   "scripts": {
-    "build": "tsup && chmod +x dist/cli/index.js dist/cli/index.cjs 2>/dev/null || true",
+    "build": "tsup && (chmod +x dist/cli/index.js dist/cli/index.cjs 2>/dev/null || true)",
     "dev": "tsup --watch",
     "start": "node dist/index.js",
     "test": "vitest run",
