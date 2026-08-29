@@ -33,4 +33,14 @@ describe('parseYamlFile', () => {
     expect(data).toBeNull();
     expect(warnings[0]).toMatch(/not.*read|not.*found/i);
   });
+
+  it('retains merge-key behavior on the patched YAML parser', () => {
+    const path = fixture('defaults: &defaults\n  role: viewer\nuser:\n  <<: *defaults\n  name: Ada\n');
+    const { data, warnings } = parseYamlFile(path, new BrandReadPolicy(join(path, '..')));
+    expect(data).toEqual({
+      defaults: { role: 'viewer' },
+      user: { role: 'viewer', name: 'Ada' },
+    });
+    expect(warnings).toEqual([]);
+  });
 });

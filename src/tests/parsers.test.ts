@@ -77,6 +77,22 @@ For secondary actions.
     expect(results[0].category).toBe('button');
     expect(results[0].variants).toContain('Primary');
   });
+
+  it('preserves YAML frontmatter behavior for BOM, CRLF, nested values, and body delimiters', () => {
+    const path = join(TEST_DIR, 'frontmatter-compat.md');
+    writeFileSync(
+      path,
+      '\uFEFF---\r\nname: "Alert: urgent"\r\ncategory: feedback\r\nvariants:\r\n  - Info\r\n  - Warning\r\nmetadata:\r\n  owner: design\r\n---\r\n# Alert\r\n\r\nBody survives.\r\n\r\n---\r\n',
+    );
+
+    const [component] = parseComponentMarkdown(path, 'base', reader);
+    expect(component).toMatchObject({
+      name: 'Alert: urgent',
+      category: 'feedback',
+      variants: ['Info', 'Warning'],
+    });
+    expect(component.description).toContain('Body survives.');
+  });
 });
 
 describe('Font Parser', () => {

@@ -1,13 +1,13 @@
 /**
  * @file markdown-parser.ts
  * @description Parses component specifications and token specimens from markdown.
- * Supports YAML frontmatter via gray-matter.
+ * Supports YAML frontmatter.
  */
 
-import matter from 'gray-matter';
 import { basename, extname } from 'path';
 import type { DesignComponent, BrandContext, TokenSpecimen } from '../types/design-system.js';
 import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
+import { parseFrontmatter } from './frontmatter.js';
 
 /**
  * Parses a markdown file as component documentation.
@@ -25,7 +25,7 @@ export function parseComponentMarkdown(filePath: string, context: BrandContext, 
     return [];
   }
 
-  const { data: frontmatter, content } = matter(raw);
+  const { data: frontmatter, content } = parseFrontmatter(raw);
 
   const name =
     (frontmatter.name as string) ??
@@ -151,7 +151,7 @@ export function parseTokenSpecimen(filePath: string, reader: BrandReadPolicy): T
   } catch {
     return { specimen: null, warnings: [`Could not read ${filePath}`] };
   }
-  const { data, content } = matter(raw);
+  const { data, content } = parseFrontmatter(raw);
   const name = data.name as string | undefined;
   const type = data.type as string | undefined;
   // value may legitimately be falsy (0, false) — check presence, not truthiness.

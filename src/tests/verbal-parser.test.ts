@@ -39,4 +39,11 @@ describe('parseVerbalDoc', () => {
     expect(doc?.frontmatter).toEqual({});
     expect(doc?.body).toContain('Body text survives');
   });
+
+  it('supports the YAML document terminator as a frontmatter boundary', () => {
+    const path = md('---\nowner: design\n...\n# Positioning\n\nBody text survives.\n');
+    const doc = parseVerbalDoc(path, new BrandReadPolicy(join(path, '..')));
+    expect(doc?.frontmatter).toEqual({ owner: 'design' });
+    expect(doc?.body).toContain('Body text survives');
+  });
 });

@@ -3,9 +3,9 @@
  * @description Parses verbal/agent markdown documents with optional YAML frontmatter.
  */
 
-import matter from 'gray-matter';
 import type { VerbalDoc } from '../types/design-system.js';
 import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
+import { parseFrontmatter } from './frontmatter.js';
 
 /**
  * Parse a verbal/agent markdown document with frontmatter support.
@@ -25,8 +25,8 @@ export function parseVerbalDoc(path: string, reader: BrandReadPolicy): VerbalDoc
   let data: Record<string, unknown> = {};
   let content = raw;
   try {
-    const parsed = matter(raw);
-    data = parsed.data as Record<string, unknown>;
+    const parsed = parseFrontmatter(raw);
+    data = parsed.data;
     content = parsed.content;
   } catch {
     // keep defaults: empty frontmatter, full raw body

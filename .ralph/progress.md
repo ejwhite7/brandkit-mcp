@@ -261,3 +261,20 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit and reinstall; that restores unused packages and unshipped parser source only.
 - Commit: Pending at time of entry.
 - Next eligible story: DEP-002.
+
+## 2026-08-29 01:48 EDT — DEP-002
+
+- Objective: Eliminate reachable production and development advisories and make audit failure a release blocker.
+- Defect reproduced: `npm audit --omit=dev` reported 10 production findings (5 high, 4 moderate, 1 low), while the full graph reported 16 (1 critical, 8 high, 6 moderate, 1 low), including YAML complexity, URI/host confusion, Hono/HTTP, body-parser, qs, and test-tool findings.
+- Changes: Upgraded MCP SDK, Express, js-yaml, Vitest/Vite, ESLint, and typescript-eslint; removed `gray-matter` and its stale js-yaml 3 chain in favor of a local conventional frontmatter parser backed by patched js-yaml; pinned patched esbuild through a precise override; migrated to ESLint flat config; enabled newly surfaced lint rules and fixed the two findings; added strict production audits to CI, publish workflow, and `prepublishOnly`.
+- Resolved versions: MCP SDK 1.30.0; Express 4.22.2; js-yaml 4.3.2; Hono 4.13.5; @hono/node-server 2.1.1; fast-uri 3.1.6; express-rate-limit 8.7.0; ip-address 10.7.0; body-parser 1.20.6/2.3.0; qs 6.15.3; brace-expansion 1.1.18/2.1.4; Vitest 4.1.11; Vite 8.2.2; ESLint 10.9.1; esbuild 0.28.1.
+- Files changed: Package manifests/lock, ESLint config, CI/publish workflows, frontmatter/markdown/verbal/config/font parsers, and YAML/frontmatter compatibility tests.
+- Tests added: BOM, CRLF, nested YAML, body delimiter, YAML terminator, scalar normalization, and merge-key compatibility across component, token, verbal, and YAML inputs.
+- Verification commands: Focused 52 tests; `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run prepublishOnly`; production and full audits; `npm ls`; clean `npm ci`; Node 20.20.2 and 22.23.2 tests/import/CLI/lint; pack/empty-consumer install/import/CLI/audit; `git diff --check`.
+- Verification results: Full 37 files / 285 tests pass; all compile/lint/build/pack/consumer gates pass; production audit is 0 and full audit is 0 across all severities.
+- Security review: No advisory is suppressed; the only override pins a patched esbuild version and is covered by build/test gates; config YAML parse errors now retain their original cause.
+- Compatibility review: Conventional `---` frontmatter, `---`/`...` closers, BOM/CRLF, nested YAML, body delimiters, and scalar normalization are covered; contributor lint tooling requires Node 20.19 or newer, while runtime builds and tests pass current Node 20 and 22.
+- Remaining risks: Advertised Vercel and Cloudflare adapter claims remain to be made real or removed.
+- Rollback: Revert this story commit and reinstall; that restores known critical/high advisories and removes audit enforcement.
+- Commit: Pending at time of entry.
+- Next eligible story: VERCEL-001.

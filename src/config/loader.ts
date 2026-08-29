@@ -130,7 +130,10 @@ export function loadConfigFromString(yamlText: string, sourcePath: string): Bran
   try {
     parsed = yaml.load(yamlText);
   } catch (err) {
-    throw new Error(`Failed to parse YAML at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(
+      `Failed to parse YAML at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`,
+      { cause: err },
+    );
   }
 
   if (!parsed || typeof parsed !== 'object') {

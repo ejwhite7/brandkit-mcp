@@ -136,7 +136,7 @@
       "title": "Upgrade vulnerable dependencies and add audit gates",
       "dependencies": ["DEP-001", "HTTP-001"],
       "acceptance": ["no unreviewed critical or high production advisory remains", "test tooling is patched", "CI audits production dependencies"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DOCKER-001",
