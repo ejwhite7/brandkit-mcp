@@ -82,7 +82,7 @@ src/
 ├── context-resolver.ts # base/web/product merge
 ├── formatters/        # token output formatters (css, scss, tailwind, w3c)
 ├── indexer/           # buildIndex + hot-reload
-├── parsers/           # css, font, image, markdown, motion, pdf, verbal, yaml
+├── parsers/           # css, font, markdown, motion, verbal, yaml
 ├── preview/           # local preview HTTP server
 ├── prompts/           # MCP prompt templates
 ├── resources/         # MCP resource handlers (brand:// URIs)

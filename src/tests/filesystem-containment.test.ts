@@ -6,8 +6,6 @@ import { scanBrandRoot } from '../scanner/directory-scanner.js';
 import { buildDesignSystemIndex } from '../indexer/index.js';
 import { BrandKitConfigSchema } from '../types/config.js';
 import { readResource } from '../resources/index.js';
-import { BrandPathError, BrandReadPolicy } from '../filesystem/brand-read-policy.js';
-import { generateBase64DataURI, parseImageFile } from '../parsers/image-parser.js';
 
 const SECRET = 'OUTSIDE_BRAND_SECRET_7d9142';
 const tempBases: string[] = [];
@@ -132,23 +130,6 @@ describe('brand read containment', () => {
     const scan = scanBrandRoot(root);
     expect(scan.magicTrick?.content).toBe('Internal magic');
     expect(scan.base.components.map((component) => component.name)).toContain('Internal Button');
-  });
-
-  it('contains image metadata and resource encoding reads', async () => {
-    const { root, outside } = tempTree();
-    write(join(outside, 'secret.svg'), `<svg width="10" height="10"><text>${SECRET}</text></svg>`);
-    const escaped = join(root, 'secret.svg');
-    symlinkSync(join(outside, 'secret.svg'), escaped);
-    const reader = new BrandReadPolicy(root);
-
-    expect(() => reader.readFile(escaped)).toThrow(BrandPathError);
-    await expect(generateBase64DataURI(escaped, reader)).rejects.toThrow(BrandPathError);
-    expect(await parseImageFile(escaped, reader)).toEqual({
-      filePath: escaped,
-      name: 'secret',
-      format: 'svg',
-      fileSize: 0,
-    });
   });
 
   it('rejects manifest paths that traverse outside the root', () => {

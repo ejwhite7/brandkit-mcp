@@ -244,3 +244,20 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; this restores the prior stdio default and broken Compose health/MCP path.
 - Commit: Pending at time of entry.
 - Next eligible story: DEP-001.
+
+## 2026-08-29 01:40 EDT — DEP-001
+
+- Objective: Remove unreachable runtime packages and parser code while preserving the shipped API and behavior.
+- Defect reproduced: `marked`, `pdf-parse`, `sharp`, `chalk`, and `ora` were production dependencies without a path from either shipped entry point; image/PDF parsers and several legacy CSS/markdown helpers were reachable only from tests and were never exported or bundled.
+- Changes: Removed the five dead runtime packages and orphaned `@types/pdf-parse`; deleted unreachable image/PDF parsers; removed legacy test-only CSS color/type helpers and markdown guideline/palette helpers; updated architecture docs; added an import-graph contract that requires exact direct-dependency parity and reachability for every retained parser.
+- Files changed: `package.json`, `package-lock.json`, `CLAUDE.md`, parser modules, parser/containment tests, and `src/tests/dependency-reachability.test.ts`.
+- Tests added: Static and dynamic import tracing from both shipped entry points; exact runtime dependency parity; every parser module must have a production path.
+- Verification commands: Focused 47-test compatibility and 2-test reachability checks, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm ls --omit=dev --all`, clean copied-tree `npm ci` plus all gates, tarball dry run and empty-consumer install/import/CLI smoke, and `git diff --check`.
+- Verification results: Full 37 files / 282 tests pass; typecheck, lint, build/DTS, production tree, clean install, consumer import, CLI version/help, and diff check pass. Published runtime exports remain `startServer` and `allowWriteToolsForTransport`.
+- Package impact: Direct production dependencies 14 to 9; unique production tree names 183 to 135; installed tree 172,712 to 125,340 KiB; packed size 323,709 to 317,469 bytes (-1.93%); unpacked size 1,359,635 to 1,332,713 bytes (-1.98%).
+- Security review: Removes the vulnerable and native Sharp/libvips surface and unused PDF parser; no replacement parser or new input path was added.
+- Compatibility review: Deleted source helpers were absent from package exports, declarations, and tarballs; canonical color/type extraction remains in the context resolver; supported scanner/tool behavior is unchanged.
+- Remaining risks: Reachable dependency advisories and CI audit enforcement remain in DEP-002.
+- Rollback: Revert this story commit and reinstall; that restores unused packages and unshipped parser source only.
+- Commit: Pending at time of entry.
+- Next eligible story: DEP-002.
