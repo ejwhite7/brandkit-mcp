@@ -176,7 +176,7 @@
       "title": "Isolate mutable indexes per server instance",
       "dependencies": ["HTTP-001"],
       "acceptance": ["concurrent servers never share brand indexes", "watcher updates remain instance-local", "two-live-server isolation regression passes"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "PREVIEW-001",

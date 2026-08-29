@@ -14,7 +14,6 @@ import { loadConfigWithPath, resolveConfigPaths } from './config/loader.js';
 import { buildDesignSystemIndex } from './indexer/index.js';
 import { registerAllTools } from './tools/index.js';
 import { watchBrandDirectory } from './indexer/hot-reload.js';
-import type { DesignSystemIndex } from './indexer/types.js';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getPackageVersion } from './version.js';
@@ -32,9 +31,6 @@ import {
   resolveNetworkLimits,
   withRequestTimeout,
 } from './network.js';
-
-/** Current design system index -- updated on hot-reload. */
-let currentIndex: DesignSystemIndex;
 
 export type Transport = 'stdio' | 'sse' | 'http';
 
@@ -81,15 +77,18 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
 
   console.error('[brandkit-mcp] Building design system index...');
   const startTime = Date.now();
-  currentIndex = await buildDesignSystemIndex(config);
+  // Keep mutable hot-reload state local to this invocation. A process may host
+  // multiple BrandKit servers, and every transport/session factory below must
+  // continue to resolve the index owned by the server that created it.
+  const indexRef = { current: await buildDesignSystemIndex(config) };
   const elapsed = Date.now() - startTime;
-  console.error(`[brandkit-mcp] Indexed ${currentIndex.contexts.base.tokens.length + currentIndex.contexts.base.components.length + currentIndex.contexts.base.assets.length} assets in ${elapsed}ms`);
+  console.error(`[brandkit-mcp] Indexed ${indexRef.current.contexts.base.tokens.length + indexRef.current.contexts.base.components.length + indexRef.current.contexts.base.assets.length} assets in ${elapsed}ms`);
 
   // Regenerate the DESIGN.md / PRODUCT.md reference files for non-MCP coding
   // agents. Written next to brandkit.config.yaml. The MCP never reads these
   // files back as input. Never blocks startup.
   try {
-    const result = regenerateBrandDocsIfReady(currentIndex, config.brief, configDir);
+    const result = regenerateBrandDocsIfReady(indexRef.current, config.brief, configDir);
     if (result.written) {
       console.error('[brandkit-mcp] Regenerated DESIGN.md and PRODUCT.md');
     } else {
@@ -112,7 +111,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
 
     registerAllTools(
       server,
-      () => currentIndex,
+      () => indexRef.current,
       syncContext,
       { allowWriteTools },
     );
@@ -122,7 +121,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   if (options.watch) {
     console.error('[brandkit-mcp] File watching enabled');
     const stopWatcher = watchBrandDirectory(config, (newIndex) => {
-      currentIndex = newIndex;
+      indexRef.current = newIndex;
       console.error(`[brandkit-mcp] Index updated: ${newIndex.contexts.base.tokens.length + newIndex.contexts.base.components.length + newIndex.contexts.base.assets.length} assets`);
     });
     // Close the watcher on shutdown so the process can exit cleanly.

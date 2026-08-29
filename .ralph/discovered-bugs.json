@@ -12,10 +12,11 @@
     {
       "id": "STATE-001",
       "severity": "high",
-      "status": "open",
+      "status": "resolved",
       "title": "Process-global index leaks brand data across server instances",
       "evidence": "src/index.ts stores currentIndex at module scope; starting server B overwrites the index read by live server A and its tools.",
-      "story": "STATE-001"
+      "story": "STATE-001",
+      "resolution": "Every startServer invocation now owns a captured mutable index reference; concurrent-server and watcher-isolation regressions pass."
     },
     {
       "id": "PREVIEW-001",

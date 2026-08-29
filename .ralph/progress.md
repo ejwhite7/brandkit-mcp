@@ -321,3 +321,19 @@ criteria and the global regression gate have objective evidence here.
 - Baseline evidence: `npm run typecheck`, `npm run lint`, 37 files / 287 tests, `npm run build`, production/full audits with zero vulnerabilities, and `git diff --check` all pass, demonstrating the findings are gaps not caught by existing gates.
 - Ralph action: Added eleven open entries to `discovered-bugs.json`, eleven failing remediation stories, and made all eleven dependencies of QA-001. No severity or acceptance criterion was weakened.
 - Next eligible story: STATE-001.
+
+## 2026-08-29 02:24 EDT — STATE-001
+
+- Objective: Prevent concurrent programmatic servers from sharing or overwriting mutable brand index state.
+- Defect reproduced: A module-global `currentIndex` meant starting a second server changed the brand returned by tools on the already-running first server; watcher callbacks also wrote the same shared slot.
+- Changes: Replaced global state with a per-`startServer()` mutable `indexRef` captured by that invocation's MCP factories, transports, and watcher callback.
+- Files changed: `src/index.ts` and `src/tests/server-state-isolation.test.ts`.
+- Tests added: Two live HTTP/MCP servers retain distinct Alpha/Beta brands; a mocked watcher update changes only its owning Alpha server while Beta remains unchanged.
+- Verification commands: Focused isolation/network/HTTP matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused 24 tests pass; full 38 files / 289 tests pass; typecheck, lint, build/DTS, and diff check pass.
+- Security review: No process-global brand data remains in the main server entry point; each tool callback resolves only its server-owned index.
+- Compatibility review: Stdio, SSE, HTTP, sync context, and hot reload interfaces are unchanged.
+- Remaining risks: Watcher process-signal lifecycle is unchanged and will be re-examined by the clean adversarial passes after all recorded fixes.
+- Rollback: Revert this story commit; that would restore confirmed cross-server data disclosure.
+- Commit: Pending at time of entry.
+- Next eligible story: PREVIEW-001.
