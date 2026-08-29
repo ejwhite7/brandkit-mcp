@@ -195,3 +195,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; config symlink protection and startup identity binding would be removed.
 - Commit: Pending at time of entry.
 - Next eligible story: FS-004.
+
+## 2026-08-29 01:06 EDT — FS-004
+
+- Objective: Make managed generated blocks unambiguous and repeatable under hostile content.
+- Defect reproduced: Brand and brief text could inject an end marker, causing later runs to replace only a prefix and leave stale generated content outside the managed block.
+- Changes: Reject reserved markers in generated blocks; accept existing files only with zero markers or exactly one ordered pair; reject mismatched, reversed, duplicate, nested, and multiple pairs before staging; preflight both brand docs; preserve zero-marker human bytes without `trimEnd` mutation.
+- Files changed: `src/brand-docs/write.ts`, `src/tests/brand-docs.test.ts`.
+- Tests added: Every brief field, representative verbal/audience/color/font/component/motion atoms, all five generated filenames, malformed topology table, two-file preflight, no-temp guarantees, trailing whitespace, and three-run byte idempotence.
+- Verification commands: Focused 65 tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 279 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Reserved source text cannot become structural control markers; ambiguous existing files remain byte-for-byte unchanged.
+- Compatibility review: Valid single managed blocks update normally, human prefixes/suffixes are preserved exactly, and caller-facing output path spelling remains stable.
+- Remaining risks: Context tools still need canonical merged-data consumption in CTX-001.
+- Rollback: Revert this story commit; injected or ambiguous delimiters would again be interpreted heuristically.
+- Commit: Pending at time of entry.
+- Next eligible story: CTX-001.

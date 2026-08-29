@@ -241,19 +241,61 @@ export function atomicWriteFile(
 }
 
 function renderDelimitedFile(existing: string | undefined, generatedBlock: string): string {
+  assertGeneratedBlockHasNoDelimiters(generatedBlock);
   const wrappedBlock = `${DELIMITER_START}\n${generatedBlock}\n${DELIMITER_END}`;
   if (existing === undefined) return wrappedBlock + '\n';
 
-  const startIdx = existing.indexOf(DELIMITER_START);
-  const endIdx = existing.indexOf(DELIMITER_END);
-  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+  const { startIdx, endIdx } = parseExistingDelimiters(existing);
+  if (startIdx !== undefined && endIdx !== undefined) {
     return (
       existing.slice(0, startIdx) +
       wrappedBlock +
       existing.slice(endIdx + DELIMITER_END.length)
     );
   }
-  return existing.trimEnd() + '\n\n' + wrappedBlock + '\n';
+  if (existing.length === 0) return wrappedBlock + '\n';
+  const separator = existing.endsWith('\n\n') ? '' : existing.endsWith('\n') ? '\n' : '\n\n';
+  return existing + separator + wrappedBlock + '\n';
+}
+
+function delimiterOffsets(content: string, delimiter: string): number[] {
+  const offsets: number[] = [];
+  let offset = 0;
+  while (offset <= content.length - delimiter.length) {
+    const found = content.indexOf(delimiter, offset);
+    if (found === -1) break;
+    offsets.push(found);
+    offset = found + delimiter.length;
+  }
+  return offsets;
+}
+
+function assertGeneratedBlockHasNoDelimiters(generatedBlock: string): void {
+  if (generatedBlock.includes(DELIMITER_START) || generatedBlock.includes(DELIMITER_END)) {
+    throw new GeneratedWriteError('Generated content contains a reserved brandkit-mcp delimiter');
+  }
+}
+
+/**
+ * Existing content is unambiguous only when it contains no reserved markers,
+ * or exactly one well-ordered start/end pair. Duplicate markers also cover
+ * nested pairs and are intentionally rejected rather than guessed at.
+ */
+function parseExistingDelimiters(existing: string): {
+  startIdx: number | undefined;
+  endIdx: number | undefined;
+} {
+  const starts = delimiterOffsets(existing, DELIMITER_START);
+  const ends = delimiterOffsets(existing, DELIMITER_END);
+  if (starts.length === 0 && ends.length === 0) {
+    return { startIdx: undefined, endIdx: undefined };
+  }
+  if (starts.length !== 1 || ends.length !== 1 || starts[0] >= ends[0]) {
+    throw new GeneratedWriteError(
+      'Existing file has ambiguous brandkit-mcp delimiters; expected exactly one well-ordered pair',
+    );
+  }
+  return { startIdx: starts[0], endIdx: ends[0] };
 }
 
 /** Write a generated block while preserving content outside the delimiters. */
@@ -290,23 +332,32 @@ export function writeBrandDocs(
     { targetPath: join(directory.path, 'DESIGN.md'), block: docs.design },
     { targetPath: join(directory.path, 'PRODUCT.md'), block: docs.product },
   ];
+  const plans: Array<{ targetPath: string; content: string; existing: Stats | undefined }> = [];
   const prepared: PreparedWrite[] = [];
   try {
-    // Stage both files first. Known unsafe destinations therefore fail before
-    // either document is committed.
+    // Validate both destinations and both delimiter topologies before staging
+    // either file. A malformed pair therefore leaves no temporary output.
     for (const spec of specs) {
       if (!isWithin(directory.path, spec.targetPath)) {
         throw new GeneratedWriteError('Generated output is outside the output directory');
       }
       const existing = inspectTarget(spec.targetPath);
       const existingText = existing ? readExistingFile(spec.targetPath, existing) : undefined;
+      plans.push({
+        targetPath: spec.targetPath,
+        content: renderDelimitedFile(existingText, spec.block),
+        existing,
+      });
+    }
+
+    for (const plan of plans) {
       prepared.push(
         prepareAtomicWrite(
           directory.path,
           directory.identity,
-          spec.targetPath,
-          renderDelimitedFile(existingText, spec.block),
-          existing,
+          plan.targetPath,
+          plan.content,
+          plan.existing,
         ),
       );
     }

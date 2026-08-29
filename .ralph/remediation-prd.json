@@ -112,7 +112,7 @@
       "title": "Harden generated document delimiters",
       "dependencies": ["FS-003"],
       "acceptance": ["source content cannot inject delimiters", "ambiguous markers fail safely", "repeated generation is idempotent"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "CTX-001",

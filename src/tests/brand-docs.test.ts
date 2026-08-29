@@ -119,6 +119,60 @@ describe('updateFileWithDelimiters', () => {
     expect(text).toContain('GENERATED');
   });
 
+  it.each([
+    ['no final newline', 'USER CONTENT   '],
+    ['one final newline', 'USER CONTENT   \n'],
+    ['multiple final newlines', 'USER CONTENT   \n\n\n'],
+  ])('preserves zero-marker human bytes when appending after %s', (_name, humanContent) => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+    const file = join(dir, 'DESIGN.md');
+    writeFileSync(file, humanContent, 'utf-8');
+
+    updateFileWithDelimiters(file, 'GENERATED');
+
+    expect(readFileSync(file, 'utf-8').slice(0, humanContent.length)).toBe(humanContent);
+  });
+
+  it.each([
+    ['missing end', `${DELIMITER_START}\nmanaged`],
+    ['missing start', `managed\n${DELIMITER_END}`],
+    ['reversed', `${DELIMITER_END}\nmanaged\n${DELIMITER_START}`],
+    ['duplicate start', `${DELIMITER_START}\n${DELIMITER_START}\n${DELIMITER_END}`],
+    ['duplicate end', `${DELIMITER_START}\n${DELIMITER_END}\n${DELIMITER_END}`],
+    [
+      'nested pairs',
+      `${DELIMITER_START}\n${DELIMITER_START}\nmanaged\n${DELIMITER_END}\n${DELIMITER_END}`,
+    ],
+    [
+      'multiple pairs',
+      `${DELIMITER_START}\none\n${DELIMITER_END}\n${DELIMITER_START}\ntwo\n${DELIMITER_END}`,
+    ],
+  ])('rejects %s marker topology without changing the file', (_name, original) => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+    const file = join(dir, 'DESIGN.md');
+    writeFileSync(file, original, 'utf-8');
+
+    expect(() => updateFileWithDelimiters(file, 'GENERATED')).toThrow(
+      /ambiguous brandkit-mcp delimiters/,
+    );
+    expect(readFileSync(file, 'utf-8')).toBe(original);
+    expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it.each(['CLAUDE.md', 'AGENTS.md', 'SKILLS.md', 'DESIGN.md', 'PRODUCT.md'])(
+    'rejects reserved delimiters in generated content for %s before creating output',
+    (filename) => {
+      const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+      const file = join(dir, filename);
+
+      expect(() => updateFileWithDelimiters(file, `source ${DELIMITER_START} injection`)).toThrow(
+        /Generated content contains a reserved brandkit-mcp delimiter/,
+      );
+      expect(existsSync(file)).toBe(false);
+      expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+    },
+  );
+
   it('atomically replaces regular files while preserving their permissions', () => {
     const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
     const file = join(dir, 'DESIGN.md');
@@ -211,6 +265,23 @@ describe('writeBrandDocs', () => {
     expect(readFileSync(magic, 'utf-8')).toBe('ORIGINAL MAGIC\n');
     expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });
+
+  it('preflights both delimiter topologies before staging either output', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-'));
+    const designPath = join(dir, 'DESIGN.md');
+    const productPath = join(dir, 'PRODUCT.md');
+    const originalDesign = 'ORIGINAL DESIGN\n';
+    const originalProduct = `${DELIMITER_START}\nBROKEN\n${DELIMITER_START}\n${DELIMITER_END}\n`;
+    writeFileSync(designPath, originalDesign);
+    writeFileSync(productPath, originalProduct);
+
+    expect(() => writeBrandDocs(dir, { design: 'NEW DESIGN', product: 'NEW PRODUCT' })).toThrow(
+      /ambiguous brandkit-mcp delimiters/,
+    );
+    expect(readFileSync(designPath, 'utf-8')).toBe(originalDesign);
+    expect(readFileSync(productPath, 'utf-8')).toBe(originalProduct);
+    expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+  });
 });
 
 describe('generateBrandDocs', () => {
@@ -246,6 +317,78 @@ describe('generateBrandDocs', () => {
     expect(product).toContain('Product Brief');
     expect(design).toContain('Design Brief');
     expect(product).toContain('Not defined in the brand atomic system');
+  });
+
+  it.each(['audience', 'voice_words', 'visual_references', 'anti_references'] as const)(
+    'rejects a delimiter injected through brief.%s before writing either document',
+    (field) => {
+      const dir = mkdtempSync(join(tmpdir(), 'bk-generated-injection-'));
+      const injectedBrief = { ...brief, [field]: `authored ${DELIMITER_START} text` };
+      const docs = generateBrandDocs(buildFixtureIndex('v2/full'), injectedBrief);
+
+      expect(() => writeBrandDocs(dir, docs)).toThrow(/Generated content contains a reserved/);
+      expect(existsSync(join(dir, 'DESIGN.md'))).toBe(false);
+      expect(existsSync(join(dir, 'PRODUCT.md'))).toBe(false);
+      expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+    },
+  );
+
+  it.each([
+    [
+      'brand name',
+      (index: ReturnType<typeof buildFixtureIndex>) => {
+        index.brandName = DELIMITER_END;
+      },
+    ],
+    [
+      'verbal body',
+      (index: ReturnType<typeof buildFixtureIndex>) => {
+        if (index.verbal.positioning) index.verbal.positioning.body = DELIMITER_START;
+      },
+    ],
+    [
+      'audience data',
+      (index: ReturnType<typeof buildFixtureIndex>) => {
+        if (index.verbal.audience) index.verbal.audience.data = { injected: DELIMITER_END };
+      },
+    ],
+    [
+      'color token value',
+      (index: ReturnType<typeof buildFixtureIndex>) => {
+        if (index.base.colorsAndType) {
+          index.base.colorsAndType.customProperties['--injected'] = DELIMITER_START;
+        }
+      },
+    ],
+    [
+      'font family',
+      (index: ReturnType<typeof buildFixtureIndex>) => {
+        index.base.fonts[0].family = DELIMITER_END;
+      },
+    ],
+    [
+      'component description',
+      (index: ReturnType<typeof buildFixtureIndex>) => {
+        index.base.components[0].description = DELIMITER_START;
+      },
+    ],
+    [
+      'motion token name',
+      (index: ReturnType<typeof buildFixtureIndex>) => {
+        if (index.base.motion) index.base.motion.tokens = { [DELIMITER_END]: 'injected' };
+      },
+    ],
+  ] as const)('rejects a delimiter injected through representative %s source content', (_name, inject) => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-generated-injection-'));
+    const index = buildFixtureIndex('v2/full');
+    inject(index);
+
+    expect(() => writeBrandDocs(dir, generateBrandDocs(index, brief))).toThrow(
+      /Generated content contains a reserved/,
+    );
+    expect(existsSync(join(dir, 'DESIGN.md'))).toBe(false);
+    expect(existsSync(join(dir, 'PRODUCT.md'))).toBe(false);
+    expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });
 });
 
@@ -315,19 +458,23 @@ describe('brand-docs delimiter round-trip', () => {
     anti_references: 'd',
   };
 
-  it('preserves human content outside the block across regenerations', () => {
+  it('is byte-idempotent and preserves human content on both sides across regenerations', () => {
     const dir = mkdtempSync(join(tmpdir(), 'bk-roundtrip-'));
     const index = buildFixtureIndex('v2/full');
     // First generation.
     regenerateBrandDocsIfReady(index, fullBrief, dir);
-    // Human appends content AFTER the generated block.
     const designPath = join(dir, 'DESIGN.md');
-    const withHuman = readFileSync(designPath, 'utf-8') + '\n## Human notes\nkeep me\n';
+    const withHuman =
+      'human prefix with spaces   \n\n' +
+      readFileSync(designPath, 'utf-8') +
+      '\n## Human notes\nkeep me   \n\n';
     writeFileSync(designPath, withHuman, 'utf-8');
-    // Second generation must preserve the human section.
     regenerateBrandDocsIfReady(index, fullBrief, dir);
-    const after = readFileSync(designPath, 'utf-8');
-    expect(after).toContain('## Human notes');
-    expect(after).toContain('keep me');
+    const afterSecondRun = readFileSync(designPath, 'utf-8');
+    expect(afterSecondRun.startsWith('human prefix with spaces   \n\n')).toBe(true);
+    expect(afterSecondRun.endsWith('\n## Human notes\nkeep me   \n\n')).toBe(true);
+
+    regenerateBrandDocsIfReady(index, fullBrief, dir);
+    expect(readFileSync(designPath, 'utf-8')).toBe(afterSecondRun);
   });
 });
