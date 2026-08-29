@@ -224,7 +224,7 @@
       "title": "Prevent prototype pollution in token formatting",
       "dependencies": ["CTX-001"],
       "acceptance": ["reserved token keys cannot mutate prototypes", "valid reserved-looking names have explicit behavior", "hostile token regressions pass"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "SCAN-001",

@@ -415,3 +415,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores unauthenticated mutable release-tool execution.
 - Commit: Pending at time of entry.
 - Next eligible story: FMT-001.
+
+## 2026-08-29 02:55 EDT — FMT-001
+
+- Objective: Preserve arbitrary token names/types without mutating or consulting JavaScript object prototypes.
+- Defect reproduced: Tailwind grouping treated inherited `constructor`/`prototype`/`__proto__` properties as buckets or setters, enabling process-global object mutation and lost output; W3C serialization dropped `__proto__` tokens.
+- Changes: Added a typed null-prototype dictionary helper and used it for both Tailwind type/name buckets and W3C token output; documented reserved-looking strings as valid data.
+- Files changed: `src/formatters/token-formatters.ts` and `src/tests/formatters.test.ts`.
+- Tests added: All three reserved strings as token types and names; constructor-prototype path; exact Object/Object.prototype preservation; deterministic repeated serialization; W3C key preservation; byte-exact normal Tailwind/W3C compatibility.
+- Verification commands: Focused 32-test formatter/visual-tool matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, formatter construction audit, and `git diff --check`.
+- Verification results: Focused tests pass; full 41 files / 337 tests pass; typecheck, lint, build/DTS, audit, and diff check pass.
+- Security review: No keyed formatter output uses an inherited prototype; hostile names remain inert JSON data.
+- Compatibility review: Normal serialized output is byte-for-byte unchanged; previously lost reserved-looking tokens now appear correctly.
+- Rollback: Revert this story commit; that restores prototype pollution and token loss.
+- Commit: Pending at time of entry.
+- Next eligible story: SCAN-001.

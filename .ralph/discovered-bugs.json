@@ -66,10 +66,11 @@
     {
       "id": "FMT-001",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "title": "Token formatting permits prototype pollution",
       "evidence": "src/formatters/token-formatters.ts indexes normal objects with unvalidated token types and names including __proto__.",
-      "story": "FMT-001"
+      "story": "FMT-001",
+      "resolution": "Tailwind and W3C serializers use null-prototype dictionaries, preserving reserved-looking keys as data without inherited setters or properties."
     },
     {
       "id": "SCAN-001",
