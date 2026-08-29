@@ -128,18 +128,28 @@ export function watchBrandDirectory(
     }, DEBOUNCE_MS);
   };
 
-  watcher.on('add', triggerReindex);
-  watcher.on('change', (path) => {
-    // With followSymlinks disabled, Chokidar can still emit a change for the
-    // symlink entry when its outside target changes. The scanner will reject
-    // that target, so such an event must not cause a reload either.
+  const triggerForExistingPath = (path: string) => {
+    // With followSymlinks disabled, Chokidar can still emit add/change events
+    // for a symlink entry or a path reached through one. The scanner rejects
+    // both, so the watcher must not schedule a reload for either event shape.
     try {
       if (lstatSync(path).isSymbolicLink()) return;
+      const resolvedPath = realpathSync.native(path);
+      const resolvedRelative = relative(plan.root, resolvedPath).replace(/\\/g, '/');
+      if (
+        resolvedRelative === '..' ||
+        resolvedRelative.startsWith('../') ||
+        isAbsolute(resolvedRelative)
+      ) return;
     } catch {
       // A concurrent unlink is handled by the unlink event below.
+      return;
     }
     triggerReindex();
-  });
+  };
+
+  watcher.on('add', triggerForExistingPath);
+  watcher.on('change', triggerForExistingPath);
   watcher.on('unlink', triggerReindex);
 
   const stop = async () => {

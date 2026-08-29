@@ -166,6 +166,7 @@ describe('brand directory watcher', () => {
       writeFileSync(join(root, 'magic_trick.md'), 'ignored fixed path\n');
       writeFileSync(join(ignoredDir, 'ignored.md'), '# ignored discovered path\n');
       writeFileSync(join(outside, 'outside.md'), 'outside two\n');
+      symlinkSync(join(outside, 'outside.md'), join(root, 'late-outside-link.md'));
       await sleep(700);
       expect(indexes).toHaveLength(0);
 
