@@ -311,3 +311,13 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Reverting this story would restore a deployment target whose advertised MCP endpoints always return 404 and should not be done without a complete Worker implementation.
 - Commit: Pending at time of entry.
 - Next eligible story: QA-001.
+
+## 2026-08-29 02:10 EDT — QA-001 adversarial pass 1 (failed discovery gate)
+
+- Objective: Complete the first of two consecutive issue-free adversarial production reviews.
+- Result: The pass was not issue-free. QA-001 remains failing and the consecutive-pass counter resets to zero.
+- Confirmed high issues: Process-global index cross-contaminates concurrent servers; preview lacks rebinding/non-loopback disclosure controls; `init` overwrites existing and symlinked config; network `startServer()` resolves before listen succeeds; manual publish version is shell-injectable; release executes a mutable unverified latest publisher binary.
+- Confirmed medium issues: Token formatting permits prototype pollution; ingestion has no size/traversal budget; five-file docs generation can partially commit; hot reload follows symlinks and ignores scanner exclusions; `search_brand` accepts negative/unbounded limits.
+- Baseline evidence: `npm run typecheck`, `npm run lint`, 37 files / 287 tests, `npm run build`, production/full audits with zero vulnerabilities, and `git diff --check` all pass, demonstrating the findings are gaps not caught by existing gates.
+- Ralph action: Added eleven open entries to `discovered-bugs.json`, eleven failing remediation stories, and made all eleven dependencies of QA-001. No severity or acceptance criterion was weakened.
+- Next eligible story: STATE-001.

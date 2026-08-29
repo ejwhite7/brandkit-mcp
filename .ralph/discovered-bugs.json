@@ -8,6 +8,94 @@
       "evidence": "After startup, replacing brandkit.config.yaml with a symlink redirects the tool's direct readFileSync/writeFileSync persistence and can overwrite magic_trick.md or another writable target.",
       "story": "FS-005",
       "resolution": "Config loading and sync persistence now use identity-bound no-follow reads and atomic replacement; protected-target regressions pass."
+    },
+    {
+      "id": "STATE-001",
+      "severity": "high",
+      "status": "open",
+      "title": "Process-global index leaks brand data across server instances",
+      "evidence": "src/index.ts stores currentIndex at module scope; starting server B overwrites the index read by live server A and its tools.",
+      "story": "STATE-001"
+    },
+    {
+      "id": "PREVIEW-001",
+      "severity": "high",
+      "status": "open",
+      "title": "Preview lacks Host Origin and non-loopback authentication protection",
+      "evidence": "src/preview/server.ts exposes brand pages without shared request policy while preview accepts arbitrary bind hosts.",
+      "story": "PREVIEW-001"
+    },
+    {
+      "id": "INIT-001",
+      "severity": "high",
+      "status": "open",
+      "title": "init overwrites existing or symlinked configuration",
+      "evidence": "src/cli/commands/init.ts checks only the brand directory then unconditionally writes brandkit.config.yaml.",
+      "story": "INIT-001"
+    },
+    {
+      "id": "HTTP-003",
+      "severity": "high",
+      "status": "open",
+      "title": "startServer resolves before network listen succeeds",
+      "evidence": "HTTP and SSE branches return immediately after app.listen; occupied ports resolve successfully then emit an uncaught EADDRINUSE.",
+      "story": "HTTP-003"
+    },
+    {
+      "id": "CI-001",
+      "severity": "high",
+      "status": "open",
+      "title": "Manual publish version permits shell injection",
+      "evidence": ".github/workflows/publish.yml interpolates workflow_dispatch version expressions directly into privileged shell scripts.",
+      "story": "CI-001"
+    },
+    {
+      "id": "CI-002",
+      "severity": "high",
+      "status": "open",
+      "title": "Publish executes mutable unverified latest binary",
+      "evidence": ".github/workflows/publish.yml downloads and executes the latest mcp-publisher without a pinned version or integrity check.",
+      "story": "CI-002"
+    },
+    {
+      "id": "FMT-001",
+      "severity": "medium",
+      "status": "open",
+      "title": "Token formatting permits prototype pollution",
+      "evidence": "src/formatters/token-formatters.ts indexes normal objects with unvalidated token types and names including __proto__.",
+      "story": "FMT-001"
+    },
+    {
+      "id": "SCAN-001",
+      "severity": "medium",
+      "status": "open",
+      "title": "Brand ingestion has no size or traversal budget",
+      "evidence": "Scanner reads complete files synchronously and bounds neither file size, total bytes, file count, nor traversal depth.",
+      "story": "SCAN-001"
+    },
+    {
+      "id": "DOCS-001",
+      "severity": "medium",
+      "status": "open",
+      "title": "Docs generation can partially update its five-file set",
+      "evidence": "docs command writes CLAUDE.md AGENTS.md and SKILLS.md before DESIGN.md and PRODUCT.md preflight can fail.",
+      "story": "DOCS-001"
+    },
+    {
+      "id": "WATCH-001",
+      "severity": "medium",
+      "status": "open",
+      "title": "Hot reload follows ignored and outside-root symlinks",
+      "evidence": "Chokidar watcher retains followSymlinks true and does not apply normalized scanner ignore rules.",
+      "story": "WATCH-001"
+    },
+    {
+      "id": "TOOL-001",
+      "severity": "medium",
+      "status": "open",
+      "title": "search_brand accepts negative and unbounded limits",
+      "evidence": "Tool schema and runtime pass an unconstrained numeric limit directly to Array.slice.",
+      "story": "TOOL-001"
     }
   ]
 }

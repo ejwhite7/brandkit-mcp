@@ -166,8 +166,96 @@
       "id": "QA-001",
       "priority": 0,
       "title": "Complete two clean adversarial discovery passes",
-      "dependencies": ["BASE-002", "SEC-003", "SEC-004", "HTTP-002", "FS-002", "FS-004", "CTX-001", "DEP-002", "DOCKER-001", "VERCEL-001", "CLOUDFLARE-001"],
+      "dependencies": ["BASE-002", "SEC-003", "SEC-004", "HTTP-002", "FS-002", "FS-004", "CTX-001", "DEP-002", "DOCKER-001", "VERCEL-001", "CLOUDFLARE-001", "STATE-001", "PREVIEW-001", "INIT-001", "HTTP-003", "CI-001", "CI-002", "FMT-001", "SCAN-001", "DOCS-001", "WATCH-001", "TOOL-001"],
       "acceptance": ["two consecutive passes find no new actionable issue", "all discovered issues become failing stories", "no known actionable bug remains open"],
+      "passes": false
+    },
+    {
+      "id": "STATE-001",
+      "priority": 0,
+      "title": "Isolate mutable indexes per server instance",
+      "dependencies": ["HTTP-001"],
+      "acceptance": ["concurrent servers never share brand indexes", "watcher updates remain instance-local", "two-live-server isolation regression passes"],
+      "passes": false
+    },
+    {
+      "id": "PREVIEW-001",
+      "priority": 0,
+      "title": "Protect preview from rebinding and network disclosure",
+      "dependencies": ["SEC-003"],
+      "acceptance": ["hostile Host and Origin are rejected", "non-loopback preview requires authentication or is refused", "loopback preview remains usable"],
+      "passes": false
+    },
+    {
+      "id": "INIT-001",
+      "priority": 0,
+      "title": "Make init preflight and writes non-destructive",
+      "dependencies": ["FS-003"],
+      "acceptance": ["existing destinations require explicit force", "symlink hard-link and non-regular targets are rejected", "failed preflight preserves every destination"],
+      "passes": false
+    },
+    {
+      "id": "HTTP-003",
+      "priority": 0,
+      "title": "Make network startup await listening and reject failures",
+      "dependencies": ["HTTP-002"],
+      "acceptance": ["startServer resolves only after listening", "occupied ports reject without uncaught errors", "partial startup resources are cleaned up"],
+      "passes": false
+    },
+    {
+      "id": "CI-001",
+      "priority": 0,
+      "title": "Remove publish workflow shell injection",
+      "dependencies": ["BASE-002"],
+      "acceptance": ["dynamic workflow values enter scripts only through env", "manual versions are strict SemVer", "hostile input cannot execute shell syntax"],
+      "passes": false
+    },
+    {
+      "id": "CI-002",
+      "priority": 0,
+      "title": "Pin and verify release tooling",
+      "dependencies": ["CI-001"],
+      "acceptance": ["mcp-publisher uses an immutable version", "download integrity is verified before execution", "third-party actions are pinned immutably"],
+      "passes": false
+    },
+    {
+      "id": "FMT-001",
+      "priority": 1,
+      "title": "Prevent prototype pollution in token formatting",
+      "dependencies": ["CTX-001"],
+      "acceptance": ["reserved token keys cannot mutate prototypes", "valid reserved-looking names have explicit behavior", "hostile token regressions pass"],
+      "passes": false
+    },
+    {
+      "id": "SCAN-001",
+      "priority": 1,
+      "title": "Bound brand ingestion work and memory",
+      "dependencies": ["FS-002"],
+      "acceptance": ["per-file and aggregate byte limits are enforced", "file-count and traversal-depth limits are enforced", "limit failures are clear and deterministic"],
+      "passes": false
+    },
+    {
+      "id": "DOCS-001",
+      "priority": 1,
+      "title": "Make five-file docs generation transactional",
+      "dependencies": ["FS-004"],
+      "acceptance": ["all five outputs preflight before any mutation", "one unsafe target preserves every output byte", "successful generation remains idempotent"],
+      "passes": false
+    },
+    {
+      "id": "WATCH-001",
+      "priority": 1,
+      "title": "Align hot reload containment and ignore semantics",
+      "dependencies": ["FS-002"],
+      "acceptance": ["watcher does not follow symlinks", "scanner ignore rules also exclude watcher events", "valid non-ignored changes still reload"],
+      "passes": false
+    },
+    {
+      "id": "TOOL-001",
+      "priority": 1,
+      "title": "Bound search_brand result limits",
+      "dependencies": ["HTTP-002"],
+      "acceptance": ["limit is an integer within a conservative bound", "invalid limits fail predictably", "response size remains bounded"],
       "passes": false
     },
     {
