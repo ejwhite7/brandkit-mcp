@@ -145,3 +145,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; parser callers would return to path-only signatures.
 - Commit: Pending at time of entry.
 - Next eligible story: FS-002.
+
+## 2026-08-29 00:15 EDT — FS-002
+
+- Objective: Make recursive discovery cycle-safe and make ignore behavior precise.
+- Defect reproduced: In-root directory symlink cycles could recurse indefinitely, and ignore paths were evaluated relative to individual visual directories with raw prefix matching.
+- Changes: Added contained canonical directory identities, per-walk visited sets, and sorted traversal; compile normalized ignore rules once against `brand.root`; apply them to fixed and discovered inputs across base/web/product; reject absolute, root-escaping, empty, and NUL patterns; match only exact paths or descendant boundaries.
+- Files changed: `README.md`, `src/filesystem/brand-read-policy.ts`, `src/scanner/directory-scanner.ts`, `src/tests/scanner.test.ts`.
+- Tests added: Self, ancestor, and mutual cycles; duplicate aliases and determinism; slash/dot normalization; invalid patterns; `human` versus `humanity`; context-specific ignore isolation.
+- Verification commands: Focused 16 tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 238 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Canonical identities are only internal traversal keys; FS-001 containment still rejects outside aliases before traversal.
+- Compatibility review: Valid in-root aliases work, traversal order is deterministic, and documented ignore entries now have stable brand-root-relative meaning.
+- Remaining risks: Output writes can still follow symlinks until FS-003.
+- Rollback: Revert this story commit; remove brand-root-relative ignore entries added under the documented contract.
+- Commit: Pending at time of entry.
+- Next eligible story: FS-003.

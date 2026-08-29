@@ -88,7 +88,7 @@
       "title": "Prevent scanner symlink cycles and correct ignore semantics",
       "dependencies": ["FS-001"],
       "acceptance": ["cycles cannot hang or crash scans", "ignore paths are brand-root relative", "directory boundaries are respected"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FS-003",

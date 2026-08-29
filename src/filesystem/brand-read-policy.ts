@@ -83,6 +83,16 @@ export class BrandReadPolicy {
     return lstatSync(entry.realPath).isDirectory();
   }
 
+  /** Return the canonical identity used to de-duplicate directory traversal. */
+  directoryIdentity(path: string): string | undefined {
+    const entry = this.resolveExisting(path);
+    if (!entry) return undefined;
+    if (!lstatSync(entry.realPath).isDirectory()) {
+      throw new BrandPathError(`Brand input is not a directory: ${entry.requestedPath}`);
+    }
+    return entry.realPath;
+  }
+
   readFile(path: string): Buffer;
   readFile(path: string, encoding: BufferEncoding): string;
   readFile(path: string, encoding?: BufferEncoding): Buffer | string {

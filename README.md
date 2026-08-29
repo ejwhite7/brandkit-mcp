@@ -135,6 +135,9 @@ ignore:
   - human/
 ```
 
+Ignore entries are paths relative to `brand.root`. They match the named path and its descendants
+on directory boundaries, so `human/` does not match `humanity/`.
+
 `version: 2` is required. A config file missing this field or declaring `version: 1` causes the server to throw `BrandkitV1ConfigError` at startup.
 
 ## Context System

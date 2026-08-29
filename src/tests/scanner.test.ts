@@ -1,11 +1,30 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { resolve, join } from 'path';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { scanBrandRoot } from '../scanner/directory-scanner.js';
 
 const FIXTURE = resolve(__dirname, '../../__test_fixtures__/v2/full');
 const EMPTY = resolve(__dirname, '../../__test_fixtures__/v2/empty');
+const tempRoots: string[] = [];
+
+function makeBrandRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), 'bk-scanner-'));
+  tempRoots.push(root);
+  return root;
+}
+
+function writeComponent(root: string, relativePath: string, name: string): void {
+  const path = join(root, relativePath);
+  mkdirSync(resolve(path, '..'), { recursive: true });
+  writeFileSync(path, `---\nname: ${name}\n---\n# ${name}\n`);
+}
+
+afterEach(() => {
+  for (const root of tempRoots.splice(0)) {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 describe('scanBrandRoot', () => {
   it('finds magic_trick.md', () => {
@@ -57,11 +76,86 @@ describe('scanBrandRoot', () => {
     const scan = scanBrandRoot(FIXTURE);
     expect(scan.warnings.every((w) => !w.includes('human/'))).toBe(true);
   });
+
+  it('terminates safely and deterministically across directory symlink cycles and aliases', () => {
+    const root = makeBrandRoot();
+    const components = join(root, 'agent', 'visual', 'components');
+    writeComponent(root, 'agent/visual/components/base.md', 'Base');
+    writeComponent(root, 'agent/visual/components/ancestor/item.md', 'Ancestor');
+    writeComponent(root, 'agent/visual/components/left/item.md', 'Left');
+    writeComponent(root, 'agent/visual/components/right/item.md', 'Right');
+    writeComponent(root, 'agent/visual/components/library/item.md', 'Library');
+
+    symlinkSync('.', join(components, 'self'));
+    symlinkSync(components, join(components, 'ancestor', 'up'));
+    symlinkSync('../right', join(components, 'left', 'to-right'));
+    symlinkSync('../left', join(components, 'right', 'to-left'));
+    symlinkSync('library', join(components, 'alias-a'));
+    symlinkSync('library', join(components, 'alias-b'));
+
+    const first = scanBrandRoot(root);
+    const second = scanBrandRoot(root);
+    const names = first.base.components.map((component) => component.name);
+
+    expect(names).toEqual(['Library', 'Ancestor', 'Base', 'Left', 'Right']);
+    expect(second.base.components.map((component) => component.source)).toEqual(
+      first.base.components.map((component) => component.source),
+    );
+  });
+
+  it('matches normalized ignore paths from the brand root with directory boundaries', () => {
+    const root = makeBrandRoot();
+    writeComponent(root, 'agent/visual/components/human/hidden.md', 'Hidden Base');
+    writeComponent(root, 'agent/visual/components/humanity/visible.md', 'Base Humanity');
+    writeComponent(root, 'agent/visual/artifacts/web/components/human/visible.md', 'Web Human');
+    writeComponent(root, 'agent/visual/artifacts/web/components/private/hidden.md', 'Hidden Web');
+    writeComponent(root, 'agent/visual/artifacts/web/components/privateer/visible.md', 'Web Privateer');
+    writeComponent(root, 'agent/visual/artifacts/product/components/internal/hidden.md', 'Hidden Product');
+    writeComponent(
+      root,
+      'agent/visual/artifacts/product/components/internalized/visible.md',
+      'Product Internalized',
+    );
+
+    const scan = scanBrandRoot(root, {
+      ignore: [
+        './agent\\visual/components/human/',
+        'agent/visual/artifacts/web/components/private/./',
+        'agent/visual/artifacts/product/components/staging/../internal',
+        '/agent/visual/components/humanity',
+        '../../agent/visual/artifacts/web/components/human',
+        'C:\\agent\\visual\\artifacts\\product\\components\\internalized',
+      ],
+    });
+
+    expect(scan.base.components.map((component) => component.name)).toEqual(['Base Humanity']);
+    expect(scan.web.components.map((component) => component.name)).toEqual([
+      'Web Human',
+      'Web Privateer',
+    ]);
+    expect(scan.product.components.map((component) => component.name)).toEqual([
+      'Product Internalized',
+    ]);
+    expect(
+      scan.warnings.filter((warning) => warning.includes('invalid ignore pattern')),
+    ).toHaveLength(3);
+  });
+
+  it('can ignore one context artifact directory without hiding sibling contexts', () => {
+    const root = makeBrandRoot();
+    writeComponent(root, 'agent/visual/artifacts/web/components/web.md', 'Web');
+    writeComponent(root, 'agent/visual/artifacts/product/components/product.md', 'Product');
+
+    const scan = scanBrandRoot(root, { ignore: ['agent/visual/artifacts/web/'] });
+
+    expect(scan.web.components).toEqual([]);
+    expect(scan.product.components.map((component) => component.name)).toEqual(['Product']);
+  });
 });
 
 describe('css-only motion systems', () => {
   it('does not warn about missing motion.json when motion.css exists', () => {
-    const root = mkdtempSync(join(tmpdir(), 'bk-motion-'));
+    const root = makeBrandRoot();
     const motionDir = join(root, 'agent', 'visual', 'motion');
     mkdirSync(motionDir, { recursive: true });
     writeFileSync(join(motionDir, 'motion.css'), '.fade { transition: opacity 200ms; }\n');
