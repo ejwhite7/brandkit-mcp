@@ -40,7 +40,7 @@
       "title": "Authenticate non-loopback network transports",
       "dependencies": ["SEC-001"],
       "acceptance": ["non-loopback mode requires a bearer token", "missing or invalid authentication returns 401", "credentials are not logged"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "SEC-003",

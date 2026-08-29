@@ -170,7 +170,7 @@ Your `brandkit.config.yaml` must also be updated to declare `version: 2` and use
 
 **Token output formats.** The `get_tokens` tool supports CSS custom properties, SCSS variables, Tailwind config, W3C Design Tokens, and flat JSON.
 
-**Transports.** The server supports stdio (recommended for Claude Desktop), SSE (legacy HTTP), and Streamable HTTP (current MCP spec).
+**Transports.** The server supports stdio (recommended for Claude Desktop), SSE (legacy HTTP), and Streamable HTTP (current MCP spec). Network transports remain unauthenticated when bound to loopback for local development. Before binding SSE or HTTP to any non-loopback host, set `BRANDKIT_AUTH_TOKEN`; clients must send it as `Authorization: Bearer <token>` on every request.
 
 ## CLI Reference
 

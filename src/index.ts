@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url';
 import { getPackageVersion } from './version.js';
 import { regenerateBrandDocsIfReady } from './brand-docs/regenerate.js';
 import type { Server as HttpServer } from 'http';
-import { formatHostForUrl } from './network.js';
+import { createNetworkAuthPolicy, formatHostForUrl } from './network.js';
 
 /** Current design system index -- updated on hot-reload. */
 let currentIndex: DesignSystemIndex;
@@ -33,6 +33,8 @@ export interface StartServerOptions {
   host?: string;
   configPath?: string;
   watch?: boolean;
+  /** Programmatic token injection, primarily for embedders and tests. */
+  authToken?: string;
 }
 
 /**
@@ -111,6 +113,15 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   const port = options.port ?? config.server.port ?? 3001;
   const host = options.host ?? config.server.host;
   const urlHost = formatHostForUrl(host);
+  const authPolicy = createNetworkAuthPolicy(host, options.authToken);
+
+  app.use((req, res, next) => {
+    if (authPolicy.authorize(req.headers.authorization)) {
+      next();
+      return;
+    }
+    res.status(401).set('WWW-Authenticate', 'Bearer').json({ error: 'Unauthorized' });
+  });
 
   if (transport === 'sse') {
     const { SSEServerTransport } = await import('@modelcontextprotocol/sdk/server/sse.js');
@@ -130,8 +141,8 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
         sessions.set(t.sessionId, t);
         res.on('close', () => sessions.delete(t.sessionId));
         await sessionServer.connect(t);
-      } catch (err) {
-        console.error('[brandkit-mcp] Request handler error:', err);
+      } catch {
+        console.error('[brandkit-mcp] SSE request handler error');
         if (!res.headersSent) {
           res.status(500).json({ error: 'Internal server error' });
         }
@@ -147,8 +158,8 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
           return;
         }
         await t.handlePostMessage(req, res);
-      } catch (err) {
-        console.error('[brandkit-mcp] Request handler error:', err);
+      } catch {
+        console.error('[brandkit-mcp] SSE message handler error');
         if (!res.headersSent) {
           res.status(500).json({ error: 'Internal server error' });
         }

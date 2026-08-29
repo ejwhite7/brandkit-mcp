@@ -49,3 +49,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit to restore prior binding behavior.
 - Commit: Pending at time of entry.
 - Next eligible story: SEC-002.
+
+## 2026-08-28 23:29 EDT — SEC-002
+
+- Objective: Require authentication whenever MCP network transports bind beyond loopback.
+- Defect reproduced: Non-loopback SSE, Streamable HTTP, and standalone endpoints accepted unauthenticated requests.
+- Changes: Added shared loopback detection and Bearer-token policy, SHA-256 digest comparison with `timingSafeEqual`, startup refusal without a usable token, HTTP middleware, standalone enforcement, safe error logging, and operator documentation.
+- Files changed: `src/network.ts`, `src/index.ts`, `src/adapters/standalone.ts`, `README.md`, `src/tests/network-auth.test.ts`.
+- Tests added: Loopback classification, token parsing, environment token, non-loopback startup refusal, HTTP and SSE 401 behavior, standalone enforcement, and credential log leakage.
+- Verification commands: Focused 7 tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `git diff --check`.
+- Verification results: Focused tests pass; full 206 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Non-loopback MCP startup now fails closed without a token; credentials are never emitted in request-error logs.
+- Compatibility review: Loopback development and stdio remain unauthenticated and compatible.
+- Remaining risks: Host/Origin validation and write-tool gating remain open.
+- Rollback: Revert this story commit; remove `BRANDKIT_AUTH_TOKEN` from deployment configuration if no longer used.
+- Commit: Pending at time of entry.
+- Next eligible story: SEC-003.

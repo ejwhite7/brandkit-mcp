@@ -17,19 +17,21 @@ import { loadConfigWithPath, resolveConfigPaths } from '../config/loader.js';
 import { buildDesignSystemIndex } from '../indexer/index.js';
 import { registerAllTools } from '../tools/index.js';
 import { getPackageVersion } from '../version.js';
-import { formatHostForUrl } from '../network.js';
+import { createNetworkAuthPolicy, formatHostForUrl } from '../network.js';
 
 /**
  * Starts a standalone HTTP server with SSE transport.
  * @param port - Optional port override (config default: 3001; pass 0 for an ephemeral port)
  * @param configPath - Optional path to brandkit.config.yaml
  * @param host - Optional host override (config default: 127.0.0.1)
+ * @param authToken - Optional programmatic Bearer token override
  * @returns The listening http.Server (caller may close() it)
  */
 export async function startStandaloneServer(
   port?: number,
   configPath?: string,
   host?: string,
+  authToken?: string,
 ): Promise<HttpServer> {
   // Resolve relative paths against the config file's own directory (same
   // portability fix as startServer in src/index.ts).
@@ -38,6 +40,7 @@ export async function startStandaloneServer(
   const listenPort = port ?? config.server.port;
   const listenHost = host ?? config.server.host;
   const urlHost = formatHostForUrl(listenHost);
+  const authPolicy = createNetworkAuthPolicy(listenHost, authToken);
   const index = await buildDesignSystemIndex(config);
 
   // One transport per connected client, keyed by sessionId.
@@ -46,6 +49,15 @@ export async function startStandaloneServer(
   const httpServer = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
+
+      if (!authPolicy.authorize(req.headers.authorization)) {
+        res.writeHead(401, {
+          'Content-Type': 'application/json',
+          'WWW-Authenticate': 'Bearer',
+        });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
 
       if (url.pathname === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -82,8 +94,8 @@ export async function startStandaloneServer(
 
       res.writeHead(404);
       res.end('Not Found');
-    } catch (err) {
-      console.error('[brandkit-mcp] Request handler error:', err);
+    } catch {
+      console.error('[brandkit-mcp] Standalone request handler error');
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Internal server error' }));
