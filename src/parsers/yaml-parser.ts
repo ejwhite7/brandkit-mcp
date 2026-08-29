@@ -4,11 +4,11 @@
  * and missing files without throwing.
  */
 
-import { load } from 'js-yaml';
 import {
   BrandIngestionLimitError,
   type BrandReadPolicy,
 } from '../filesystem/brand-read-policy.js';
+import { loadSafeYaml } from './safe-yaml.js';
 
 export interface YamlParseResult {
   data: unknown;
@@ -35,7 +35,7 @@ export function parseYamlFile(path: string, reader: BrandReadPolicy): YamlParseR
   }
 
   try {
-    const data = load(text);
+    const data = loadSafeYaml(text);
     return { data: data ?? null, warnings: [], source: path };
   } catch (err) {
     return {

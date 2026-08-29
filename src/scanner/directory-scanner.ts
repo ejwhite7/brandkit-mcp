@@ -237,7 +237,7 @@ function parseVisualDir(
   if (!ignore.matches(componentsDir) && safeIsDirectory(componentsDir, reader, warnings)) {
     for (const file of listFiles(componentsDir, ['.md'], ignore, reader, warnings)) {
       try {
-        const parsed = parseComponentMarkdown(file, 'base', reader);
+        const parsed = parseComponentMarkdown(file, 'base', reader, warnings);
         data.components.push(...parsed);
       } catch (err) {
         warnings.push(`Failed to parse component ${file}: ${(err as Error).message}`);

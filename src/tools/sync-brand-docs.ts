@@ -8,6 +8,7 @@
 
 import { dirname } from 'path';
 import yaml from 'js-yaml';
+import { loadSafeYaml } from '../parsers/safe-yaml.js';
 import type { DesignSystemIndex } from '../indexer/types.js';
 import {
   isBriefComplete,
@@ -92,7 +93,7 @@ export async function handler(
   let configReadIdentity: RegularFileIdentity | undefined;
   try {
     const configFile = safeReadRegularFile(context.configPath, context.configIdentity);
-    raw = (yaml.load(configFile.content) as Record<string, unknown>) ?? {};
+    raw = (loadSafeYaml(configFile.content) as Record<string, unknown>) ?? {};
     context.configIdentity = configFile.identity;
     configReadIdentity = configFile.identity;
     configReadOk = true;

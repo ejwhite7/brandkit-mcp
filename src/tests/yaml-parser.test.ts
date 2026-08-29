@@ -43,4 +43,12 @@ describe('parseYamlFile', () => {
     });
     expect(warnings).toEqual([]);
   });
+
+  it('returns a deterministic warning instead of a cyclic object graph', () => {
+    const path = fixture('self: &self\n  value: *self\n');
+    const { data, warnings } = parseYamlFile(path, new BrandReadPolicy(join(path, '..')));
+
+    expect(data).toBeNull();
+    expect(warnings).toEqual([expect.stringMatching(/Invalid YAML.*aliases form a cycle/)]);
+  });
 });

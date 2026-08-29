@@ -10,7 +10,7 @@ import {
   BrandIngestionLimitError,
   type BrandReadPolicy,
 } from '../filesystem/brand-read-policy.js';
-import { parseFrontmatter } from './frontmatter.js';
+import { frontmatterBody, parseFrontmatter } from './frontmatter.js';
 
 /**
  * Parses a markdown file as component documentation.
@@ -19,7 +19,12 @@ import { parseFrontmatter } from './frontmatter.js';
  * @param context - Design context
  * @returns Array of parsed components
  */
-export function parseComponentMarkdown(filePath: string, context: BrandContext, reader: BrandReadPolicy): DesignComponent[] {
+export function parseComponentMarkdown(
+  filePath: string,
+  context: BrandContext,
+  reader: BrandReadPolicy,
+  warnings?: string[],
+): DesignComponent[] {
   let raw: string;
   try {
     raw = reader.readFile(filePath, 'utf-8');
@@ -29,7 +34,17 @@ export function parseComponentMarkdown(filePath: string, context: BrandContext, 
     return [];
   }
 
-  const { data: frontmatter, content } = parseFrontmatter(raw);
+  let frontmatter: Record<string, unknown> = {};
+  let content: string;
+  try {
+    ({ data: frontmatter, content } = parseFrontmatter(raw));
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
+    content = frontmatterBody(raw);
+    warnings?.push(
+      `Invalid component frontmatter in ${filePath}: ${err instanceof Error ? err.message : String(err)}; using markdown body`,
+    );
+  }
 
   const name =
     (frontmatter.name as string) ??
@@ -156,7 +171,19 @@ export function parseTokenSpecimen(filePath: string, reader: BrandReadPolicy): T
     if (err instanceof BrandIngestionLimitError) throw err;
     return { specimen: null, warnings: [`Could not read ${filePath}`] };
   }
-  const { data, content } = parseFrontmatter(raw);
+  let data: Record<string, unknown>;
+  let content: string;
+  try {
+    ({ data, content } = parseFrontmatter(raw));
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
+    return {
+      specimen: null,
+      warnings: [
+        `Invalid token frontmatter in ${filePath}: ${err instanceof Error ? err.message : String(err)}; skipping`,
+      ],
+    };
+  }
   const name = data.name as string | undefined;
   const type = data.type as string | undefined;
   // value may legitimately be falsy (0, false) — check presence, not truthiness.

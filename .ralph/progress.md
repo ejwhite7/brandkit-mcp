@@ -499,3 +499,18 @@ criteria and the global regression gate have objective evidence here.
 - Gate context: 43 files / 387 tests, typecheck, lint, build/DTS, full audit (0), and diff check passed before review, confirming missing adversarial coverage rather than existing gate failures.
 - Ralph action: Added YAML-001, MANIFEST-001, and TOOL-002 as open bugs and failing dependencies of QA-001. The reviewer response was interrupted by an automated safety filter after reporting the confirmed reproductions; because actionable findings already existed, the pass could not qualify regardless.
 - Next eligible story: YAML-001.
+
+## 2026-08-29 04:13 EDT — YAML-001
+
+- Objective: Prevent YAML aliases, cycles, and exotic values from creating unbounded or unserializable tool/index data.
+- Defect reproduced: A roughly 218-byte nested alias graph expanded to 4,691,377 JSON bytes; a self-alias produced a cyclic object that made `JSON.stringify` throw.
+- Changes: Added a shared safe YAML boundary used by config loading, sync config rereads, standalone YAML files, and frontmatter; deep-copy aliases per occurrence into an acyclic JSON-safe tree; charge every expanded node/key/value against source-derived minimum/maximum budgets; limit depth to 64; normalize dates; reject cycles, non-finite values, and unsupported objects; preserve reserved keys as own data. Unsafe verbal/component frontmatter falls back to safe body parsing with warnings; unsafe token frontmatter is skipped with a warning.
+- Files changed: `src/parsers/safe-yaml.ts`, config loader, YAML/frontmatter/markdown parsers, scanner warning plumbing, sync tool, and safe-YAML/YAML parser tests.
+- Tests added: Exact and one-over node/text/depth boundaries; tiny/large budget caps; multiplicative aliases; cycles; independent safe aliases; merge keys; BOM/CRLF/nesting; scalar/date/reserved keys; config/YAML warnings; cyclic/amplifying verbal, component, and token frontmatter with valid siblings; index and audience/voice/component/token tool serialization bounds.
+- Verification commands: Focused 34-test safe-YAML/parser/scanner matrix plus 49 consumer tests, production `js-yaml` import audit, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, production/full audits, and `git diff --check`.
+- Verification results: Focused tests pass; full 44 files / 398 tests pass; typecheck, lint, build/DTS, both audits (0), serialization bounds, and diff check pass.
+- Security review: Alias expansion work/output is finite and proportional within hard caps; cycles never leave the parser; all production YAML loads are routed through the boundary and dump-only imports remain.
+- Compatibility review: Normal nested YAML, merge keys, conventional frontmatter, BOM/CRLF, dates, scalars, and valid sibling indexing remain compatible; unsafe token entries now skip deterministically.
+- Rollback: Revert this story commit; that restores YAML amplification and cyclic tool failures.
+- Commit: Pending at time of entry.
+- Next eligible story: MANIFEST-001.

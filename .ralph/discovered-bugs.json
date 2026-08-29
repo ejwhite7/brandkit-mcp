@@ -111,10 +111,11 @@
     {
       "id": "YAML-001",
       "severity": "high",
-      "status": "open",
+      "status": "resolved",
       "title": "YAML aliases and cycles amplify or break serialized tool data",
       "evidence": "A 233-byte alias graph parsed by YAML/frontmatter expanded to 5,273,436 JSON bytes, while a self-alias produced a cycle that throws during JSON serialization.",
-      "story": "YAML-001"
+      "story": "YAML-001",
+      "resolution": "Every production YAML load crosses a source-derived node/text/depth budget into an acyclic JSON-safe copy; unsafe frontmatter consumers fall back or skip with warnings."
     },
     {
       "id": "MANIFEST-001",

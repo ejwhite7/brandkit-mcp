@@ -264,7 +264,7 @@
       "title": "Reject cyclic or amplifying YAML object graphs",
       "dependencies": ["DEP-002", "SCAN-001"],
       "acceptance": ["cycles cannot reach tool serialization", "aliases cannot amplify parsed output beyond a finite structural budget", "normal nested YAML and frontmatter remain compatible"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "MANIFEST-001",

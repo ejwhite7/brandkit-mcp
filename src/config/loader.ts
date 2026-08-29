@@ -12,9 +12,9 @@
 import { existsSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import yaml from 'js-yaml';
 import { BrandKitConfigSchema, BrandkitV1ConfigError, type BrandKitConfig } from '../types/config.js';
 import { DEFAULT_CONFIG_FILENAMES } from './defaults.js';
+import { loadSafeYaml } from '../parsers/safe-yaml.js';
 import {
   safeReadRegularFile,
   type RegularFileIdentity,
@@ -128,7 +128,7 @@ function isV1Config(parsed: Record<string, unknown>): boolean {
 export function loadConfigFromString(yamlText: string, sourcePath: string): BrandKitConfig {
   let parsed: unknown;
   try {
-    parsed = yaml.load(yamlText);
+    parsed = loadSafeYaml(yamlText);
   } catch (err) {
     throw new Error(
       `Failed to parse YAML at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`,
