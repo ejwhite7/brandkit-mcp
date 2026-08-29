@@ -430,3 +430,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores prototype pollution and token loss.
 - Commit: Pending at time of entry.
 - Next eligible story: SCAN-001.
+
+## 2026-08-29 03:05 EDT — SCAN-001
+
+- Objective: Bound startup/serverless ingestion work and memory across every brand input path.
+- Defect reproduced: A single large file, aggregate tree, deep hierarchy, or directory containing only non-ingestible entries could consume unbounded synchronous I/O, memory, and traversal work.
+- Changes: Added one per-scan budget to the contained read policy; enforce 16 MiB/file, 128 MiB aggregate, 1,000 canonical files, 16 lexical and canonical path levels, and a derived directory-enumeration cap by default; permit typed overrides only up to hard caps of 64 MiB, 512 MiB, 10,000 files, and 64 levels; account fixed/discovered/manifest/font/asset inputs; deduplicate aliases by device/inode; use capped streaming directory enumeration; re-account actual returned bytes after pre-read fstat.
+- Files changed: `README.md`, config schema/index builder, `src/filesystem/brand-read-policy.ts`, directory scanner, CSS/markdown/motion/verbal/YAML parsers, config tests, and `src/tests/scanner-budget.test.ts`.
+- Tests added: Exact and one-over per-file, aggregate, file-count, and depth boundaries; lexical and canonical shallow-alias depth; canonical alias byte/file deduplication; deterministic brand-relative errors; inode growth between discovery/read; empty-directory enumeration DoS; config defaults, overrides, contradictions, and hard caps.
+- Verification commands: Focused 31-test budget/scanner/containment/config matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, pack dry run, starter and Acme CLI validation, production audit, and `git diff --check`.
+- Verification results: Focused tests pass; full 42 files / 347 tests pass; typecheck, lint, build/DTS, pack, starter/Acme validation, production audit (0), and diff check pass.
+- Security review: Limits are enforced inside the same no-follow contained policy as reads; symlink aliases cannot bypass canonical depth or inflate/dodge identity accounting; error paths do not disclose the absolute brand root.
+- Compatibility review: Typical bundled brands pass unchanged. Brands above defaults must opt into higher bounded values; metadata-only missing manifest entries remain allowed, while existing declared binaries now consume the shared budget.
+- Rollback: Revert this story commit; that restores unbounded synchronous ingestion.
+- Commit: Pending at time of entry.
+- Next eligible story: DOCS-001.

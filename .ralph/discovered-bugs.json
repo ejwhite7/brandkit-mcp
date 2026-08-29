@@ -75,10 +75,11 @@
     {
       "id": "SCAN-001",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "title": "Brand ingestion has no size or traversal budget",
       "evidence": "Scanner reads complete files synchronously and bounds neither file size, total bytes, file count, nor traversal depth.",
-      "story": "SCAN-001"
+      "story": "SCAN-001",
+      "resolution": "A shared read policy now enforces bounded per-file, aggregate, canonical-file, lexical/canonical depth, and directory-enumeration budgets before returning content."
     },
     {
       "id": "DOCS-001",

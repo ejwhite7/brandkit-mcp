@@ -5,7 +5,10 @@
 
 import * as csstree from 'css-tree';
 import type { DesignCSSFile, BrandContext } from '../types/design-system.js';
-import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
 
 /**
  * Parses a CSS file and extracts all custom properties and class definitions.
@@ -17,7 +20,8 @@ export function parseCSSFile(filePath: string, _context: BrandContext, reader: B
   let rawContent: string;
   try {
     rawContent = reader.readFile(filePath, 'utf-8');
-  } catch {
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     console.error(`[css-parser] Could not read file: ${filePath}`);
     return { filePath, rawContent: '', customProperties: {}, classes: [] };
   }

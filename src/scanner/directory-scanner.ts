@@ -33,7 +33,10 @@ import { parseTokenSpecimen } from '../parsers/markdown-parser.js';
 import { parseComponentMarkdown } from '../parsers/markdown-parser.js';
 import { parseCSSFile } from '../parsers/css-parser.js';
 import { parseFontFile } from '../parsers/font-parser.js';
-import { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
+import {
+  BrandReadPolicy,
+  type BrandIngestionLimits,
+} from '../filesystem/brand-read-policy.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -51,6 +54,8 @@ export interface ScanResult {
 export interface ScanOptions {
   /** Paths to skip, relative to the configured brand root. Defaults to ['human/']. */
   ignore?: string[];
+  /** Bounded ingestion budget. Omitted fields retain production defaults. */
+  limits?: Partial<BrandIngestionLimits>;
 }
 
 interface IgnoreMatcher {
@@ -70,7 +75,7 @@ interface IgnoreMatcher {
  */
 export function scanBrandRoot(rootDir: string, options?: ScanOptions): ScanResult {
   const warnings: string[] = [];
-  const reader = new BrandReadPolicy(rootDir);
+  const reader = new BrandReadPolicy(rootDir, options?.limits);
   const ignore = createIgnoreMatcher(options?.ignore ?? ['human/'], reader, warnings);
 
   // ---------------------------------------------------------------------------
@@ -101,6 +106,7 @@ export function scanBrandRoot(rootDir: string, options?: ScanOptions): ScanResul
   const productVisualDir = join(rootDir, 'agent', 'visual', 'artifacts', 'product');
   const product = parseVisualDir(productVisualDir, 'product', ignore, reader, warnings);
 
+  reader.assertWithinLimits();
   return { magicTrick, verbal, base, web, product, warnings };
 }
 
@@ -370,6 +376,9 @@ function parseFontsDir(
           warnings.push(`Rejected font manifest entry that is not a file: ${file}`);
           continue;
         }
+        // Existing manifest-declared binaries share the same ingestion budget
+        // even though the index stores metadata rather than file contents.
+        reader.isFile(filePath);
       } catch (err) {
         warnings.push(`Rejected font manifest entry ${file}: ${(err as Error).message}`);
         continue;
@@ -447,6 +456,10 @@ function parseAssetsDir(
           warnings.push(`Rejected asset manifest entry that is not a file: ${file}`);
           continue;
         }
+        // Count an existing declared asset even when its extension is not one
+        // of the auto-discovered image formats. Missing metadata-only entries
+        // remain compatible and do not consume a file budget.
+        reader.isFile(filePath);
       } catch (err) {
         warnings.push(`Rejected asset manifest entry ${file}: ${(err as Error).message}`);
         continue;

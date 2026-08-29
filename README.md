@@ -138,10 +138,28 @@ brand:
 contexts: [base, web, product]
 ignore:
   - human/
+ingestion:
+  maxFileBytes: 16777216
+  maxTotalBytes: 134217728
+  maxFiles: 1000
+  maxDepth: 16
 ```
 
 Ignore entries are paths relative to `brand.root`. They match the named path and its descendants
 on directory boundaries, so `human/` does not match `humanity/`.
+
+Brand ingestion is bounded before file content is read. The defaults allow a
+maximum of 16 MiB per file, 128 MiB across all unique inputs, 1,000 unique
+files, and 16 path segments below `brand.root`. Fixed documents, discovered
+components and tokens, manifests, fonts, and image assets all share the same
+budget. Directory enumeration is also capped at four times the configured file
+limit, so a tree of empty or unsupported entries cannot create unbounded work
+before file counting. In-root symlink and hard-link aliases count once by canonical file
+identity; an alias cannot bypass containment or a limit. Exact boundaries are
+accepted and the next byte, file, or path segment fails startup with a
+brand-relative error. Large brands can raise these typed `ingestion` values up
+to the built-in safety caps (64 MiB per file, 512 MiB total, 10,000 files, and
+64 segments); `maxTotalBytes` must be at least `maxFileBytes`.
 
 `version: 2` is required. A config file missing this field or declaring `version: 1` causes the server to throw `BrandkitV1ConfigError` at startup.
 

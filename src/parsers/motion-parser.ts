@@ -5,7 +5,10 @@
  */
 
 import { join } from 'path';
-import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
 
 export interface MotionParseResult {
   tokens: unknown;
@@ -29,6 +32,7 @@ export function parseMotionDir(dir: string, reader: BrandReadPolicy): MotionPars
     try {
       tokens = JSON.parse(reader.readFile(jsonPath, 'utf-8'));
     } catch (err) {
+      if (err instanceof BrandIngestionLimitError) throw err;
       warnings.push(`Invalid motion.json: ${(err as Error).message}`);
     }
   } else {
@@ -40,6 +44,7 @@ export function parseMotionDir(dir: string, reader: BrandReadPolicy): MotionPars
     try {
       css = reader.readFile(cssPath, 'utf-8');
     } catch (err) {
+      if (err instanceof BrandIngestionLimitError) throw err;
       warnings.push(`Could not read motion.css: ${(err as Error).message}`);
     }
   }

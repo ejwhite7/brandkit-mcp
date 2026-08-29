@@ -232,7 +232,7 @@
       "title": "Bound brand ingestion work and memory",
       "dependencies": ["FS-002"],
       "acceptance": ["per-file and aggregate byte limits are enforced", "file-count and traversal-depth limits are enforced", "limit failures are clear and deterministic"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DOCS-001",

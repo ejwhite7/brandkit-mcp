@@ -4,7 +4,10 @@
  */
 
 import type { VerbalDoc } from '../types/design-system.js';
-import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
 import { parseFrontmatter } from './frontmatter.js';
 
 /**
@@ -17,7 +20,8 @@ export function parseVerbalDoc(path: string, reader: BrandReadPolicy): VerbalDoc
   let raw: string;
   try {
     raw = reader.readFile(path, 'utf-8');
-  } catch {
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     return undefined;
   }
   // Tolerance principle: malformed frontmatter must not abort the scan.

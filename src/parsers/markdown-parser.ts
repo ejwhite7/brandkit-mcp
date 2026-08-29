@@ -6,7 +6,10 @@
 
 import { basename, extname } from 'path';
 import type { DesignComponent, BrandContext, TokenSpecimen } from '../types/design-system.js';
-import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
 import { parseFrontmatter } from './frontmatter.js';
 
 /**
@@ -20,7 +23,8 @@ export function parseComponentMarkdown(filePath: string, context: BrandContext, 
   let raw: string;
   try {
     raw = reader.readFile(filePath, 'utf-8');
-  } catch {
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     console.error(`[markdown-parser] Could not read file: ${filePath}`);
     return [];
   }
@@ -148,7 +152,8 @@ export function parseTokenSpecimen(filePath: string, reader: BrandReadPolicy): T
   let raw: string;
   try {
     raw = reader.readFile(filePath, 'utf-8');
-  } catch {
+  } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     return { specimen: null, warnings: [`Could not read ${filePath}`] };
   }
   const { data, content } = parseFrontmatter(raw);

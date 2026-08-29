@@ -26,6 +26,12 @@ describe('config v2 schema', () => {
     expect(parsed.contexts).toEqual(['base', 'web', 'product']);
     expect(parsed.brand.root).toBe('./brand_atomic_system');
     expect(parsed.ignore).toContain('human/');
+    expect(parsed.ingestion).toEqual({
+      maxFileBytes: 16 * 1024 * 1024,
+      maxTotalBytes: 128 * 1024 * 1024,
+      maxFiles: 1_000,
+      maxDepth: 16,
+    });
     expect(parsed.server).toEqual({
       transport: 'stdio',
       port: 3001,
@@ -34,6 +40,31 @@ describe('config v2 schema', () => {
       allowedOrigins: [],
     });
     expect(parsed.preview).toEqual({ port: 3000, host: '127.0.0.1' });
+  });
+
+  it('accepts bounded ingestion overrides and rejects contradictory limits', () => {
+    const parsed = BrandKitConfigSchema.parse({
+      version: 2,
+      brand: { name: 'Acme Corp' },
+      ingestion: {
+        maxFileBytes: 1024,
+        maxTotalBytes: 4096,
+        maxFiles: 10,
+        maxDepth: 8,
+      },
+    });
+    expect(parsed.ingestion).toEqual({
+      maxFileBytes: 1024,
+      maxTotalBytes: 4096,
+      maxFiles: 10,
+      maxDepth: 8,
+    });
+
+    expect(() => BrandKitConfigSchema.parse({
+      version: 2,
+      brand: { name: 'Acme Corp' },
+      ingestion: { maxFileBytes: 4096, maxTotalBytes: 1024 },
+    })).toThrow('ingestion.maxTotalBytes must be at least ingestion.maxFileBytes');
   });
 
   it('accepts explicit network trust configuration', () => {

@@ -43,7 +43,7 @@ export async function buildDesignSystemIndex(
 ): Promise<DesignSystemIndex> {
   const brandRoot = brandRootOverride ?? config.brand.root;
 
-  const scan = scanBrandRoot(brandRoot, { ignore: config.ignore });
+  const scan = scanBrandRoot(brandRoot, { ignore: config.ignore, limits: config.ingestion });
   const contexts = resolveContexts(scan);
   const resolved = materializeAll(contexts, {
     brandName: config.brand.name,

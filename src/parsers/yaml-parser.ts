@@ -5,7 +5,10 @@
  */
 
 import { load } from 'js-yaml';
-import type { BrandReadPolicy } from '../filesystem/brand-read-policy.js';
+import {
+  BrandIngestionLimitError,
+  type BrandReadPolicy,
+} from '../filesystem/brand-read-policy.js';
 
 export interface YamlParseResult {
   data: unknown;
@@ -23,6 +26,7 @@ export function parseYamlFile(path: string, reader: BrandReadPolicy): YamlParseR
   try {
     text = reader.readFile(path, 'utf-8');
   } catch (err) {
+    if (err instanceof BrandIngestionLimitError) throw err;
     return {
       data: null,
       warnings: [`Could not read YAML file: ${path} (${(err as Error).message})`],
