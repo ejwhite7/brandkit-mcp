@@ -398,3 +398,20 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores confirmed privileged workflow command execution.
 - Commit: Pending at time of entry.
 - Next eligible story: CI-002.
+
+## 2026-08-29 02:52 EDT — CI-002
+
+- Objective: Prevent mutable or replaced third-party release tooling from executing in privileged CI jobs.
+- Defect reproduced: Publish downloaded `mcp-publisher` through a mutable `releases/latest` URL, piped it directly into extraction, and executed it without integrity verification; all Actions used mutable major tags.
+- Changes: Pin mcp-publisher v1.7.9; select only Linux amd64/arm64 and fail closed otherwise; download to a temporary archive over constrained HTTPS; verify fixed per-architecture SHA-256 before extracting one member and granting execute permission; pin checkout/setup-node across CI and publish to full commit SHAs with release comments.
+- Integrity values: Linux amd64 `ab128162b0616090b47cf245afe0a23f3ef08936fdce19074f5ba0a4469281ac`; Linux arm64 `04f5199b3deef8e6fc4d6ed98c56a74f799def53edca3fe6d4862ecd4397c172`.
+- Immutable Actions: checkout v5.1.0 `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09`; setup-node v5.0.0 `a0853c24544627f65ddf259abe73b1d18a591444`.
+- Files changed: `.github/workflows/publish.yml`, `.github/workflows/ci.yml`, and `src/tests/publish-workflow.test.ts`.
+- Tests added: Exact publisher version/checksums; verification precedes extraction/permission; no latest URL or curl-to-tar pipeline; unsupported platform failure; every external Action in every workflow is a full 40-character SHA.
+- Verification commands: Independently download/hash both official release archives; focused 24-test publish/Docker workflow matrix; mutable-reference grep; `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, production/full audits, and `git diff --check`.
+- Verification results: Official archive hashes reproduce; focused tests pass; full 41 files / 335 tests pass; typecheck, lint, build, both audits (0), mutable-reference audit, and diff check pass.
+- Security review: Integrity is checked before archive parsing or execution; release URLs and action code are immutable; OIDC permissions are unchanged and remain job-scoped.
+- Compatibility review: Publish still supports Ubuntu amd64 and arm64 runners; current job is amd64. The release was not dispatched because doing so would publish externally.
+- Rollback: Revert this story commit; that restores unauthenticated mutable release-tool execution.
+- Commit: Pending at time of entry.
+- Next eligible story: FMT-001.

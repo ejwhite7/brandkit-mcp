@@ -57,10 +57,11 @@
     {
       "id": "CI-002",
       "severity": "high",
-      "status": "open",
+      "status": "resolved",
       "title": "Publish executes mutable unverified latest binary",
       "evidence": ".github/workflows/publish.yml downloads and executes the latest mcp-publisher without a pinned version or integrity check.",
-      "story": "CI-002"
+      "story": "CI-002",
+      "resolution": "Release tooling uses a fixed mcp-publisher release with verified per-architecture SHA-256 values, and every external workflow action is pinned to a full commit SHA."
     },
     {
       "id": "FMT-001",

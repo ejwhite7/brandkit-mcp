@@ -216,7 +216,7 @@
       "title": "Pin and verify release tooling",
       "dependencies": ["CI-001"],
       "acceptance": ["mcp-publisher uses an immutable version", "download integrity is verified before execution", "third-party actions are pinned immutably"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FMT-001",

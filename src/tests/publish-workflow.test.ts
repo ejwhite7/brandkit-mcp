@@ -1,4 +1,11 @@
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { spawnSync } from 'child_process';
@@ -177,5 +184,52 @@ describe('publish workflow input safety', () => {
     expect(result.output).toBe('');
     expect(existsSync(resolve(root, 'INJECTED'))).toBe(false);
     expect(existsSync(join(result.directory, 'INJECTED'))).toBe(false);
+  });
+
+  it('pins and verifies the official mcp-publisher archive before extraction', () => {
+    const step = readWorkflow().jobs.publish.steps
+      .find(({ name }) => name === 'Install mcp-publisher');
+
+    expect(step?.env).toEqual({
+      MCP_PUBLISHER_VERSION: '1.7.9',
+      MCP_PUBLISHER_LINUX_AMD64_SHA256:
+        'ab128162b0616090b47cf245afe0a23f3ef08936fdce19074f5ba0a4469281ac',
+      MCP_PUBLISHER_LINUX_ARM64_SHA256:
+        '04f5199b3deef8e6fc4d6ed98c56a74f799def53edca3fe6d4862ecd4397c172',
+    });
+
+    const installer = step?.run ?? '';
+    expect(installer).toContain('/releases/download/v${MCP_PUBLISHER_VERSION}/$asset');
+    expect(installer).not.toMatch(/releases\/latest|curl[^\n]*\|\s*tar/);
+    expect(installer).toContain('Linux:x86_64)');
+    expect(installer).toContain('Linux:aarch64)');
+    expect(installer).toMatch(/\*\)[\s\S]*exit 1/);
+
+    const verification = installer.indexOf('sha256sum --check --strict');
+    const extraction = installer.indexOf('tar --extract');
+    const executionPermission = installer.indexOf('chmod +x');
+    expect(verification).toBeGreaterThan(-1);
+    expect(extraction).toBeGreaterThan(verification);
+    expect(executionPermission).toBeGreaterThan(extraction);
+  });
+
+  it('pins every external action in every workflow to a full commit SHA', () => {
+    const workflowDirectory = resolve(root, '.github/workflows');
+    const mutableReferences: string[] = [];
+
+    for (const filename of readdirSync(workflowDirectory)) {
+      if (!/\.ya?ml$/.test(filename)) continue;
+      const source = readFileSync(resolve(workflowDirectory, filename), 'utf8');
+
+      for (const match of source.matchAll(/^\s*uses:\s*([^\s#]+)/gm)) {
+        const action = match[1];
+        if (action.startsWith('./') || action.startsWith('docker://')) continue;
+        if (!/@[a-f0-9]{40}$/.test(action)) {
+          mutableReferences.push(`${filename}: ${action}`);
+        }
+      }
+    }
+
+    expect(mutableReferences).toEqual([]);
   });
 });

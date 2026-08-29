@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
@@ -75,9 +75,32 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Install mcp-publisher
+        env:
+          MCP_PUBLISHER_VERSION: '1.7.9'
+          MCP_PUBLISHER_LINUX_AMD64_SHA256: ab128162b0616090b47cf245afe0a23f3ef08936fdce19074f5ba0a4469281ac
+          MCP_PUBLISHER_LINUX_ARM64_SHA256: 04f5199b3deef8e6fc4d6ed98c56a74f799def53edca3fe6d4862ecd4397c172
         run: |
-          curl -fL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
-            | tar xz mcp-publisher
+          case "$(uname -s):$(uname -m)" in
+            Linux:x86_64)
+              asset="mcp-publisher_linux_amd64.tar.gz"
+              checksum="$MCP_PUBLISHER_LINUX_AMD64_SHA256"
+              ;;
+            Linux:aarch64)
+              asset="mcp-publisher_linux_arm64.tar.gz"
+              checksum="$MCP_PUBLISHER_LINUX_ARM64_SHA256"
+              ;;
+            *)
+              printf 'Unsupported mcp-publisher platform: %s:%s\n' "$(uname -s)" "$(uname -m)" >&2
+              exit 1
+              ;;
+          esac
+
+          archive="$(mktemp "${RUNNER_TEMP:?}/mcp-publisher.XXXXXX.tar.gz")"
+          curl --fail --location --proto '=https' --tlsv1.2 --silent --show-error \
+            --output "$archive" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/$asset"
+          printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$archive" --no-same-owner mcp-publisher
           chmod +x ./mcp-publisher
 
       - name: Validate server.json
