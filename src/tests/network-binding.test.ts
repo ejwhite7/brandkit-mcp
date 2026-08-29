@@ -102,4 +102,22 @@ describe('network binding', () => {
 
     expect((await listeningAddress(server)).address).toBe('::1');
   });
+
+  it.each(['0.0.0.0', '192.0.2.10'])(
+    'refuses a non-loopback preview host before listening: %s',
+    async (host) => {
+      await expect(previewCommand({
+        config: writeConfig(''),
+        host,
+        port: '0',
+      })).rejects.toThrow(/only supports loopback hosts/i);
+    },
+  );
+
+  it('refuses a non-loopback preview host loaded from configuration', async () => {
+    await expect(previewCommand({
+      config: writeConfig('preview:\n  host: "0.0.0.0"\n'),
+      port: '0',
+    })).rejects.toThrow(/only supports loopback hosts/i);
+  });
 });

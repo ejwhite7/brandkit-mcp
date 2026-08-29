@@ -21,10 +21,11 @@
     {
       "id": "PREVIEW-001",
       "severity": "high",
-      "status": "open",
+      "status": "resolved",
       "title": "Preview lacks Host Origin and non-loopback authentication protection",
       "evidence": "src/preview/server.ts exposes brand pages without shared request policy while preview accepts arbitrary bind hosts.",
-      "story": "PREVIEW-001"
+      "story": "PREVIEW-001",
+      "resolution": "Preview is loopback-only and applies the shared Host/Origin policy before all page and static routes."
     },
     {
       "id": "INIT-001",

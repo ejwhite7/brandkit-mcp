@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import type { Server } from 'http';
+import { request as httpRequest, type Server } from 'http';
 import { buildFixtureIndex } from './helpers.js';
 import { createPreviewServer } from '../preview/server.js';
 import { BrandKitConfigSchema } from '../types/config.js';
@@ -23,6 +23,27 @@ const PAGES = [
   '/css',
   '/search?q=primary',
 ];
+
+function getWithHost(url: string, host: string): Promise<{ status: number; body: string }> {
+  const target = new URL(url);
+  return new Promise((resolve, reject) => {
+    const request = httpRequest({
+      hostname: target.hostname,
+      port: target.port,
+      path: `${target.pathname}${target.search}`,
+      headers: { Host: host },
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.on('end', () => resolve({
+        status: response.statusCode ?? 0,
+        body: Buffer.concat(chunks).toString('utf8'),
+      }));
+    });
+    request.once('error', reject);
+    request.end();
+  });
+}
 
 describe('preview server (v2)', () => {
   let server: Server;
@@ -77,5 +98,42 @@ describe('preview server (v2)', () => {
   it('returns search results for fixture content', async () => {
     const html = await (await fetch(`${base}/search?q=color`)).text();
     expect(html).toContain('result');
+  });
+
+  it('serves static assets to a normal loopback browser origin', async () => {
+    const res = await fetch(`${base}/static/styles.css`, {
+      headers: { Origin: base },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('BrandKit MCP Preview Server Styles');
+  });
+
+  it.each(['/', '/assets', '/static/styles.css'])(
+    'rejects a hostile Host header on %s',
+    async (page) => {
+      const response = await getWithHost(`${base}${page}`, 'attacker.example');
+      expect(response.status).toBe(403);
+      expect(response.body).not.toContain('Test Brand');
+    },
+  );
+
+  it('rejects a hostile browser Origin before rendering brand data', async () => {
+    const res = await fetch(`${base}/colors`, {
+      headers: { Origin: 'https://attacker.example' },
+    });
+    expect(res.status).toBe(403);
+    expect(await res.text()).not.toContain('--color-primary');
+  });
+
+  it('refuses to create a preview configured for a non-loopback host', () => {
+    const config = BrandKitConfigSchema.parse({
+      version: 2,
+      brand: { name: 'Test Brand' },
+      preview: { host: '0.0.0.0' },
+    });
+
+    expect(() => createPreviewServer(buildFixtureIndex('v2/full'), config)).toThrow(
+      /loopback/i,
+    );
   });
 });

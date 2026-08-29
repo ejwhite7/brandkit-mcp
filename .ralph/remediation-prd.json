@@ -184,7 +184,7 @@
       "title": "Protect preview from rebinding and network disclosure",
       "dependencies": ["SEC-003"],
       "acceptance": ["hostile Host and Origin are rejected", "non-loopback preview requires authentication or is refused", "loopback preview remains usable"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "INIT-001",

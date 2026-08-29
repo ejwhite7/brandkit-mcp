@@ -9,7 +9,11 @@ import { exec } from 'child_process';
 import { loadConfigWithPath, resolveConfigPaths } from '../../config/loader.js';
 import { buildDesignSystemIndex } from '../../indexer/index.js';
 import { watchBrandDirectory } from '../../indexer/hot-reload.js';
-import { createPreviewServer, type IndexRef } from '../../preview/server.js';
+import {
+  assertPreviewLoopbackHost,
+  createPreviewServer,
+  type IndexRef,
+} from '../../preview/server.js';
 import type { Server as HttpServer } from 'http';
 import { formatHostForUrl } from '../../network.js';
 
@@ -29,6 +33,13 @@ export async function previewCommand(options: PreviewOptions): Promise<HttpServe
   // portability fix as startServer in src/index.ts).
   const { config: rawConfig, filePath } = loadConfigWithPath(options.config);
   const config = resolveConfigPaths(rawConfig, dirname(filePath));
+  const parsed = parseInt(options.port ?? '', 10);
+  const port = Number.isNaN(parsed) ? config.preview.port : parsed;
+  const host = options.host ?? config.preview.host;
+
+  // Fail before indexing or starting a watcher so a preview can never be
+  // accidentally exposed on a LAN or wildcard listener.
+  assertPreviewLoopbackHost(host);
 
   console.log(`Building design system index for "${config.brand.name}"...`);
   const ref: IndexRef = { current: await buildDesignSystemIndex(config) };
@@ -41,10 +52,7 @@ export async function previewCommand(options: PreviewOptions): Promise<HttpServe
     });
   }
 
-  const app = createPreviewServer(ref, config);
-  const parsed = parseInt(options.port ?? '', 10);
-  const port = Number.isNaN(parsed) ? config.preview.port : parsed;
-  const host = options.host ?? config.preview.host;
+  const app = createPreviewServer(ref, config, { host, port });
 
   const server = app.listen(port, host, () => {
     const address = server.address();

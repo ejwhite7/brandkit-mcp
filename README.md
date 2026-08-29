@@ -198,6 +198,11 @@ server:
 
 `allowedOrigins` entries are exact HTTP(S) origins, including the port when it is non-default. If the list is empty, requests without an `Origin` header remain valid for MCP clients, while a supplied Origin must use a trusted Host hostname. Configure `allowedOrigins` explicitly when a browser application is hosted on a different origin. IPv6 entries in `allowedHosts` use brackets, for example `[2001:db8::10]`.
 
+The preview UI is deliberately loopback-only and refuses any wildcard, LAN, or
+public bind host. It also applies the same Host and Origin validation to every
+page and static asset. Use the authenticated MCP HTTP transport when data must
+be available beyond the local machine.
+
 ### Docker Compose
 
 The default Compose service runs the supported Streamable HTTP transport on `http://127.0.0.1:3001/mcp`. It uses the bundled Acme example, so a fresh checkout does not require host-side brand files. Set a bearer token before starting it:

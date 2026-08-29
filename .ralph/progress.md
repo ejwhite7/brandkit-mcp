@@ -337,3 +337,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that would restore confirmed cross-server data disclosure.
 - Commit: Pending at time of entry.
 - Next eligible story: PREVIEW-001.
+
+## 2026-08-29 02:29 EDT — PREVIEW-001
+
+- Objective: Prevent DNS rebinding and unauthenticated disclosure through the visual preview UI.
+- Defect reproduced: Hostile Host headers reached preview pages, assets, and static files; hostile Origins were accepted; configuration or CLI flags could bind preview on wildcard/LAN interfaces without credentials.
+- Decision: Keep preview a trusted local development surface instead of adding a second remotely authenticated product surface.
+- Changes: Preview now refuses every non-loopback host before indexing, watching, or listening; `createPreviewServer` independently enforces the same invariant; shared Host/Origin validation runs before every route including static assets; remote users are directed to authenticated MCP HTTP.
+- Files changed: `README.md`, `src/preview/server.ts`, `src/cli/commands/preview.ts`, `src/tests/preview-server.test.ts`, and `src/tests/network-binding.test.ts`.
+- Tests added: Hostile Host rejection for page, asset, and static routes; hostile Origin rejection; normal loopback browser/static behavior; wildcard, LAN, and config-derived non-loopback refusal.
+- Verification commands: Focused 45-test preview/policy/binding/context matrix, built CLI smoke, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 38 files / 298 tests pass; typecheck, lint, build/DTS, CLI smoke, and diff check pass. Built CLI returns 403 before brand content for hostile Host/Origin and exits before indexing for `--host 0.0.0.0`.
+- Security review: No preview credential exists to leak or log because remote binds are refused; request validation precedes static and dynamic content.
+- Compatibility review: `localhost`, `127.0.0.1`, and `::1` preview workflows remain supported; remote preview binding is intentionally removed.
+- Rollback: Revert this story commit; that restores confirmed unauthenticated brand disclosure.
+- Commit: Pending at time of entry.
+- Next eligible story: INIT-001.
