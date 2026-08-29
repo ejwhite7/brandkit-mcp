@@ -39,14 +39,16 @@ program
 program
   .command('serve')
   .description('Start the MCP server')
-  .option('--transport <type>', 'Transport type: stdio, sse, or http (Streamable HTTP)', 'stdio')
-  .option('--port <number>', 'Port for SSE transport', '3001')
+  .option('--transport <type>', 'Transport type: stdio, sse, or http (Streamable HTTP)')
+  .option('--port <number>', 'Port for network transports')
+  .option('--host <host>', 'Host for network transports')
   .option('--config <path>', 'Path to brandkit.config.yaml')
   .option('--watch', 'Enable hot reload on file changes')
   .action(async (options) => {
     await startServer({
       transport: options.transport as 'stdio' | 'sse' | 'http',
-      port: parseInt(options.port, 10),
+      port: options.port === undefined ? undefined : parseInt(options.port, 10),
+      host: options.host,
       configPath: options.config,
       watch: options.watch,
     });
@@ -55,7 +57,8 @@ program
 program
   .command('preview')
   .description('Start the local preview UI for browsing the brand atomic system')
-  .option('--port <number>', 'Port for preview server', '3000')
+  .option('--port <number>', 'Port for preview server')
+  .option('--host <host>', 'Host for preview server')
   .option('--config <path>', 'Path to brandkit.config.yaml')
   .option('--watch', 'Enable hot reload on file changes')
   .option('--open', 'Open browser automatically')

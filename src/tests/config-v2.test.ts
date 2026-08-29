@@ -11,6 +11,20 @@ describe('config v2 schema', () => {
     expect(parsed.contexts).toEqual(['base', 'web', 'product']);
     expect(parsed.brand.root).toBe('./brand_atomic_system');
     expect(parsed.ignore).toContain('human/');
+    expect(parsed.server).toEqual({ transport: 'stdio', port: 3001, host: '127.0.0.1' });
+    expect(parsed.preview).toEqual({ port: 3000, host: '127.0.0.1' });
+  });
+
+  it('accepts Streamable HTTP and explicit network hosts', () => {
+    const parsed = BrandKitConfigSchema.parse({
+      version: 2,
+      brand: { name: 'Acme Corp' },
+      server: { transport: 'http', host: '::1' },
+      preview: { host: '::1' },
+    });
+    expect(parsed.server.transport).toBe('http');
+    expect(parsed.server.host).toBe('::1');
+    expect(parsed.preview.host).toBe('::1');
   });
 
   it('rejects v1 configs via schema (wrong version literal)', () => {

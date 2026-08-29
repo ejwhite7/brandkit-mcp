@@ -17,21 +17,27 @@ import { loadConfigWithPath, resolveConfigPaths } from '../config/loader.js';
 import { buildDesignSystemIndex } from '../indexer/index.js';
 import { registerAllTools } from '../tools/index.js';
 import { getPackageVersion } from '../version.js';
+import { formatHostForUrl } from '../network.js';
 
 /**
  * Starts a standalone HTTP server with SSE transport.
- * @param port - Port to listen on (default: 3001; pass 0 for an ephemeral port)
+ * @param port - Optional port override (config default: 3001; pass 0 for an ephemeral port)
  * @param configPath - Optional path to brandkit.config.yaml
+ * @param host - Optional host override (config default: 127.0.0.1)
  * @returns The listening http.Server (caller may close() it)
  */
 export async function startStandaloneServer(
-  port: number = 3001,
+  port?: number,
   configPath?: string,
+  host?: string,
 ): Promise<HttpServer> {
   // Resolve relative paths against the config file's own directory (same
   // portability fix as startServer in src/index.ts).
   const { config: rawConfig, filePath } = loadConfigWithPath(configPath);
   const config = resolveConfigPaths(rawConfig, dirname(filePath));
+  const listenPort = port ?? config.server.port;
+  const listenHost = host ?? config.server.host;
+  const urlHost = formatHostForUrl(listenHost);
   const index = await buildDesignSystemIndex(config);
 
   // One transport per connected client, keyed by sessionId.
@@ -87,12 +93,12 @@ export async function startStandaloneServer(
 
   await new Promise<void>((resolveListen, rejectListen) => {
     httpServer.once('error', rejectListen);
-    httpServer.listen(port, () => {
+    httpServer.listen(listenPort, listenHost, () => {
       const address = httpServer.address();
-      const actualPort = typeof address === 'object' && address !== null ? address.port : port;
-      console.error(`[brandkit-mcp] Standalone server running at http://localhost:${actualPort}`);
-      console.error(`[brandkit-mcp] SSE endpoint: http://localhost:${actualPort}/sse`);
-      console.error(`[brandkit-mcp] Health check: http://localhost:${actualPort}/health`);
+      const actualPort = typeof address === 'object' && address !== null ? address.port : listenPort;
+      console.error(`[brandkit-mcp] Standalone server running at http://${urlHost}:${actualPort}`);
+      console.error(`[brandkit-mcp] SSE endpoint: http://${urlHost}:${actualPort}/sse`);
+      console.error(`[brandkit-mcp] Health check: http://${urlHost}:${actualPort}/health`);
       resolveListen();
     });
   });
@@ -109,7 +115,7 @@ const isDirectRun = (() => {
   }
 })();
 if (isDirectRun) {
-  const parsed = parseInt(process.env.PORT ?? '3001', 10);
-  const port = Number.isNaN(parsed) ? 3001 : parsed;
-  startStandaloneServer(port).catch(console.error);
+  const parsed = process.env.PORT === undefined ? undefined : parseInt(process.env.PORT, 10);
+  const port = parsed !== undefined && Number.isNaN(parsed) ? undefined : parsed;
+  startStandaloneServer(port, undefined, process.env.HOST).catch(console.error);
 }

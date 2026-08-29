@@ -9,12 +9,12 @@ import { startStandaloneServer } from '../adapters/standalone.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureRoot = resolve(__dirname, '../..', '__test_fixtures__', 'v2', 'full');
 
-function writeTempConfig(): string {
+function writeTempConfig(host?: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'bk-standalone-'));
   const configPath = join(dir, 'brandkit.config.yaml');
   writeFileSync(
     configPath,
-    `version: 2\nbrand:\n  name: Test Brand\n  root: ${JSON.stringify(fixtureRoot)}\n`,
+    `version: 2\nbrand:\n  name: Test Brand\n  root: ${JSON.stringify(fixtureRoot)}\n${host ? `server:\n  host: ${JSON.stringify(host)}\n` : ''}`,
   );
   return configPath;
 }
@@ -33,6 +33,7 @@ describe('startStandaloneServer', () => {
     server = await startStandaloneServer(0, writeTempConfig());
     const address = server.address();
     if (typeof address !== 'object' || address === null) throw new Error('no address');
+    expect(address.address).toBe('127.0.0.1');
     const base = `http://127.0.0.1:${address.port}`;
 
     const health = await fetch(`${base}/health`);
@@ -46,6 +47,13 @@ describe('startStandaloneServer', () => {
     expect(messages.status).toBe(400);
     const body = (await messages.json()) as { error: string };
     expect(body.error).toContain('No active SSE session');
+  });
+
+  it('honors server.host from config', async () => {
+    server = await startStandaloneServer(0, writeTempConfig('::1'));
+    const address = server.address();
+    if (typeof address !== 'object' || address === null) throw new Error('no address');
+    expect(address.address).toBe('::1');
   });
 
   it('supports two concurrent SSE clients without crashing', async () => {

@@ -38,14 +38,14 @@ export const BrandKitConfigSchema = z.object({
   preview: z
     .object({
       port: z.number().int().min(1).max(65535).default(3000),
-      host: z.string().default('localhost'),
+      host: z.string().min(1).default('127.0.0.1'),
     })
     .default({}),
   server: z
     .object({
-      transport: z.enum(['stdio', 'sse']).default('stdio'),
+      transport: z.enum(['stdio', 'sse', 'http']).default('stdio'),
       port: z.number().int().min(1).max(65535).default(3001),
-      host: z.string().default('localhost'),
+      host: z.string().min(1).default('127.0.0.1'),
     })
     .default({}),
 });

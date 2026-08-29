@@ -32,7 +32,7 @@
       "title": "Enforce loopback defaults and honor configured hosts",
       "dependencies": ["BASE-001"],
       "acceptance": ["HTTP SSE preview and standalone bind to loopback by default", "server.host and preview.host are honored", "stdio remains compatible"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "SEC-002",

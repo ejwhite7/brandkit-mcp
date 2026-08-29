@@ -19,6 +19,8 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getPackageVersion } from './version.js';
 import { regenerateBrandDocsIfReady } from './brand-docs/regenerate.js';
+import type { Server as HttpServer } from 'http';
+import { formatHostForUrl } from './network.js';
 
 /** Current design system index -- updated on hot-reload. */
 let currentIndex: DesignSystemIndex;
@@ -28,6 +30,7 @@ export type Transport = 'stdio' | 'sse' | 'http';
 export interface StartServerOptions {
   transport?: Transport;
   port?: number;
+  host?: string;
   configPath?: string;
   watch?: boolean;
 }
@@ -35,9 +38,7 @@ export interface StartServerOptions {
 /**
  * Starts the BrandKit MCP server.
  */
-export async function startServer(options: StartServerOptions = {}): Promise<void> {
-  const transport = options.transport ?? 'stdio';
-
+export async function startServer(options: StartServerOptions = {}): Promise<void | HttpServer> {
   // Log to stderr (stdout is reserved for MCP protocol in stdio mode)
   console.error('[brandkit-mcp] Starting server...');
 
@@ -48,6 +49,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   // may set the working directory to something other than the install dir.
   const configDir = dirname(filePath);
   const config = resolveConfigPaths(rawConfig, configDir);
+  const transport = options.transport ?? config.server.transport;
   console.error(`[brandkit-mcp] Loaded config for "${config.brand.name}" from ${filePath}`);
 
   console.error('[brandkit-mcp] Building design system index...');
@@ -107,6 +109,8 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   const express = (await import('express')).default;
   const app = express();
   const port = options.port ?? config.server.port ?? 3001;
+  const host = options.host ?? config.server.host;
+  const urlHost = formatHostForUrl(host);
 
   if (transport === 'sse') {
     const { SSEServerTransport } = await import('@modelcontextprotocol/sdk/server/sse.js');
@@ -151,11 +155,13 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       }
     });
 
-    app.listen(port, () => {
-      console.error(`[brandkit-mcp] SSE server running at http://localhost:${port}`);
-      console.error(`[brandkit-mcp] Connect via SSE at http://localhost:${port}/sse`);
+    const httpServer = app.listen(port, host, () => {
+      const address = httpServer.address();
+      const actualPort = typeof address === 'object' && address !== null ? address.port : port;
+      console.error(`[brandkit-mcp] SSE server running at http://${urlHost}:${actualPort}`);
+      console.error(`[brandkit-mcp] Connect via SSE at http://${urlHost}:${actualPort}/sse`);
     });
-    return;
+    return httpServer;
   }
 
   if (transport === 'http') {
@@ -172,10 +178,12 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       await httpTransport.handleRequest(req, res, req.body);
     });
 
-    app.listen(port, () => {
-      console.error(`[brandkit-mcp] Streamable HTTP server running at http://localhost:${port}/mcp`);
+    const httpServer = app.listen(port, host, () => {
+      const address = httpServer.address();
+      const actualPort = typeof address === 'object' && address !== null ? address.port : port;
+      console.error(`[brandkit-mcp] Streamable HTTP server running at http://${urlHost}:${actualPort}/mcp`);
     });
-    return;
+    return httpServer;
   }
 
   throw new Error(`Unknown transport: ${transport}`);

@@ -10,9 +10,12 @@ import { loadConfigWithPath, resolveConfigPaths } from '../../config/loader.js';
 import { buildDesignSystemIndex } from '../../indexer/index.js';
 import { watchBrandDirectory } from '../../indexer/hot-reload.js';
 import { createPreviewServer, type IndexRef } from '../../preview/server.js';
+import type { Server as HttpServer } from 'http';
+import { formatHostForUrl } from '../../network.js';
 
 export interface PreviewOptions {
   port?: string;
+  host?: string;
   config?: string;
   watch?: boolean;
   open?: boolean;
@@ -21,7 +24,7 @@ export interface PreviewOptions {
 /**
  * Handles the `brandkit-mcp preview` command.
  */
-export async function previewCommand(options: PreviewOptions): Promise<void> {
+export async function previewCommand(options: PreviewOptions): Promise<HttpServer> {
   // Resolve relative paths against the config file's own directory (same
   // portability fix as startServer in src/index.ts).
   const { config: rawConfig, filePath } = loadConfigWithPath(options.config);
@@ -41,9 +44,12 @@ export async function previewCommand(options: PreviewOptions): Promise<void> {
   const app = createPreviewServer(ref, config);
   const parsed = parseInt(options.port ?? '', 10);
   const port = Number.isNaN(parsed) ? config.preview.port : parsed;
+  const host = options.host ?? config.preview.host;
 
-  const server = app.listen(port, () => {
-    const url = `http://localhost:${port}`;
+  const server = app.listen(port, host, () => {
+    const address = server.address();
+    const actualPort = typeof address === 'object' && address !== null ? address.port : port;
+    const url = `http://${formatHostForUrl(host)}:${actualPort}`;
     console.log(`Preview running at ${url}`);
     if (options.open) {
       const opener =
@@ -64,4 +70,6 @@ export async function previewCommand(options: PreviewOptions): Promise<void> {
     }
     process.exit(1);
   });
+
+  return server;
 }

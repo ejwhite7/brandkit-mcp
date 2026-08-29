@@ -33,3 +33,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Restore the previous package script and remove the contract test.
 - Commit: Pending at time of entry.
 - Next eligible story: SEC-001.
+
+## 2026-08-28 23:24 EDT — SEC-001
+
+- Objective: Make every local network entry point bind to loopback by default and honor explicit configuration.
+- Defect reproduced: HTTP, SSE, preview, and standalone used hostless `listen` calls, while CLI defaults masked configured transport and ports.
+- Changes: Defaulted network hosts to `127.0.0.1`; plumbed host through server, preview, CLI, and standalone; honored configured transport and ports; accepted `http` in config; formatted IPv6 URLs safely.
+- Files changed: `src/types/config.ts`, `src/network.ts`, `src/index.ts`, `src/cli/index.ts`, `src/cli/commands/preview.ts`, `src/adapters/standalone.ts`, and binding/config tests.
+- Tests added: Default and configured binding tests for Streamable HTTP, SSE, preview, and standalone.
+- Verification commands: Focused 16 tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `git diff --check`.
+- Verification results: Focused tests pass; full 199 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Default network exposure is now restricted to loopback. Explicit non-loopback configuration remains intentionally possible and is gated by SEC-002.
+- Compatibility review: Stdio remains the config default; CLI flags remain available and now override rather than mask config.
+- Remaining risks: Non-loopback authentication, Host/Origin validation, and write-tool gating remain open.
+- Rollback: Revert this story commit to restore prior binding behavior.
+- Commit: Pending at time of entry.
+- Next eligible story: SEC-002.
