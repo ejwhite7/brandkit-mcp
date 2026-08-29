@@ -40,6 +40,8 @@ describe('startStandaloneServer', () => {
 
     const health = await fetch(`${base}/health`);
     expect(health.status).toBe(200);
+    expect(health.headers.get('cache-control')).toBe('no-store');
+    await expect(health.json()).resolves.toEqual({ status: 'ready' });
 
     const messages = await fetch(`${base}/messages?sessionId=nope`, {
       method: 'POST',
@@ -96,6 +98,45 @@ describe('startStandaloneServer', () => {
 
     c1.abort();
     c2.abort();
+  });
+
+  it('bounds SSE sessions and message bodies', async () => {
+    server = await startStandaloneServer(
+      0,
+      writeTempConfig(),
+      undefined,
+      undefined,
+      false,
+      { maxSseSessions: 1, jsonBodyBytes: 128 },
+    );
+    const address = server.address();
+    if (typeof address !== 'object' || address === null) throw new Error('no address');
+    const base = `http://127.0.0.1:${address.port}`;
+    const controller = new AbortController();
+    const connection = await fetch(`${base}/sse`, {
+      headers: { Accept: 'text/event-stream' },
+      signal: controller.signal,
+    });
+    const reader = connection.body!.getReader();
+    const { value } = await reader.read();
+    const match = /sessionId=([a-z0-9-]+)/i.exec(new TextDecoder().decode(value));
+    if (!match) throw new Error('no session id');
+
+    const capacity = await fetch(`${base}/sse`, { headers: { Accept: 'text/event-stream' } });
+    expect(capacity.status).toBe(503);
+    await expect(capacity.json()).resolves.toMatchObject({ code: 'session_capacity' });
+
+    const oversized = await fetch(`${base}/messages?sessionId=${match[1]}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload: 'x'.repeat(256) }),
+    });
+    expect(oversized.status).toBe(413);
+    await expect(oversized.json()).resolves.toEqual({
+      error: 'Request body too large',
+      code: 'body_too_large',
+    });
+    controller.abort();
   });
 
   it('does not advertise sync_brand_docs by default', async () => {

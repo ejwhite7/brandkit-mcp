@@ -24,8 +24,13 @@ import type { ErrorRequestHandler } from 'express';
 import {
   createNetworkAuthPolicy,
   createNetworkRequestPolicy,
+  configureHttpServerLimits,
   formatHostForUrl,
   getDistinctRequestHeader,
+  NetworkRequestTimeoutError,
+  type NetworkResourceLimits,
+  resolveNetworkLimits,
+  withRequestTimeout,
 } from './network.js';
 
 /** Current design system index -- updated on hot-reload. */
@@ -43,6 +48,8 @@ export interface StartServerOptions {
   authToken?: string;
   /** Explicitly expose write-capable tools on network transports. */
   allowWriteTools?: boolean;
+  /** Optional finite network limits for embedders and tests. */
+  networkLimits?: Partial<NetworkResourceLimits>;
 }
 
 /** Stdio is the trusted local workflow; network transports require opt-in. */
@@ -146,6 +153,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     config.server.allowedHosts,
     config.server.allowedOrigins,
   );
+  const limits = resolveNetworkLimits(options.networkLimits);
 
   app.use((req, res, next) => {
     if (requestPolicy.validate(
@@ -166,44 +174,93 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     res.status(401).set('WWW-Authenticate', 'Bearer').json({ error: 'Unauthorized' });
   });
 
+  app.get('/health', (_req, res) => {
+    res.set('Cache-Control', 'no-store').status(200).json({ status: 'ready' });
+  });
+
   if (transport === 'sse') {
     const { SSEServerTransport } = await import('@modelcontextprotocol/sdk/server/sse.js');
     // Map per-session-id -> transport so multiple clients can connect.
     const sessions = new Map<string, InstanceType<typeof SSEServerTransport>>();
 
     app.get('/sse', async (_req, res) => {
+      if (sessions.size >= limits.maxSseSessions) {
+        res.status(503).json({ error: 'Server is at session capacity', code: 'session_capacity' });
+        return;
+      }
+      let sessionServer: Server | undefined;
       try {
         // The MCP SDK allows one transport per Server instance, so each SSE
         // connection gets its own Server sharing the index via closure.
-        const sessionServer = createMcpServer();
+        sessionServer = createMcpServer();
         const t = new SSEServerTransport('/messages', res, requestPolicy.sdkDnsRebindingOptions);
         sessions.set(t.sessionId, t);
-        res.on('close', () => sessions.delete(t.sessionId));
+        res.on('close', () => {
+          sessions.delete(t.sessionId);
+          void sessionServer?.close().catch(() => {
+            console.error('[brandkit-mcp] SSE session cleanup error');
+          });
+        });
         await sessionServer.connect(t);
       } catch {
         console.error('[brandkit-mcp] SSE request handler error');
         if (!res.headersSent) {
           res.status(500).json({ error: 'Internal server error' });
+        } else if (!res.writableEnded) {
+          res.end();
         }
       }
     });
 
+    app.use('/messages', express.json({ limit: limits.jsonBodyBytes }));
+    let activeMessages = 0;
     app.post('/messages', async (req, res) => {
+      if (activeMessages >= limits.maxConcurrentRequests) {
+        res.status(503).json({ error: 'Server is at request capacity', code: 'request_capacity' });
+        return;
+      }
+      activeMessages += 1;
+      const sessionId = (req.query.sessionId as string) ?? '';
+      const t = sessions.get(sessionId);
       try {
-        const sessionId = (req.query.sessionId as string) ?? '';
-        const t = sessions.get(sessionId);
         if (!t) {
           res.status(400).json({ error: 'No active SSE session for sessionId' });
           return;
         }
-        await t.handlePostMessage(req, res);
-      } catch {
+        await withRequestTimeout(t.handlePostMessage(req, res, req.body), limits.requestTimeoutMs);
+      } catch (error) {
         console.error('[brandkit-mcp] SSE message handler error');
         if (!res.headersSent) {
-          res.status(500).json({ error: 'Internal server error' });
+          const timedOut = error instanceof NetworkRequestTimeoutError;
+          res.status(timedOut ? 504 : 500).json({
+            error: timedOut ? 'Request timed out' : 'Internal server error',
+            code: timedOut ? 'request_timeout' : 'internal_error',
+          });
+          if (timedOut) {
+            sessions.delete(sessionId);
+            void t?.close().catch(() => {
+              console.error('[brandkit-mcp] Timed-out SSE session cleanup error');
+            });
+          }
+        } else if (!res.writableEnded) {
+          res.end();
         }
+      } finally {
+        activeMessages -= 1;
       }
     });
+
+    app.use(((error, _req, res, _next) => {
+      const tooLarge = typeof error === 'object' && error !== null
+        && 'type' in error && error.type === 'entity.too.large';
+      const parseError = error instanceof SyntaxError
+        || (typeof error === 'object' && error !== null
+          && 'type' in error && error.type === 'entity.parse.failed');
+      res.status(tooLarge ? 413 : parseError ? 400 : 500).json({
+        error: tooLarge ? 'Request body too large' : parseError ? 'Invalid JSON' : 'Internal server error',
+        code: tooLarge ? 'body_too_large' : parseError ? 'invalid_json' : 'internal_error',
+      });
+    }) satisfies ErrorRequestHandler);
 
     const httpServer = app.listen(port, host, () => {
       const address = httpServer.address();
@@ -211,13 +268,14 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       console.error(`[brandkit-mcp] SSE server running at http://${urlHost}:${actualPort}`);
       console.error(`[brandkit-mcp] Connect via SSE at http://${urlHost}:${actualPort}/sse`);
     });
+    configureHttpServerLimits(httpServer, limits);
     return httpServer;
   }
 
   if (transport === 'http') {
     // Streamable HTTP transport (MCP spec 2025-03-26)
     const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
-    app.use(express.json());
+    app.use(express.json({ limit: limits.jsonBodyBytes }));
 
     // Express' default body-parser error is HTML. Keep failures on the MCP
     // endpoint machine-readable and finish the response rather than hanging.
@@ -225,18 +283,30 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       const isParseError = error instanceof SyntaxError
         || (typeof error === 'object' && error !== null && 'type' in error
           && error.type === 'entity.parse.failed');
+      const isTooLarge = typeof error === 'object' && error !== null && 'type' in error
+        && error.type === 'entity.too.large';
       console.error('[brandkit-mcp] Streamable HTTP request body error');
-      res.status(isParseError ? 400 : 500).json({
+      res.status(isTooLarge ? 413 : isParseError ? 400 : 500).json({
         jsonrpc: '2.0',
         error: {
-          code: isParseError ? -32700 : -32603,
-          message: isParseError ? 'Parse error' : 'Internal server error',
+          code: isTooLarge ? -32001 : isParseError ? -32700 : -32603,
+          message: isTooLarge ? 'Request body too large' : isParseError ? 'Parse error' : 'Internal server error',
         },
         id: null,
       });
     }) satisfies ErrorRequestHandler);
 
+    let activeRequests = 0;
     app.post('/mcp', async (req, res) => {
+      if (activeRequests >= limits.maxConcurrentRequests) {
+        res.status(503).json({
+          jsonrpc: '2.0',
+          error: { code: -32002, message: 'Server is at request capacity' },
+          id: null,
+        });
+        return;
+      }
+      activeRequests += 1;
       // The SDK transport and Server both retain protocol callbacks and
       // initialization state. Stateless mode therefore requires a fresh pair
       // for every HTTP request, including simultaneous requests.
@@ -255,12 +325,18 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       // A stateless request has no server-side session after the response.
       // ServerResponse `close` runs after the SDK has finished its response
       // bridge and also covers a client disconnect during request processing.
-      res.once('close', () => { void cleanup(); });
+      res.once('close', () => {
+        activeRequests -= 1;
+        void cleanup();
+      });
 
       try {
         await requestServer.connect(requestTransport);
-        await requestTransport.handleRequest(req, res, req.body);
-      } catch {
+        await withRequestTimeout(
+          requestTransport.handleRequest(req, res, req.body),
+          limits.requestTimeoutMs,
+        );
+      } catch (error) {
         console.error('[brandkit-mcp] Streamable HTTP request handler error');
         if (!res.headersSent) {
           const requestId = typeof req.body === 'object'
@@ -269,11 +345,15 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
             && (typeof req.body.id === 'string' || typeof req.body.id === 'number' || req.body.id === null)
             ? req.body.id
             : null;
-          res.status(500).json({
+          const timedOut = error instanceof NetworkRequestTimeoutError;
+          res.status(timedOut ? 504 : 500).json({
             jsonrpc: '2.0',
-            error: { code: -32603, message: 'Internal server error' },
+            error: timedOut
+              ? { code: -32003, message: 'Request timed out' }
+              : { code: -32603, message: 'Internal server error' },
             id: requestId,
           });
+          if (timedOut) void cleanup();
         } else if (!res.writableEnded) {
           res.end();
         }
@@ -296,6 +376,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       const actualPort = typeof address === 'object' && address !== null ? address.port : port;
       console.error(`[brandkit-mcp] Streamable HTTP server running at http://${urlHost}:${actualPort}/mcp`);
     });
+    configureHttpServerLimits(httpServer, limits);
     return httpServer;
   }
 

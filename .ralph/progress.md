@@ -113,3 +113,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit to restore the former HTTP handler, noting that doing so restores the second-request failure.
 - Commit: Pending at time of entry.
 - Next eligible story: HTTP-002.
+
+## 2026-08-29 00:01 EDT — HTTP-002
+
+- Objective: Bound network resources and make readiness and failure behavior predictable.
+- Defect reproduced: Main HTTP/SSE lacked readiness, request/session caps, and application timeouts; standalone exposed indexed asset counts and buffered message bodies without an explicit limit; several post-header errors could leave responses open.
+- Changes: Added shared finite network limits; authenticated and authority-protected `{status: "ready"}` health responses with no brand data; bounded JSON bodies, concurrent requests, and SSE sessions; finite request/header/keep-alive/header-count settings; structured redacted 400/413/500/503/504 responses; session Server cleanup and timeout cancellation.
+- Files changed: `src/network.ts`, `src/index.ts`, `src/adapters/standalone.ts`, `src/tests/streamable-http.test.ts`, `src/tests/standalone-adapter.test.ts`.
+- Tests added: Readiness response/redaction, concrete server limits, oversized Express and standalone bodies, SSE session capacity, concurrent request capacity, stuck-handler timeout, and retained HTTP-001 client/cleanup coverage.
+- Verification commands: Focused 28 network tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 230 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Requests, bodies, headers, and sessions have finite caps; external error payloads do not expose stack traces, credentials, filesystem paths, or brand counts.
+- Compatibility review: Stdio is unchanged; SSE remains long-lived because socket limits do not impose a response lifetime; HTTP-001 cleanup remains response-owned on successful requests.
+- Remaining risks: Brand file reads still need universal symlink containment in FS-001.
+- Rollback: Revert this story commit; custom `networkLimits` embedder options will no longer be accepted.
+- Commit: Pending at time of entry.
+- Next eligible story: FS-001.

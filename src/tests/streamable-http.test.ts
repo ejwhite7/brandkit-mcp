@@ -44,8 +44,10 @@ async function endpointFor(server: HttpServer): Promise<URL> {
   return new URL(`http://127.0.0.1:${address.port}/mcp`);
 }
 
-async function startHttpServer(): Promise<{ server: HttpServer; endpoint: URL }> {
-  const server = await startServer({ configPath: writeConfig(), port: 0 });
+async function startHttpServer(
+  networkLimits: NonNullable<Parameters<typeof startServer>[0]>['networkLimits'] = {},
+): Promise<{ server: HttpServer; endpoint: URL }> {
+  const server = await startServer({ configPath: writeConfig(), port: 0, networkLimits });
   if (!server) throw new Error('expected an HTTP server');
   servers.push(server);
   return { server, endpoint: await endpointFor(server) };
@@ -162,5 +164,77 @@ describe('stateless Streamable HTTP lifecycle', () => {
       error: { code: -32603, message: 'Internal server error' },
       id: 42,
     });
+  });
+
+  it('reports readiness without exposing brand data and applies finite server limits', async () => {
+    const { server, endpoint } = await startHttpServer();
+    const health = await fetch(new URL('/health', endpoint));
+
+    expect(health.status).toBe(200);
+    expect(health.headers.get('cache-control')).toBe('no-store');
+    await expect(health.json()).resolves.toEqual({ status: 'ready' });
+    expect(server.requestTimeout).toBe(30_000);
+    expect(server.headersTimeout).toBe(10_000);
+    expect(server.keepAliveTimeout).toBe(5_000);
+    expect(server.maxHeadersCount).toBe(100);
+  });
+
+  it('rejects oversized JSON before creating an MCP request', async () => {
+    const { endpoint } = await startHttpServer({ jsonBodyBytes: 128 });
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload: 'x'.repeat(256) }),
+    });
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Request body too large' },
+      id: null,
+    });
+  });
+
+  it('times out a stuck handler and bounds concurrent requests', async () => {
+    const { endpoint } = await startHttpServer({
+      maxConcurrentRequests: 1,
+      requestTimeoutMs: 1_000,
+      headersTimeoutMs: 500,
+    });
+    const transportClose = vi.spyOn(StreamableHTTPServerTransport.prototype, 'close');
+    let signalStarted: (() => void) | undefined;
+    const handlerStarted = new Promise<void>((resolveStarted) => {
+      signalStarted = resolveStarted;
+    });
+    vi.spyOn(StreamableHTTPServerTransport.prototype, 'handleRequest')
+      .mockImplementation(() => {
+        signalStarted?.();
+        return new Promise<void>(() => {});
+      });
+    const request = {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json, text/event-stream',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'ping' }),
+    } as const;
+
+    const firstPromise = fetch(endpoint, request);
+    await handlerStarted;
+    const capacity = await fetch(endpoint, request);
+    expect(capacity.status).toBe(503);
+    await expect(capacity.json()).resolves.toMatchObject({
+      error: { code: -32002, message: 'Server is at request capacity' },
+    });
+
+    const timedOut = await firstPromise;
+    expect(timedOut.status).toBe(504);
+    await expect(timedOut.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      error: { code: -32003, message: 'Request timed out' },
+      id: 7,
+    });
+    await vi.waitFor(() => expect(transportClose).toHaveBeenCalled());
   });
 });

@@ -1,6 +1,129 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import { isIP } from 'net';
-import type { IncomingMessage } from 'http';
+import type { IncomingMessage, Server as HttpServer } from 'http';
+
+/** Conservative defaults for every long-running Node network adapter. */
+export const DEFAULT_NETWORK_LIMITS = Object.freeze({
+  jsonBodyBytes: 256 * 1024,
+  maxConcurrentRequests: 64,
+  maxSseSessions: 64,
+  requestTimeoutMs: 30_000,
+  headersTimeoutMs: 10_000,
+  keepAliveTimeoutMs: 5_000,
+  maxHeadersCount: 100,
+});
+
+export interface NetworkResourceLimits {
+  jsonBodyBytes: number;
+  maxConcurrentRequests: number;
+  maxSseSessions: number;
+  requestTimeoutMs: number;
+  headersTimeoutMs: number;
+  keepAliveTimeoutMs: number;
+  maxHeadersCount: number;
+}
+
+export function resolveNetworkLimits(
+  overrides: Partial<NetworkResourceLimits> = {},
+): NetworkResourceLimits {
+  const limits = { ...DEFAULT_NETWORK_LIMITS, ...overrides };
+  for (const [name, value] of Object.entries(limits)) {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new Error(`networkLimits.${name} must be a positive integer`);
+    }
+  }
+  if (limits.headersTimeoutMs > limits.requestTimeoutMs) {
+    throw new Error('networkLimits.headersTimeoutMs cannot exceed requestTimeoutMs');
+  }
+  return limits;
+}
+
+/** Applies finite socket/parser limits without imposing a lifetime on SSE responses. */
+export function configureHttpServerLimits(
+  server: HttpServer,
+  limits: NetworkResourceLimits,
+): void {
+  server.requestTimeout = limits.requestTimeoutMs;
+  server.headersTimeout = limits.headersTimeoutMs;
+  server.keepAliveTimeout = limits.keepAliveTimeoutMs;
+  server.maxHeadersCount = limits.maxHeadersCount;
+}
+
+export class NetworkRequestTimeoutError extends Error {}
+export class NetworkBodyTooLargeError extends Error {}
+export class NetworkInvalidJsonError extends Error {}
+
+/** Reads a standalone adapter JSON body without allowing unbounded buffering. */
+export function readBoundedJsonBody(
+  request: IncomingMessage,
+  maxBytes: number,
+): Promise<unknown> {
+  const declaredLength = Number(request.headers['content-length']);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    return Promise.reject(new NetworkBodyTooLargeError('Request body too large'));
+  }
+
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let received = 0;
+    const cleanup = (): void => {
+      request.off('data', onData);
+      request.off('end', onEnd);
+      request.off('error', onError);
+      request.off('aborted', onAborted);
+    };
+    const onError = (): void => {
+      cleanup();
+      reject(new Error('Request body stream failed'));
+    };
+    const onAborted = (): void => {
+      cleanup();
+      reject(new Error('Request body aborted'));
+    };
+    const onData = (chunk: Buffer | string): void => {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      received += buffer.length;
+      if (received > maxBytes) {
+        cleanup();
+        request.pause();
+        reject(new NetworkBodyTooLargeError('Request body too large'));
+        return;
+      }
+      chunks.push(buffer);
+    };
+    const onEnd = (): void => {
+      cleanup();
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown);
+      } catch {
+        reject(new NetworkInvalidJsonError('Invalid JSON'));
+      }
+    };
+    request.on('data', onData);
+    request.once('end', onEnd);
+    request.once('error', onError);
+    request.once('aborted', onAborted);
+  });
+}
+
+/** Bounds application handler latency; Node's requestTimeout only bounds body receipt. */
+export async function withRequestTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new NetworkRequestTimeoutError('Request timed out')), timeoutMs);
+        timer.unref();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /** Formats a configured hostname or IP address for use in an HTTP URL. */
 export function formatHostForUrl(host: string): string {

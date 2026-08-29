@@ -72,7 +72,7 @@
       "title": "Normalize HTTP errors health checks and resource limits",
       "dependencies": ["HTTP-001"],
       "acceptance": ["errors never leave requests hanging", "health reports readiness without brand data", "request and session resources are bounded"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "FS-001",

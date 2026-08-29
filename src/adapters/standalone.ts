@@ -20,8 +20,16 @@ import { getPackageVersion } from '../version.js';
 import {
   createNetworkAuthPolicy,
   createNetworkRequestPolicy,
+  configureHttpServerLimits,
   formatHostForUrl,
   getDistinctRequestHeader,
+  NetworkBodyTooLargeError,
+  NetworkInvalidJsonError,
+  NetworkRequestTimeoutError,
+  readBoundedJsonBody,
+  type NetworkResourceLimits,
+  resolveNetworkLimits,
+  withRequestTimeout,
 } from '../network.js';
 
 /**
@@ -31,6 +39,7 @@ import {
  * @param host - Optional host override (config default: 127.0.0.1)
  * @param authToken - Optional programmatic Bearer token override
  * @param allowWriteTools - Explicitly expose write-capable tools (default: false)
+ * @param networkLimits - Optional finite network limits for embedders and tests
  * @returns The listening http.Server (caller may close() it)
  */
 export async function startStandaloneServer(
@@ -39,6 +48,7 @@ export async function startStandaloneServer(
   host?: string,
   authToken?: string,
   allowWriteTools = false,
+  networkLimits: Partial<NetworkResourceLimits> = {},
 ): Promise<HttpServer> {
   // Resolve relative paths against the config file's own directory (same
   // portability fix as startServer in src/index.ts).
@@ -55,12 +65,16 @@ export async function startStandaloneServer(
     config.server.allowedHosts,
     config.server.allowedOrigins,
   );
+  const limits = resolveNetworkLimits(networkLimits);
   const index = await buildDesignSystemIndex(config);
 
   // One transport per connected client, keyed by sessionId.
   const sessions = new Map<string, SSEServerTransport>();
+  let activeMessages = 0;
 
   const httpServer = createServer(async (req, res) => {
+    let requestSessionId = '';
+    let requestTransport: SSEServerTransport | undefined;
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
 
@@ -83,12 +97,23 @@ export async function startStandaloneServer(
       }
 
       if (url.pathname === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', assets: index.base.tokens.length + index.base.components.length + index.base.assets.length }));
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        });
+        res.end(JSON.stringify({ status: 'ready' }));
         return;
       }
 
       if (req.method === 'GET' && url.pathname === '/sse') {
+        if (sessions.size >= limits.maxSseSessions) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Server is at session capacity',
+            code: 'session_capacity',
+          }));
+          return;
+        }
         // The MCP SDK allows one transport per Server instance, so each SSE
         // connection gets its own Server sharing the index via closure.
         const sessionServer = new Server(
@@ -107,16 +132,41 @@ export async function startStandaloneServer(
           requestPolicy.sdkDnsRebindingOptions,
         );
         sessions.set(transport.sessionId, transport);
-        res.on('close', () => sessions.delete(transport.sessionId));
+        res.on('close', () => {
+          sessions.delete(transport.sessionId);
+          void sessionServer.close().catch(() => {
+            console.error('[brandkit-mcp] Standalone SSE session cleanup error');
+          });
+        });
         await sessionServer.connect(transport);
         return;
       }
 
       if (req.method === 'POST' && url.pathname === '/messages') {
-        const sessionId = url.searchParams.get('sessionId') ?? '';
-        const transport = sessions.get(sessionId);
-        if (transport) {
-          await transport.handlePostMessage(req, res);
+        if (activeMessages >= limits.maxConcurrentRequests) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Server is at request capacity',
+            code: 'request_capacity',
+          }));
+          return;
+        }
+        requestSessionId = url.searchParams.get('sessionId') ?? '';
+        requestTransport = sessions.get(requestSessionId);
+        if (requestTransport) {
+          activeMessages += 1;
+          try {
+            const body = await withRequestTimeout(
+              readBoundedJsonBody(req, limits.jsonBodyBytes),
+              limits.requestTimeoutMs,
+            );
+            await withRequestTimeout(
+              requestTransport.handlePostMessage(req, res, body),
+              limits.requestTimeoutMs,
+            );
+          } finally {
+            activeMessages -= 1;
+          }
         } else {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'No active SSE session for sessionId' }));
@@ -126,14 +176,40 @@ export async function startStandaloneServer(
 
       res.writeHead(404);
       res.end('Not Found');
-    } catch {
+    } catch (error) {
       console.error('[brandkit-mcp] Standalone request handler error');
       if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal server error' }));
+        const timedOut = error instanceof NetworkRequestTimeoutError;
+        const tooLarge = error instanceof NetworkBodyTooLargeError;
+        const invalidJson = error instanceof NetworkInvalidJsonError;
+        res.writeHead(tooLarge ? 413 : invalidJson ? 400 : timedOut ? 504 : 500, {
+          'Content-Type': 'application/json',
+          ...(tooLarge ? { Connection: 'close' } : {}),
+        });
+        res.end(JSON.stringify({
+          error: tooLarge
+            ? 'Request body too large'
+            : invalidJson
+              ? 'Invalid JSON'
+              : timedOut ? 'Request timed out' : 'Internal server error',
+          code: tooLarge
+            ? 'body_too_large'
+            : invalidJson
+              ? 'invalid_json'
+              : timedOut ? 'request_timeout' : 'internal_error',
+        }));
+        if (timedOut) {
+          sessions.delete(requestSessionId);
+          void requestTransport?.close().catch(() => {
+            console.error('[brandkit-mcp] Timed-out standalone SSE cleanup error');
+          });
+        }
+      } else if (!res.writableEnded) {
+        res.end();
       }
     }
   });
+  configureHttpServerLimits(httpServer, limits);
 
   await new Promise<void>((resolveListen, rejectListen) => {
     httpServer.once('error', rejectListen);
