@@ -81,3 +81,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit and remove the new allowlist fields from configuration.
 - Commit: Pending at time of entry.
 - Next eligible story: SEC-004.
+
+## 2026-08-28 23:43 EDT — SEC-004
+
+- Objective: Remove write-capable tools from network surfaces unless explicitly privileged.
+- Defect reproduced: `sync_brand_docs` was advertised and dispatched on network servers whenever a writable configuration context existed.
+- Changes: Added an explicit tool-registration policy; kept stdio writable; made SSE, Streamable HTTP, standalone, and context-free Vercel registration read-only by default; added CLI and programmatic privileged opt-in; aligned overview metadata and documentation.
+- Files changed: `README.md`, `src/tools/index.ts`, `src/tools/get-brand-overview.ts`, `src/index.ts`, `src/cli/index.ts`, `src/adapters/standalone.ts`, and tool/adapter tests.
+- Tests added: Tool listing and direct-dispatch refusal, privilege-plus-context requirements, transport policy, standalone handshakes, and context-free Vercel behavior.
+- Verification commands: Focused 12 tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, CLI help inspection, and `git diff --check`.
+- Verification results: Focused tests pass; full 221 tests pass; typecheck, lint, build, CLI help, and diff check pass.
+- Security review: Both tool discovery and direct invocation are gated; merely knowing the tool name does not bypass the policy.
+- Compatibility review: The local stdio workflow retains `sync_brand_docs`; network users must opt into privileged mode explicitly.
+- Remaining risks: Streamable HTTP still reuses a stateless transport and fails after its first request.
+- Rollback: Revert this story commit and remove the privileged CLI flag from deployment commands.
+- Commit: Pending at time of entry.
+- Next eligible story: HTTP-001.

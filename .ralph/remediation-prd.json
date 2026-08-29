@@ -56,7 +56,7 @@
       "title": "Gate write-capable tools on network transports",
       "dependencies": ["SEC-002"],
       "acceptance": ["sync_brand_docs is hidden on network transports by default", "explicit privileged mode is required", "stdio write workflow remains available"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "HTTP-001",

@@ -44,6 +44,7 @@ program
   .option('--host <host>', 'Host for network transports')
   .option('--config <path>', 'Path to brandkit.config.yaml')
   .option('--watch', 'Enable hot reload on file changes')
+  .option('--allow-write-tools', 'Expose write-capable tools on network transports')
   .action(async (options) => {
     await startServer({
       transport: options.transport as 'stdio' | 'sse' | 'http',
@@ -51,6 +52,7 @@ program
       host: options.host,
       configPath: options.config,
       watch: options.watch,
+      allowWriteTools: options.allowWriteTools,
     });
   });
 

@@ -4,6 +4,8 @@ import { tmpdir } from 'os';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { Server } from 'http';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { startStandaloneServer } from '../adapters/standalone.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -94,5 +96,29 @@ describe('startStandaloneServer', () => {
 
     c1.abort();
     c2.abort();
+  });
+
+  it('does not advertise sync_brand_docs by default', async () => {
+    server = await startStandaloneServer(0, writeTempConfig());
+    const address = server.address();
+    if (typeof address !== 'object' || address === null) throw new Error('no address');
+    const client = new Client({ name: 'standalone-test', version: '1.0.0' });
+
+    await client.connect(new SSEClientTransport(new URL(`http://127.0.0.1:${address.port}/sse`)));
+    const result = await client.listTools();
+    expect(result.tools.map((tool) => tool.name)).not.toContain('sync_brand_docs');
+    await client.close();
+  });
+
+  it('advertises sync_brand_docs only in explicit privileged mode', async () => {
+    server = await startStandaloneServer(0, writeTempConfig(), undefined, undefined, true);
+    const address = server.address();
+    if (typeof address !== 'object' || address === null) throw new Error('no address');
+    const client = new Client({ name: 'standalone-test', version: '1.0.0' });
+
+    await client.connect(new SSEClientTransport(new URL(`http://127.0.0.1:${address.port}/sse`)));
+    const result = await client.listTools();
+    expect(result.tools.map((tool) => tool.name)).toContain('sync_brand_docs');
+    await client.close();
   });
 });

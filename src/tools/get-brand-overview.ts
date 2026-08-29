@@ -2,7 +2,7 @@
  * @file get-brand-overview.ts
  * @description MCP tool: get_brand_overview
  * Returns a high-level overview of the design system including brand name,
- * contexts, asset inventory, available 19 tools, and taste primer.
+ * contexts, asset inventory, registered tools, and taste primer.
  */
 
 import type { DesignSystemIndex } from '../indexer/types.js';
@@ -45,7 +45,7 @@ const TOOLS: ReadonlyArray<readonly [string, string]> = [
  * @param index - The design system index
  * @returns MCP CallToolResult content
  */
-export function handler(index: DesignSystemIndex) {
+export function handler(index: DesignSystemIndex, includeWriteTools = true) {
   const payload = {
     name: index.brandName,
     description: index.brandDescription,
@@ -67,7 +67,9 @@ export function handler(index: DesignSystemIndex) {
       },
       magicTrick: index.magicTrick != null,
     },
-    availableTools: TOOLS.map(([name, description]) => ({ name, description })),
+    availableTools: TOOLS
+      .filter(([name]) => includeWriteTools || name !== 'sync_brand_docs')
+      .map(([name, description]) => ({ name, description })),
     _warnings: index.warnings,
   };
 
@@ -78,4 +80,3 @@ export function handler(index: DesignSystemIndex) {
     },
   ];
 }
-

@@ -30,6 +30,7 @@ import {
  * @param configPath - Optional path to brandkit.config.yaml
  * @param host - Optional host override (config default: 127.0.0.1)
  * @param authToken - Optional programmatic Bearer token override
+ * @param allowWriteTools - Explicitly expose write-capable tools (default: false)
  * @returns The listening http.Server (caller may close() it)
  */
 export async function startStandaloneServer(
@@ -37,11 +38,13 @@ export async function startStandaloneServer(
   configPath?: string,
   host?: string,
   authToken?: string,
+  allowWriteTools = false,
 ): Promise<HttpServer> {
   // Resolve relative paths against the config file's own directory (same
   // portability fix as startServer in src/index.ts).
   const { config: rawConfig, filePath } = loadConfigWithPath(configPath);
-  const config = resolveConfigPaths(rawConfig, dirname(filePath));
+  const configDir = dirname(filePath);
+  const config = resolveConfigPaths(rawConfig, configDir);
   const listenPort = port ?? config.server.port;
   const listenHost = host ?? config.server.host;
   const urlHost = formatHostForUrl(listenHost);
@@ -92,7 +95,12 @@ export async function startStandaloneServer(
           { name: 'brandkit-mcp', version: getPackageVersion() },
           { capabilities: { tools: {}, resources: {}, prompts: {} } },
         );
-        registerAllTools(sessionServer, () => index);
+        registerAllTools(
+          sessionServer,
+          () => index,
+          { configPath: filePath, outputDir: configDir },
+          { allowWriteTools },
+        );
         const transport = new SSEServerTransport(
           '/messages',
           res,

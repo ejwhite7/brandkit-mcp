@@ -40,6 +40,16 @@ export interface StartServerOptions {
   watch?: boolean;
   /** Programmatic token injection, primarily for embedders and tests. */
   authToken?: string;
+  /** Explicitly expose write-capable tools on network transports. */
+  allowWriteTools?: boolean;
+}
+
+/** Stdio is the trusted local workflow; network transports require opt-in. */
+export function allowWriteToolsForTransport(
+  transport: Transport,
+  requested = false,
+): boolean {
+  return transport === 'stdio' || requested;
 }
 
 /**
@@ -57,6 +67,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   const configDir = dirname(filePath);
   const config = resolveConfigPaths(rawConfig, configDir);
   const transport = options.transport ?? config.server.transport;
+  const allowWriteTools = allowWriteToolsForTransport(transport, options.allowWriteTools);
   console.error(`[brandkit-mcp] Loaded config for "${config.brand.name}" from ${filePath}`);
 
   console.error('[brandkit-mcp] Building design system index...');
@@ -89,7 +100,12 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
-  registerAllTools(server, () => currentIndex, { configPath: filePath, outputDir: configDir });
+  registerAllTools(
+    server,
+    () => currentIndex,
+    { configPath: filePath, outputDir: configDir },
+    { allowWriteTools },
+  );
 
   if (options.watch) {
     console.error('[brandkit-mcp] File watching enabled');
@@ -158,7 +174,12 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
           { name: 'brandkit-mcp', version: getPackageVersion() },
           { capabilities: { tools: {}, resources: {}, prompts: {} } },
         );
-        registerAllTools(sessionServer, () => currentIndex, { configPath: filePath, outputDir: configDir });
+        registerAllTools(
+          sessionServer,
+          () => currentIndex,
+          { configPath: filePath, outputDir: configDir },
+          { allowWriteTools },
+        );
         const t = new SSEServerTransport('/messages', res, requestPolicy.sdkDnsRebindingOptions);
         sessions.set(t.sessionId, t);
         res.on('close', () => sessions.delete(t.sessionId));

@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org)
 [![ejwhite7/brandkit-mcp MCP server](https://glama.ai/mcp/servers/ejwhite7/brandkit-mcp/badges/score.svg)](https://glama.ai/mcp/servers/ejwhite7/brandkit-mcp)
 
-BrandKit MCP v2 is an open-source MCP server that exposes a company's complete **brand atomic system** -- verbal identity (positioning, audience, messaging, differentiation, concepts, voice) and visual identity (colors, typography, components, tokens, motion, assets) -- to Claude and other AI tools via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). It ships 18 tools and 14 resources. When an LLM helps build a website, app, or marketing asset, it has instant structured access to the exact brand language and visual rules it needs -- including a human-authored taste primer that carries the brand's instincts, not just its specs.
+BrandKit MCP v2 is an open-source MCP server that exposes a company's complete **brand atomic system** -- verbal identity (positioning, audience, messaging, differentiation, concepts, voice) and visual identity (colors, typography, components, tokens, motion, assets) -- to Claude and other AI tools via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). It ships 18 read-only tools, one local write tool, and 14 resources. When an LLM helps build a website, app, or marketing asset, it has instant structured access to the exact brand language and visual rules it needs -- including a human-authored taste primer that carries the brand's instincts, not just its specs.
 
 ## Quick Start
 
@@ -93,6 +93,8 @@ BrandKit MCP exposes 18 tools to AI assistants:
 | `validate_usage` | Validate brand compliance |
 | `get_context_diff` | Diff base vs web vs product |
 
+The stdio transport also exposes `sync_brand_docs`, which updates `brandkit.config.yaml`, `DESIGN.md`, and `PRODUCT.md`. Network transports hide and refuse this write-capable tool by default.
+
 ### Taste primer
 
 Seven creative/verbal tools (`get_brand_overview`, `get_positioning`, `get_audience`, `get_messaging`, `get_differentiation`, `get_concepts`, `get_voice`) inject a `_taste_primer` field carrying `magic_trick.md` verbatim. `get_magic_trick` returns the primer directly without wrapping.
@@ -166,11 +168,13 @@ Your `brandkit.config.yaml` must also be updated to declare `version: 2` and use
 
 ## Conventions
 
-**`magic_trick.md` is human-authored.** The MCP reads it but no tool writes to it. If write tools are added in a future version, they must denylist this path. The taste primer is the brand's instincts -- it must stay human.
+**`magic_trick.md` is human-authored.** The MCP reads it, but `sync_brand_docs` never writes to it. The taste primer is the brand's instincts -- it must stay human.
 
 **Token output formats.** The `get_tokens` tool supports CSS custom properties, SCSS variables, Tailwind config, W3C Design Tokens, and flat JSON.
 
 **Transports.** The server supports stdio (recommended for Claude Desktop), SSE (legacy HTTP), and Streamable HTTP (current MCP spec). Network transports remain unauthenticated when bound to loopback for local development. Before binding SSE or HTTP to any non-loopback host, set `BRANDKIT_AUTH_TOKEN`; clients must send it as `Authorization: Bearer <token>` on every request.
+
+Network transports are read-only by default, including loopback, standalone, and Vercel deployments. To deliberately expose `sync_brand_docs` over SSE or Streamable HTTP, start the CLI with `brandkit-mcp serve --transport http --allow-write-tools` (or set `allowWriteTools: true` in the programmatic `startServer` options). Treat this as privileged mode: authentication is still mandatory for non-loopback binds. Stdio keeps the intended local write workflow without this flag. Adapters without a writable config context never advertise the tool, even if privileged mode is requested.
 
 Every network transport rejects untrusted `Host` and `Origin` headers with HTTP 403. Loopback listeners automatically trust loopback hostnames and origins, including IPv4, IPv6, and ephemeral ports. A concrete non-loopback `server.host` derives trust for that exact hostname. Wildcard bindings (`0.0.0.0` or `::`) fail at startup unless `server.allowedHosts` is explicit:
 
@@ -203,6 +207,8 @@ Global Options:
   --version             Show version number
   --help                Show help
 ```
+
+`serve` accepts `--transport <stdio|sse|http>`, `--host <host>`, `--port <number>`, `--config <path>`, `--watch`, and the privileged network option `--allow-write-tools`.
 
 ## Contributing
 

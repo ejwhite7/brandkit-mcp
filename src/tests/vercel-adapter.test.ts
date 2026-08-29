@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const handlePostMessageSpy = vi.fn().mockResolvedValue(undefined);
 const capturedSessionId = 'test-session-id';
+const registerAllToolsSpy = vi.hoisted(() => vi.fn());
 
 vi.mock('@modelcontextprotocol/sdk/server/sse.js', () => {
   return {
@@ -41,7 +42,7 @@ vi.mock('../indexer/index.js', () => ({
 }));
 
 vi.mock('../tools/index.js', () => ({
-  registerAllTools: vi.fn(),
+  registerAllTools: registerAllToolsSpy,
 }));
 
 // Must be imported AFTER mocks are declared so vi.mock hoisting applies.
@@ -71,6 +72,21 @@ describe('vercel adapter handleMessages', () => {
 describe('vercel adapter handleSSE + handleMessages body forwarding', () => {
   beforeEach(() => {
     handlePostMessageSpy.mockClear();
+    registerAllToolsSpy.mockClear();
+  });
+
+  it('registers a context-free read-only tool surface', async () => {
+    const sseRes = {
+      writeHead: vi.fn(),
+      write: vi.fn(),
+      end: vi.fn(),
+      on: vi.fn(),
+    };
+    await handleSSE({}, sseRes);
+
+    expect(registerAllToolsSpy).toHaveBeenCalledOnce();
+    expect(registerAllToolsSpy.mock.calls[0][2]).toBeUndefined();
+    expect(registerAllToolsSpy.mock.calls[0][3]).toBeUndefined();
   });
 
   it('forwards the pre-parsed req.body to handlePostMessage', async () => {
