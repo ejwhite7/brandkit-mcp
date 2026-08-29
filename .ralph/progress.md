@@ -97,3 +97,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit and remove the privileged CLI flag from deployment commands.
 - Commit: Pending at time of entry.
 - Next eligible story: HTTP-001.
+
+## 2026-08-28 23:54 EDT — HTTP-001
+
+- Objective: Make stateless Streamable HTTP reliable across sequential and concurrent requests.
+- Defect reproduced: A single stateless SDK transport was reused for every `/mcp` request, which the SDK rejects after its first request.
+- Changes: Added a shared MCP server factory; create a fresh Server and stateless transport for every POST; close each owned pair idempotently on response close; return structured JSON-RPC parse/internal errors; return an explicit structured 405 for stateless GET and DELETE in line with the SDK reference server.
+- Files changed: `src/index.ts`, `src/tests/streamable-http.test.ts`.
+- Tests added: Real SDK client initialize, ping, repeated tool listing, simultaneous client isolation, Server/transport close spies, malformed JSON, injected handler failure, and unsupported method responses.
+- Verification commands: Focused 5 tests, focused HTTP/security 28 tests, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused and security tests pass; full 226 tests pass; typecheck, lint, build, and diff check pass.
+- Security review: Every request retains authentication, Host/Origin validation, and the network write-tool policy before an MCP server is created.
+- Compatibility review: Stdio and SSE behavior are unchanged. Stateless HTTP is POST-only; the former GET/DELETE paths could not provide useful cross-request state with a fresh transport.
+- Remaining risks: HTTP health, request size, timeouts, and normalized operational errors remain for HTTP-002.
+- Rollback: Revert this story commit to restore the former HTTP handler, noting that doing so restores the second-request failure.
+- Commit: Pending at time of entry.
+- Next eligible story: HTTP-002.

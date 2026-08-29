@@ -64,7 +64,7 @@
       "title": "Use a fresh stateless Streamable HTTP transport per request",
       "dependencies": ["SEC-002"],
       "acceptance": ["initialize followed by multiple requests succeeds", "concurrent clients do not share transport state", "transports close after requests"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "HTTP-002",

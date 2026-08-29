@@ -20,6 +20,7 @@ import { fileURLToPath } from 'url';
 import { getPackageVersion } from './version.js';
 import { regenerateBrandDocsIfReady } from './brand-docs/regenerate.js';
 import type { Server as HttpServer } from 'http';
+import type { ErrorRequestHandler } from 'express';
 import {
   createNetworkAuthPolicy,
   createNetworkRequestPolicy,
@@ -95,17 +96,20 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     );
   }
 
-  const server = new Server(
-    { name: 'brandkit-mcp', version: getPackageVersion() },
-    { capabilities: { tools: {}, resources: {}, prompts: {} } },
-  );
+  const createMcpServer = (): Server => {
+    const server = new Server(
+      { name: 'brandkit-mcp', version: getPackageVersion() },
+      { capabilities: { tools: {}, resources: {}, prompts: {} } },
+    );
 
-  registerAllTools(
-    server,
-    () => currentIndex,
-    { configPath: filePath, outputDir: configDir },
-    { allowWriteTools },
-  );
+    registerAllTools(
+      server,
+      () => currentIndex,
+      { configPath: filePath, outputDir: configDir },
+      { allowWriteTools },
+    );
+    return server;
+  };
 
   if (options.watch) {
     console.error('[brandkit-mcp] File watching enabled');
@@ -122,6 +126,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   }
 
   if (transport === 'stdio') {
+    const server = createMcpServer();
     const stdioTransport = new StdioServerTransport();
     await server.connect(stdioTransport);
     console.error('[brandkit-mcp] Server running on stdio');
@@ -170,16 +175,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       try {
         // The MCP SDK allows one transport per Server instance, so each SSE
         // connection gets its own Server sharing the index via closure.
-        const sessionServer = new Server(
-          { name: 'brandkit-mcp', version: getPackageVersion() },
-          { capabilities: { tools: {}, resources: {}, prompts: {} } },
-        );
-        registerAllTools(
-          sessionServer,
-          () => currentIndex,
-          { configPath: filePath, outputDir: configDir },
-          { allowWriteTools },
-        );
+        const sessionServer = createMcpServer();
         const t = new SSEServerTransport('/messages', res, requestPolicy.sdkDnsRebindingOptions);
         sessions.set(t.sessionId, t);
         res.on('close', () => sessions.delete(t.sessionId));
@@ -223,14 +219,76 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
     app.use(express.json());
 
-    const httpTransport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless: simpler for single-tenant brand servers
-      ...requestPolicy.sdkDnsRebindingOptions,
-    });
-    await server.connect(httpTransport);
+    // Express' default body-parser error is HTML. Keep failures on the MCP
+    // endpoint machine-readable and finish the response rather than hanging.
+    app.use(((error, _req, res, _next) => {
+      const isParseError = error instanceof SyntaxError
+        || (typeof error === 'object' && error !== null && 'type' in error
+          && error.type === 'entity.parse.failed');
+      console.error('[brandkit-mcp] Streamable HTTP request body error');
+      res.status(isParseError ? 400 : 500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: isParseError ? -32700 : -32603,
+          message: isParseError ? 'Parse error' : 'Internal server error',
+        },
+        id: null,
+      });
+    }) satisfies ErrorRequestHandler);
 
-    app.all('/mcp', async (req, res) => {
-      await httpTransport.handleRequest(req, res, req.body);
+    app.post('/mcp', async (req, res) => {
+      // The SDK transport and Server both retain protocol callbacks and
+      // initialization state. Stateless mode therefore requires a fresh pair
+      // for every HTTP request, including simultaneous requests.
+      const requestServer = createMcpServer();
+      const requestTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        ...requestPolicy.sdkDnsRebindingOptions,
+      });
+      let cleanupPromise: Promise<void> | undefined;
+      const cleanup = (): Promise<void> => {
+        cleanupPromise ??= requestServer.close().catch(() => {
+          console.error('[brandkit-mcp] Streamable HTTP request cleanup error');
+        });
+        return cleanupPromise;
+      };
+      // A stateless request has no server-side session after the response.
+      // ServerResponse `close` runs after the SDK has finished its response
+      // bridge and also covers a client disconnect during request processing.
+      res.once('close', () => { void cleanup(); });
+
+      try {
+        await requestServer.connect(requestTransport);
+        await requestTransport.handleRequest(req, res, req.body);
+      } catch {
+        console.error('[brandkit-mcp] Streamable HTTP request handler error');
+        if (!res.headersSent) {
+          const requestId = typeof req.body === 'object'
+            && req.body !== null
+            && 'id' in req.body
+            && (typeof req.body.id === 'string' || typeof req.body.id === 'number' || req.body.id === null)
+            ? req.body.id
+            : null;
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: { code: -32603, message: 'Internal server error' },
+            id: requestId,
+          });
+        } else if (!res.writableEnded) {
+          res.end();
+        }
+      }
+    });
+
+    // A per-request stateless server cannot route later notifications to a
+    // standalone GET stream, and there is no session to delete. Match the SDK's
+    // stateless reference server by making POST the only supported method.
+    app.all('/mcp', (_req, res) => {
+      res.status(405).set('Allow', 'POST').json({
+        jsonrpc: '2.0',
+        error: { code: -32000, message: 'Method not allowed.' },
+        id: null,
+      });
     });
 
     const httpServer = app.listen(port, host, () => {
