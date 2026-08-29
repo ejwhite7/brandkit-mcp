@@ -17,7 +17,7 @@ export const INPUT_SCHEMA = {
 export function handler(index: DesignSystemIndex, args: { context?: BrandContext }) {
   const warnings: string[] = [];
   const ctx = coerceContext(args.context, warnings);
-  const file = index[ctx].colorsAndType ?? index.base.colorsAndType;
+  const file = index.contexts[ctx].colorsAndType;
   if (!file) warnings.push('No colors_and_type.css found');
   return [
     {

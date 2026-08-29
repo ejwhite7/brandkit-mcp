@@ -83,7 +83,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
   const startTime = Date.now();
   currentIndex = await buildDesignSystemIndex(config);
   const elapsed = Date.now() - startTime;
-  console.error(`[brandkit-mcp] Indexed ${currentIndex.base.tokens.length + currentIndex.base.components.length + currentIndex.base.assets.length} assets in ${elapsed}ms`);
+  console.error(`[brandkit-mcp] Indexed ${currentIndex.contexts.base.tokens.length + currentIndex.contexts.base.components.length + currentIndex.contexts.base.assets.length} assets in ${elapsed}ms`);
 
   // Regenerate the DESIGN.md / PRODUCT.md reference files for non-MCP coding
   // agents. Written next to brandkit.config.yaml. The MCP never reads these
@@ -123,7 +123,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
     console.error('[brandkit-mcp] File watching enabled');
     const stopWatcher = watchBrandDirectory(config, (newIndex) => {
       currentIndex = newIndex;
-      console.error(`[brandkit-mcp] Index updated: ${newIndex.base.tokens.length + newIndex.base.components.length + newIndex.base.assets.length} assets`);
+      console.error(`[brandkit-mcp] Index updated: ${newIndex.contexts.base.tokens.length + newIndex.contexts.base.components.length + newIndex.contexts.base.assets.length} assets`);
     });
     // Close the watcher on shutdown so the process can exit cleanly.
     const shutdown = (signal: NodeJS.Signals) => {

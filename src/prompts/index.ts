@@ -70,10 +70,8 @@ export function getPrompt(
   const brandName = index.brandName;
 
   // Get color custom properties from the appropriate context for hints
-  const ctxData = ctx === 'web' ? index.web
-                : ctx === 'product' ? index.product
-                : index.base;
-  const customProps = ctxData.colorsAndType?.customProperties ?? index.base.colorsAndType?.customProperties ?? {};
+  const ctxData = ctx === 'web' || ctx === 'product' ? index.contexts[ctx] : index.contexts.base;
+  const customProps = ctxData.colorsAndType?.customProperties ?? {};
   const colorHints = Object.entries(customProps)
     .filter(([k]) => k.startsWith('--color'))
     .slice(0, 20)

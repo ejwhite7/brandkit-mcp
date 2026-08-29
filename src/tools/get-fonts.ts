@@ -17,7 +17,7 @@ export const INPUT_SCHEMA = {
 export function handler(index: DesignSystemIndex, args: { context?: BrandContext }) {
   const warnings: string[] = [];
   const ctx = coerceContext(args.context, warnings);
-  const faces = index[ctx].fonts.length ? index[ctx].fonts : index.base.fonts;
+  const faces = index.contexts[ctx].fonts;
   if (faces.length === 0) warnings.push('No font faces discovered');
   return [
     {

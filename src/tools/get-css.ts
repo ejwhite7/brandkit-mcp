@@ -31,9 +31,8 @@ export function handler(
   const warnings: string[] = [];
   const ctx = coerceContext(args.context, warnings);
 
-  const colorsAndType =
-    index[ctx].colorsAndType?.rawContent ?? index.base.colorsAndType?.rawContent ?? '';
-  const motion = index[ctx].motion?.css ?? index.base.motion?.css ?? '';
+  const colorsAndType = index.contexts[ctx].colorsAndType?.rawContent ?? '';
+  const motion = index.contexts[ctx].motion?.css ?? '';
 
   if (!colorsAndType) warnings.push('No colors_and_type.css found');
   if (!motion) warnings.push('No motion.css found');
@@ -49,4 +48,3 @@ export function handler(
     },
   ];
 }
-

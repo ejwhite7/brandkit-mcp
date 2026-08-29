@@ -1,18 +1,19 @@
 /**
  * @file get-context-diff.ts
  * @description MCP tool: get_context_diff
- * Diffs two contexts (base | web | product) across colors_and_type custom
- * properties, components, and tokens.
+ * Diffs two canonical contexts across CSS properties, components, tokens,
+ * assets, fonts, and motion.
  */
 
 import type { DesignSystemIndex } from '../indexer/types.js';
 import type { BrandContext } from '../types/design-system.js';
 import { coerceContext } from './_context.js';
+import { contextItemKeys } from '../context-resolver.js';
 
 export const TOOL_NAME = 'get_context_diff';
 
 export const TOOL_DESCRIPTION =
-  'Diff two contexts (base | web | product) across colors_and_type custom properties, components, and tokens.';
+  'Diff two contexts (base | web | product) across colors_and_type custom properties, components, tokens, assets, fonts, and motion.';
 
 export const INPUT_SCHEMA = {
   type: 'object' as const,
@@ -24,6 +25,23 @@ export const INPUT_SCHEMA = {
 
 interface DiffEntry { name: string; a?: string; b?: string }
 
+function keyedDiff<T>(
+  a: T[],
+  b: T[],
+  key: (item: T) => string,
+  label: (item: T) => string,
+): { onlyInA: string[]; onlyInB: string[]; changed: string[] } {
+  const mapA = new Map(a.map((item) => [key(item), item]));
+  const mapB = new Map(b.map((item) => [key(item), item]));
+  return {
+    onlyInA: [...mapA].filter(([identity]) => !mapB.has(identity)).map(([, item]) => label(item)),
+    onlyInB: [...mapB].filter(([identity]) => !mapA.has(identity)).map(([, item]) => label(item)),
+    changed: [...mapA].filter(
+      ([identity, item]) => mapB.has(identity) && JSON.stringify(item) !== JSON.stringify(mapB.get(identity)),
+    ).map(([, item]) => label(item)),
+  };
+}
+
 export function handler(
   index: DesignSystemIndex,
   args: { a?: BrandContext; b?: BrandContext },
@@ -33,8 +51,10 @@ export function handler(
   const b = args.b == null ? 'product' : coerceContext(args.b, warnings);
 
   // Custom properties (colors_and_type)
-  const propsA = index[a].colorsAndType?.customProperties ?? index.base.colorsAndType?.customProperties ?? {};
-  const propsB = index[b].colorsAndType?.customProperties ?? index.base.colorsAndType?.customProperties ?? {};
+  const contextA = index.contexts[a];
+  const contextB = index.contexts[b];
+  const propsA = contextA.colorsAndType?.customProperties ?? {};
+  const propsB = contextB.colorsAndType?.customProperties ?? {};
   const allKeys = new Set([...Object.keys(propsA), ...Object.keys(propsB)]);
   const changed: DiffEntry[] = [];
   const onlyInA: DiffEntry[] = [];
@@ -45,17 +65,15 @@ export function handler(
     else if (propsA[k] !== propsB[k]) changed.push({ name: k, a: propsA[k], b: propsB[k] });
   }
 
-  // Components (override-aware: fall through to base if empty)
-  const compsA = (index[a].components.length ? index[a].components : index.base.components).map((c) => c.name);
-  const compsB = (index[b].components.length ? index[b].components : index.base.components).map((c) => c.name);
-  const compsAOnly = compsA.filter((n) => !compsB.includes(n));
-  const compsBOnly = compsB.filter((n) => !compsA.includes(n));
-
-  // Tokens
-  const tokensA = (index[a].tokens.length ? index[a].tokens : index.base.tokens).map((t) => t.name);
-  const tokensB = (index[b].tokens.length ? index[b].tokens : index.base.tokens).map((t) => t.name);
-  const tokensAOnly = tokensA.filter((n) => !tokensB.includes(n));
-  const tokensBOnly = tokensB.filter((n) => !tokensA.includes(n));
+  const componentDiff = keyedDiff(contextA.components, contextB.components, contextItemKeys.component, (item) => item.name);
+  const tokenDiff = keyedDiff(contextA.tokens, contextB.tokens, contextItemKeys.token, (item) => item.name);
+  const assetDiff = keyedDiff(contextA.assets, contextB.assets, contextItemKeys.asset, (item) => item.id ?? item.file);
+  const fontDiff = keyedDiff(
+    contextA.fonts,
+    contextB.fonts,
+    contextItemKeys.font,
+    (item) => `${item.family}:${item.weight ?? ''}:${item.style ?? ''}`,
+  );
 
   return [
     {
@@ -65,8 +83,13 @@ export function handler(
           a,
           b,
           customProperties: { changed, onlyInA, onlyInB },
-          components: { onlyInA: compsAOnly, onlyInB: compsBOnly },
-          tokens: { onlyInA: tokensAOnly, onlyInB: tokensBOnly },
+          components: componentDiff,
+          tokens: tokenDiff,
+          assets: assetDiff,
+          fonts: fontDiff,
+          motion: {
+            changed: JSON.stringify(contextA.motion) !== JSON.stringify(contextB.motion),
+          },
           _warnings: warnings,
         },
         null,

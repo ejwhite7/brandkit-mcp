@@ -167,15 +167,14 @@ export function createPreviewServer(
   app.get('/assets', (req, res) => {
     const ctx = pickContext(req.query.context);
     const index = ref.current;
-    // Override layer falls through to base when empty (same rule as get_assets).
-    const assets = index[ctx].assets.length ? index[ctx].assets : index.base.assets;
+    const assets = index.contexts[ctx].assets;
     res.send(renderPage('assets', { title: 'Assets', ctx, assets }));
   });
 
   app.get('/fonts', (req, res) => {
     const ctx = pickContext(req.query.context);
     const index = ref.current;
-    const fonts = index[ctx].fonts.length ? index[ctx].fonts : index.base.fonts;
+    const fonts = index.contexts[ctx].fonts;
     res.send(renderPage('fonts', { title: 'Fonts', ctx, fonts }));
   });
 
@@ -185,7 +184,7 @@ export function createPreviewServer(
     res.send(renderPage('motion', {
       title: 'Motion',
       ctx,
-      motion: index[ctx].motion ?? index.base.motion,
+      motion: index.contexts[ctx].motion,
     }));
   });
 
@@ -199,9 +198,8 @@ export function createPreviewServer(
     res.send(renderPage('css', {
       title: 'CSS',
       ctx,
-      colorsAndTypeCss:
-        index[ctx].colorsAndType?.rawContent ?? index.base.colorsAndType?.rawContent ?? '',
-      motionCss: index[ctx].motion?.css ?? index.base.motion?.css ?? '',
+      colorsAndTypeCss: index.contexts[ctx].colorsAndType?.rawContent ?? '',
+      motionCss: index.contexts[ctx].motion?.css ?? '',
     }));
   });
 

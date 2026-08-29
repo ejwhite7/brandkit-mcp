@@ -48,11 +48,11 @@ export async function validateCommand(configPath?: string): Promise<void> {
     const index = await buildDesignSystemIndex(config);
 
     console.log('Asset Inventory (base context):');
-    console.log(`  Tokens:      ${index.base.tokens.length}`);
-    console.log(`  Components:  ${index.base.components.length}`);
-    console.log(`  Fonts:       ${index.base.fonts.length}`);
-    console.log(`  Assets:      ${index.base.assets.length}`);
-    console.log(`  Motion:      ${index.base.motion != null ? 'yes' : 'no'}`);
+    console.log(`  Tokens:      ${index.contexts.base.tokens.length}`);
+    console.log(`  Components:  ${index.contexts.base.components.length}`);
+    console.log(`  Fonts:       ${index.contexts.base.fonts.length}`);
+    console.log(`  Assets:      ${index.contexts.base.assets.length}`);
+    console.log(`  Motion:      ${index.contexts.base.motion != null ? 'yes' : 'no'}`);
 
     console.log('\nVerbal Layer:');
     console.log(`  Positioning: ${index.verbal.positioning != null ? 'yes' : 'no'}`);
@@ -70,7 +70,7 @@ export async function validateCommand(configPath?: string): Promise<void> {
       }
     }
 
-    const totalAssets = index.base.tokens.length + index.base.components.length + index.base.assets.length;
+    const totalAssets = index.contexts.base.tokens.length + index.contexts.base.components.length + index.contexts.base.assets.length;
     if (totalAssets === 0) {
       console.log('\n[WARN] No design system files found. Add files to the brand root directory.');
       hasErrors = true;

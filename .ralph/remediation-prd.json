@@ -120,7 +120,7 @@
       "title": "Create and consume canonical merged contexts",
       "dependencies": ["BASE-001"],
       "acceptance": ["partial overrides preserve unrelated base items", "tools preview search and diffs use equivalent resolved data", "all mergeable asset types have regression tests"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DEP-001",

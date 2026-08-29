@@ -9,7 +9,7 @@ import type { DesignSystemIndex } from '../indexer/types.js';
 export const TOOL_NAME = 'search_brand';
 
 export const TOOL_DESCRIPTION =
-  'Full-text search across all brand atomic system content: verbal docs, magic_trick, components, tokens, assets, and CSS files.';
+  'Full-text search across all brand atomic system content: verbal docs, magic_trick, components, tokens, assets, fonts, motion, and CSS files.';
 
 export const INPUT_SCHEMA = {
   type: 'object' as const,
@@ -24,7 +24,7 @@ interface SearchHit {
   source?: string;
   snippet: string;
   score: number;
-  kind: 'verbal' | 'magic_trick' | 'component' | 'token' | 'asset' | 'css';
+  kind: 'verbal' | 'magic_trick' | 'component' | 'token' | 'asset' | 'font' | 'motion' | 'css';
   context?: string;
 }
 
@@ -75,7 +75,7 @@ export function handler(
   maybeHit(index.magicTrick?.content, { kind: 'magic_trick', source: index.magicTrick?.source });
 
   for (const ctx of ['base', 'web', 'product'] as const) {
-    const bucket = index[ctx];
+    const bucket = index.contexts[ctx];
     for (const c of bucket.components) {
       const blob = `${c.name} ${c.category ?? ''} ${c.description ?? ''} ${c.usage ?? ''} ${(c.examples ?? []).join(' ')}`;
       maybeHit(blob, { kind: 'component', source: c.source, context: ctx });
@@ -88,8 +88,16 @@ export function handler(
       const blob = `${a.id ?? ''} ${a.file} ${a.purpose ?? ''}`;
       maybeHit(blob, { kind: 'asset', source: a.filePath, context: ctx });
     }
+    for (const f of bucket.fonts) {
+      const blob = `${f.family} ${f.weight ?? ''} ${f.style ?? ''} ${f.file}`;
+      maybeHit(blob, { kind: 'font', source: f.filePath, context: ctx });
+    }
     if (bucket.colorsAndType?.rawContent) {
       maybeHit(bucket.colorsAndType.rawContent, { kind: 'css', source: bucket.colorsAndType.filePath, context: ctx });
+    }
+    if (bucket.motion) {
+      maybeHit(JSON.stringify(bucket.motion.tokens), { kind: 'motion', source: bucket.motion.source, context: ctx });
+      maybeHit(bucket.motion.css, { kind: 'css', source: bucket.motion.source, context: ctx });
     }
   }
 

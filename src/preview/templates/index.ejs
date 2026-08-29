@@ -6,32 +6,32 @@
 <div class="card-grid">
   <div class="card">
     <h3>Colors</h3>
-    <p class="count"><%= Object.keys(index.base.colorsAndType ? index.base.colorsAndType.customProperties : {}).length %></p>
+    <p class="count"><%= Object.keys(index.contexts.base.colorsAndType ? index.contexts.base.colorsAndType.customProperties : {}).length %></p>
     <a href="/colors">View palette</a>
   </div>
   <div class="card">
     <h3>Tokens</h3>
-    <p class="count"><%= index.base.tokens.length %></p>
+    <p class="count"><%= index.contexts.base.tokens.length %></p>
     <a href="/tokens">View specimens</a>
   </div>
   <div class="card">
     <h3>Components</h3>
-    <p class="count"><%= index.base.components.length %></p>
+    <p class="count"><%= index.contexts.base.components.length %></p>
     <a href="/components">View specs</a>
   </div>
   <div class="card">
     <h3>Assets</h3>
-    <p class="count"><%= index.base.assets.length %></p>
+    <p class="count"><%= index.contexts.base.assets.length %></p>
     <a href="/assets">View assets</a>
   </div>
   <div class="card">
     <h3>Fonts</h3>
-    <p class="count"><%= index.base.fonts.length %></p>
+    <p class="count"><%= index.contexts.base.fonts.length %></p>
     <a href="/fonts">View faces</a>
   </div>
   <div class="card">
     <h3>Motion</h3>
-    <p class="count"><%= index.base.motion ? 'yes' : 'no' %></p>
+    <p class="count"><%= index.contexts.base.motion ? 'yes' : 'no' %></p>
     <a href="/motion">View system</a>
   </div>
 </div>

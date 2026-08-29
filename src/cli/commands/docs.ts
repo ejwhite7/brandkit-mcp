@@ -47,11 +47,11 @@ export async function docsCommand(options: { config?: string; output?: string })
 
 | Category | Count |
 |---|---|
-| Tokens | ${index.base.tokens.length} |
-| Components | ${index.base.components.length} |
-| Fonts | ${index.base.fonts.length} |
-| Assets | ${index.base.assets.length} |
-| Motion | ${index.base.motion != null ? 'yes' : 'no'} |
+| Tokens | ${index.contexts.base.tokens.length} |
+| Components | ${index.contexts.base.components.length} |
+| Fonts | ${index.contexts.base.fonts.length} |
+| Assets | ${index.contexts.base.assets.length} |
+| Motion | ${index.contexts.base.motion != null ? 'yes' : 'no'} |
 
 ## Available MCP Tools (v2 surface)
 

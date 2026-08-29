@@ -13,10 +13,6 @@
  *    base item; items only in base carry forward; items only in override are added.
  * 4. colorsAndType + motion are single objects — override wins if present, else base.
  *
- * Note: v2 TokenSpecimen[] is stored on ResolvedDesignSystem.tokens but NOT mapped
- * into .colors/.typography. Downstream get_tokens tools read from the raw index.
- * Similarly, motion is not surfaced here — get_motion reads from the raw index.
- *
  * Note: v2 assets (logos, textures, etc.) are folded into .textures; get_assets
  * surfaces them to callers.
  */
@@ -48,6 +44,15 @@ export interface ResolveOptions {
   brandDescription?: string;
 }
 
+/** Stable identities shared by merging and context-diff consumers. */
+export const contextItemKeys = {
+  component: (item: DesignComponent) => item.name.toLowerCase(),
+  token: (item: TokenSpecimen) => item.name.toLowerCase(),
+  asset: (item: AssetEntry) => item.id ?? item.file,
+  font: (item: FontFace) =>
+    `${item.family.toLowerCase()}:${item.weight ?? ''}:${item.style ?? ''}`,
+};
+
 /**
  * Resolves all three contexts (base, web, product) from a ScanResult.
  * Returns a record keyed by BrandContext, each containing a fully resolved
@@ -57,10 +62,27 @@ export function resolveAll(
   scan: ScanResult,
   opts: ResolveOptions,
 ): Record<BrandContext, ResolvedDesignSystem> {
+  return materializeAll(resolveContexts(scan), opts);
+}
+
+/** Build the canonical raw-data view consumed by tools, previews, and search. */
+export function resolveContexts(scan: ScanResult): Record<BrandContext, RawContextData> {
   return {
-    base: materialize(scan.base, 'base', opts),
-    web: materialize(mergeContext(scan.base, scan.web), 'web', opts),
-    product: materialize(mergeContext(scan.base, scan.product), 'product', opts),
+    base: scan.base,
+    web: mergeContext(scan.base, scan.web),
+    product: mergeContext(scan.base, scan.product),
+  };
+}
+
+/** Materialize already-merged context data without resolving it a second time. */
+export function materializeAll(
+  contexts: Record<BrandContext, RawContextData>,
+  opts: ResolveOptions,
+): Record<BrandContext, ResolvedDesignSystem> {
+  return {
+    base: materialize(contexts.base, 'base', opts),
+    web: materialize(contexts.web, 'web', opts),
+    product: materialize(contexts.product, 'product', opts),
   };
 }
 
@@ -94,18 +116,18 @@ function mergeContext(base: RawContextData, override: RawContextData): RawContex
     components: mergeByKey(
       base.components,
       override.components,
-      (c) => c.name.toLowerCase(),
+      contextItemKeys.component,
     ),
-    tokens: mergeByKey(base.tokens, override.tokens, (t) => t.name),
+    tokens: mergeByKey(base.tokens, override.tokens, contextItemKeys.token),
     assets: mergeByKey(
       base.assets,
       override.assets,
-      (a) => a.id ?? a.file,
+      contextItemKeys.asset,
     ),
     fonts: mergeByKey(
       base.fonts,
       override.fonts,
-      (f) => `${f.family}:${f.weight ?? ''}:${f.style ?? ''}`,
+      contextItemKeys.font,
     ),
     motion: override.motion ?? base.motion,
   };
@@ -313,4 +335,3 @@ function materialize(
     assetInventory: buildInventory(partial),
   };
 }
-

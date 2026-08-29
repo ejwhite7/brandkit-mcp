@@ -52,11 +52,11 @@ export function handler(index: DesignSystemIndex, includeWriteTools = true) {
     lastIndexed: index.lastIndexed.toISOString(),
     contexts: ['base', 'web', 'product'] as const,
     inventory: {
-      tokens: index.base.tokens.length,
-      components: index.base.components.length,
-      fonts: index.base.fonts.length,
-      assets: index.base.assets.length,
-      motion: index.base.motion != null,
+      tokens: index.contexts.base.tokens.length,
+      components: index.contexts.base.components.length,
+      fonts: index.contexts.base.fonts.length,
+      assets: index.contexts.base.assets.length,
+      motion: index.contexts.base.motion != null,
       verbal: {
         positioning: index.verbal.positioning != null,
         audience: index.verbal.audience != null,

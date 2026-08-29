@@ -82,7 +82,7 @@ function buildProduct(index: DesignSystemIndex, brief: Brief): string {
 }
 
 function buildDesign(index: DesignSystemIndex, brief: Brief): string {
-  const b = index.base;
+  const b = index.contexts.base;
   const colorBlock = b.colorsAndType ? renderCustomProps(b.colorsAndType.customProperties) : '';
   const fontsBlock = b.fonts.length
     ? b.fonts

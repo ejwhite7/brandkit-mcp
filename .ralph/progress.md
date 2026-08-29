@@ -211,3 +211,19 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; injected or ambiguous delimiters would again be interpreted heuristically.
 - Commit: Pending at time of entry.
 - Next eligible story: CTX-001.
+
+## 2026-08-29 01:18 EDT — CTX-001
+
+- Objective: Create one canonical merged context view and make every public consumer use it.
+- Defect reproduced: A partial product/web override caused raw-bucket consumers to discard unrelated base components, tokens, assets, and fonts even though the resolver preserved them.
+- Changes: Added `DesignSystemIndex.contexts` as the canonical merged raw-data record; materialize `resolved` from that record; share stable item identities between merging and diffs; route visual tools, search, preview, prompts, resources, docs, validation, CLI summaries, and server counts through the canonical view. Raw `base`/`web`/`product` scan layers remain for compatibility and diagnostics. Whole-file CSS and motion retain their documented override-or-fallback semantics.
+- Files changed: Context resolver/index types and builder; visual/diff/search tools; preview server/template; prompts; brand-doc generation; CLI docs/validation; server logging; test helper; `src/tests/context-merge.test.ts`.
+- Tests added: Partial replacement plus inheritance for components, tokens, assets, and fonts; case-normalized identity parity; CSS/motion fallback; tool/materialized/resource equivalence; inherited and replaced search behavior; replacement-aware diffs; preview rendering across all context asset routes.
+- Verification commands: Focused 8 and 79-test runs, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, raw-access `rg` audit, and `git diff --check`.
+- Verification results: Focused tests pass; full 35 files / 287 tests pass; typecheck, lint, build/declarations, raw-access audit, and diff check pass.
+- Security review: Canonicalization does not add filesystem access or expand network authority; raw scan layers are retained but no production consumer bypasses containment or context resolution.
+- Compatibility review: Existing whole-object CSS/motion behavior is unchanged; diff output gains additive changed/assets/fonts/motion sections; unfiltered search intentionally represents inherited entries in each resolved context.
+- Remaining risks: The shipped Docker target still does not start the advertised network service; DOCKER-001 is next.
+- Rollback: Revert this story commit; callers would return to raw override buckets and partial-override data loss.
+- Commit: Pending at time of entry.
+- Next eligible story: DOCKER-001.
