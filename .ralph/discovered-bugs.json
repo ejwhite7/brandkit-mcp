@@ -93,10 +93,11 @@
     {
       "id": "WATCH-001",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "title": "Hot reload follows ignored and outside-root symlinks",
       "evidence": "Chokidar watcher retains followSymlinks true and does not apply normalized scanner ignore rules.",
-      "story": "WATCH-001"
+      "story": "WATCH-001",
+      "resolution": "Watcher and scanner share one normalized ignore matcher, descendant symlink following is disabled, and residual symlink change events are filtered."
     },
     {
       "id": "TOOL-001",

@@ -6,9 +6,57 @@
  */
 
 import chokidar from 'chokidar';
+import { lstatSync, realpathSync } from 'fs';
+import { isAbsolute, relative } from 'path';
 import type { BrandKitConfig } from '../types/config.js';
 import type { DesignSystemIndex } from './types.js';
 import { buildDesignSystemIndex } from './index.js';
+import { createBrandPathIgnoreMatcher } from '../scanner/directory-scanner.js';
+
+export interface BrandWatchPlan {
+  root: string;
+  options: chokidar.WatchOptions;
+}
+
+export interface BrandWatcherStop {
+  (): Promise<void>;
+  /** Resolves after Chokidar has completed its initial crawl. */
+  readonly ready: Promise<void>;
+}
+
+/** Build deterministic watcher options from the scanner's ignore policy. */
+export function createBrandWatchPlan(config: BrandKitConfig): BrandWatchPlan {
+  // The configured root itself may intentionally be a symlink. Resolve that
+  // one trusted entry before disabling all descendant symlink traversal.
+  const root = realpathSync.native(config.brand.root);
+  const configuredIgnore = createBrandPathIgnoreMatcher(root, config.ignore);
+
+  return {
+    root,
+    options: {
+      persistent: true,
+      ignoreInitial: true,
+      followSymlinks: false,
+      ignored: (path: string) => {
+        const normalizedPath = path.replace(/\\/g, '/');
+        const normalizedRoot = root.replace(/\\/g, '/');
+        const brandPath = relative(normalizedRoot, normalizedPath).replace(/\\/g, '/');
+        if (brandPath === '..' || brandPath.startsWith('../') || isAbsolute(brandPath)) return true;
+        if (brandPath === '') return false;
+
+        const segments = brandPath.split('/');
+        return (
+          segments.some((segment) => segment.startsWith('.') || segment === 'node_modules') ||
+          configuredIgnore.matches(path)
+        );
+      },
+      awaitWriteFinish: {
+        stabilityThreshold: 200,
+        pollInterval: 50,
+      },
+    },
+  };
+}
 
 /**
  * Serializes reindex executions: at most one reindex runs at a time. A
@@ -57,22 +105,13 @@ export function createReindexRunner(
 export function watchBrandDirectory(
   config: BrandKitConfig,
   onUpdate: (index: DesignSystemIndex) => void,
-): () => Promise<void> {
+): BrandWatcherStop {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   const DEBOUNCE_MS = 300;
 
-  const watcher = chokidar.watch(config.brand.root, {
-    persistent: true,
-    ignoreInitial: true,
-    ignored: [
-      /(^|[/\\])\./,  // Ignore dotfiles
-      '**/node_modules/**',
-    ],
-    awaitWriteFinish: {
-      stabilityThreshold: 200,
-      pollInterval: 50,
-    },
-  });
+  const plan = createBrandWatchPlan(config);
+  const watcher = chokidar.watch(plan.root, plan.options);
+  const ready = new Promise<void>((resolveReady) => watcher.once('ready', resolveReady));
 
   const runReindex = createReindexRunner(async () => {
     console.error('[hot-reload] File change detected, re-indexing...');
@@ -90,10 +129,20 @@ export function watchBrandDirectory(
   };
 
   watcher.on('add', triggerReindex);
-  watcher.on('change', triggerReindex);
+  watcher.on('change', (path) => {
+    // With followSymlinks disabled, Chokidar can still emit a change for the
+    // symlink entry when its outside target changes. The scanner will reject
+    // that target, so such an event must not cause a reload either.
+    try {
+      if (lstatSync(path).isSymbolicLink()) return;
+    } catch {
+      // A concurrent unlink is handled by the unlink event below.
+    }
+    triggerReindex();
+  });
   watcher.on('unlink', triggerReindex);
 
-  return async () => {
+  const stop = async () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     try {
       await watcher.close();
@@ -101,4 +150,5 @@ export function watchBrandDirectory(
       console.error('[hot-reload] Failed to close watcher:', err);
     }
   };
+  return Object.assign(stop, { ready });
 }

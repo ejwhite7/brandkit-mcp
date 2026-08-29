@@ -460,3 +460,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores partial five-file writes.
 - Commit: Pending at time of entry.
 - Next eligible story: WATCH-001.
+
+## 2026-08-29 03:16 EDT — WATCH-001
+
+- Objective: Ensure hot reload observes exactly the contained, non-ignored filesystem surface that scanning consumes.
+- Defect reproduced: Chokidar's default symlink following emitted changes after mutating an outside target; ignored fixed/discovered paths could still trigger full reindexing. Even `followSymlinks:false` emitted a change for the symlink entry itself.
+- Changes: Export one brand-root-relative normalized exact/boundary ignore matcher for scanner and watcher; canonicalize the explicitly configured root; disable descendant symlink following; reject dot, node_modules, outside-root, and configured ignored event paths; lstat-filter residual change events on symlink entries; expose watcher readiness for deterministic integration tests.
+- Files changed: `src/indexer/hot-reload.ts`, `src/scanner/directory-scanner.ts`, and `src/tests/hot-reload.test.ts`.
+- Tests added: Real valid add/change/unlink reload; fixed and nested discovered ignores; `human` versus `humanity` boundary; outside symlink target mutation; native/cross-separator matcher behavior; dot/node_modules/outside filtering.
+- Verification commands: Focused 16-test scanner/watcher matrix three consecutive times, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused repeated tests pass; full 42 files / 374 tests pass; typecheck, lint, build/DTS, and diff check pass.
+- Security review: External symlink targets are neither watched nor allowed to trigger reindex; ignore paths cannot be reintroduced by the watcher; configured symlink roots are canonicalized once and descendants remain no-follow.
+- Compatibility review: Valid add/change/unlink hot reload behavior remains; ignore semantics now match scanning exactly and boundary matching avoids false positives.
+- Rollback: Revert this story commit; that restores outside/ignored reload triggers.
+- Commit: Pending at time of entry.
+- Next eligible story: TOOL-001.

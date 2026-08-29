@@ -17,7 +17,7 @@
  *   <root>/agent/visual/artifacts/product/ (same)
  */
 
-import { join, extname, relative, basename, posix } from 'path';
+import { join, extname, relative, basename, posix, resolve, isAbsolute } from 'path';
 import type {
   MagicTrick,
   AudienceDoc,
@@ -58,9 +58,11 @@ export interface ScanOptions {
   limits?: Partial<BrandIngestionLimits>;
 }
 
-interface IgnoreMatcher {
+export interface BrandPathIgnoreMatcher {
   matches(path: string): boolean;
 }
+
+type IgnoreMatcher = BrandPathIgnoreMatcher;
 
 // ---------------------------------------------------------------------------
 // Main export
@@ -76,7 +78,11 @@ interface IgnoreMatcher {
 export function scanBrandRoot(rootDir: string, options?: ScanOptions): ScanResult {
   const warnings: string[] = [];
   const reader = new BrandReadPolicy(rootDir, options?.limits);
-  const ignore = createIgnoreMatcher(options?.ignore ?? ['human/'], reader, warnings);
+  const ignore = createBrandPathIgnoreMatcher(
+    reader.configuredRoot,
+    options?.ignore ?? ['human/'],
+    () => warnings.push('Ignored invalid ignore pattern: paths must stay relative to the brand root'),
+  );
 
   // ---------------------------------------------------------------------------
   // 1. magic_trick.md
@@ -546,11 +552,17 @@ function walkDir(
   }
 }
 
-function createIgnoreMatcher(
+/**
+ * Create the canonical matcher for configured brand-root-relative ignore
+ * paths. Both scanning and hot reload use this function so an ignored path
+ * cannot be reintroduced by a watcher event.
+ */
+export function createBrandPathIgnoreMatcher(
+  rootDir: string,
   patterns: string[],
-  reader: BrandReadPolicy,
-  warnings: string[],
-): IgnoreMatcher {
+  onInvalidPattern?: (pattern: string) => void,
+): BrandPathIgnoreMatcher {
+  const configuredRoot = resolve(rootDir);
   const normalized = new Set<string>();
 
   for (const pattern of patterns) {
@@ -573,7 +585,7 @@ function createIgnoreMatcher(
     }
 
     if (isAbsolutePattern || escapesRoot || segments.length === 0 || pattern.includes('\0')) {
-      warnings.push('Ignored invalid ignore pattern: paths must stay relative to the brand root');
+      onInvalidPattern?.(pattern);
       continue;
     }
     normalized.add(posix.join(...segments));
@@ -582,12 +594,12 @@ function createIgnoreMatcher(
 
   return {
     matches(path: string): boolean {
-      let brandPath: string;
-      try {
-        brandPath = relative(reader.configuredRoot, reader.assertPath(path)).replace(/\\/g, '/');
-      } catch {
-        return false;
-      }
+      // Chokidar emits native separators, but tests and adapter layers can
+      // supply paths with the other platform's separator. Ignore patterns
+      // already treat both slash styles as separators, so event paths do too.
+      const candidate = resolve(path.replace(/\\/g, '/'));
+      const brandPath = relative(configuredRoot, candidate).replace(/\\/g, '/');
+      if (brandPath === '..' || brandPath.startsWith('../') || isAbsolute(brandPath)) return false;
       return normalizedPatterns.some(
         (pattern) => brandPath === pattern || brandPath.startsWith(`${pattern}/`),
       );

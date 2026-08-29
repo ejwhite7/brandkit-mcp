@@ -248,7 +248,7 @@
       "title": "Align hot reload containment and ignore semantics",
       "dependencies": ["FS-002"],
       "acceptance": ["watcher does not follow symlinks", "scanner ignore rules also exclude watcher events", "valid non-ignored changes still reload"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "TOOL-001",
