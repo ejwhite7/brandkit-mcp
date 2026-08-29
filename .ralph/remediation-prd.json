@@ -166,7 +166,7 @@
       "id": "QA-001",
       "priority": 0,
       "title": "Complete two clean adversarial discovery passes",
-      "dependencies": ["BASE-002", "SEC-003", "SEC-004", "HTTP-002", "FS-002", "FS-004", "CTX-001", "DEP-002", "DOCKER-001", "VERCEL-001", "CLOUDFLARE-001", "STATE-001", "PREVIEW-001", "INIT-001", "HTTP-003", "CI-001", "CI-002", "FMT-001", "SCAN-001", "DOCS-001", "WATCH-001", "TOOL-001"],
+      "dependencies": ["BASE-002", "SEC-003", "SEC-004", "HTTP-002", "FS-002", "FS-004", "CTX-001", "DEP-002", "DOCKER-001", "VERCEL-001", "CLOUDFLARE-001", "STATE-001", "PREVIEW-001", "INIT-001", "HTTP-003", "CI-001", "CI-002", "FMT-001", "SCAN-001", "DOCS-001", "WATCH-001", "TOOL-001", "YAML-001", "MANIFEST-001", "TOOL-002"],
       "acceptance": ["two consecutive passes find no new actionable issue", "all discovered issues become failing stories", "no known actionable bug remains open"],
       "passes": false
     },
@@ -257,6 +257,30 @@
       "dependencies": ["HTTP-002"],
       "acceptance": ["limit is an integer within a conservative bound", "invalid limits fail predictably", "response size remains bounded"],
       "passes": true
+    },
+    {
+      "id": "YAML-001",
+      "priority": 0,
+      "title": "Reject cyclic or amplifying YAML object graphs",
+      "dependencies": ["DEP-002", "SCAN-001"],
+      "acceptance": ["cycles cannot reach tool serialization", "aliases cannot amplify parsed output beyond a finite structural budget", "normal nested YAML and frontmatter remain compatible"],
+      "passes": false
+    },
+    {
+      "id": "MANIFEST-001",
+      "priority": 0,
+      "title": "Validate tolerant manifest entry shapes",
+      "dependencies": ["FS-001"],
+      "acceptance": ["null scalar and array manifest entries never crash scanning", "invalid entries become deterministic warnings", "valid asset and font entries remain indexed"],
+      "passes": false
+    },
+    {
+      "id": "TOOL-002",
+      "priority": 1,
+      "title": "Bound search query and snippet response bytes",
+      "dependencies": ["TOOL-001"],
+      "acceptance": ["query length is bounded in schema and runtime", "snippet length is independent of hostile query length", "maximum search response remains within a tested byte ceiling"],
+      "passes": false
     },
     {
       "id": "RELEASE-001",

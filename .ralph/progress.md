@@ -490,3 +490,12 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores unbounded/negative response behavior.
 - Commit: Pending at time of entry.
 - Next eligible story: QA-001 (restart consecutive clean-pass count at zero).
+
+## 2026-08-29 04:10 EDT — QA-001 clean-pass attempt 1 (failed discovery gate)
+
+- Objective: Restart the required sequence of two independent issue-free adversarial reviews after resolving all prior findings.
+- Result: Not clean. The consecutive-pass counter remains zero and QA-001 stays failing.
+- Confirmed findings: A 233-byte YAML alias graph expanded to 5,273,436 serialized bytes and self-aliases created cycles; null entries in syntactically valid font/asset manifest arrays caused property dereference crashes; a 200 KB search query with 100 hits produced a roughly 20 MB response despite result-count limits.
+- Gate context: 43 files / 387 tests, typecheck, lint, build/DTS, full audit (0), and diff check passed before review, confirming missing adversarial coverage rather than existing gate failures.
+- Ralph action: Added YAML-001, MANIFEST-001, and TOOL-002 as open bugs and failing dependencies of QA-001. The reviewer response was interrupted by an automated safety filter after reporting the confirmed reproductions; because actionable findings already existed, the pass could not qualify regardless.
+- Next eligible story: YAML-001.

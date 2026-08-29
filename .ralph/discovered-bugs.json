@@ -107,6 +107,30 @@
       "evidence": "Tool schema and runtime pass an unconstrained numeric limit directly to Array.slice.",
       "story": "TOOL-001",
       "resolution": "Search schema and runtime require an integer from 1 to 100, default 20, and maintain a bounded top-k candidate set."
+    },
+    {
+      "id": "YAML-001",
+      "severity": "high",
+      "status": "open",
+      "title": "YAML aliases and cycles amplify or break serialized tool data",
+      "evidence": "A 233-byte alias graph parsed by YAML/frontmatter expanded to 5,273,436 JSON bytes, while a self-alias produced a cycle that throws during JSON serialization.",
+      "story": "YAML-001"
+    },
+    {
+      "id": "MANIFEST-001",
+      "severity": "high",
+      "status": "open",
+      "title": "Null font and asset manifest entries crash scanning",
+      "evidence": "Valid YAML list entries with no value parse as null; scanner manifest loops dereference item.file and abort startup.",
+      "story": "MANIFEST-001"
+    },
+    {
+      "id": "TOOL-002",
+      "severity": "medium",
+      "status": "open",
+      "title": "search_brand query length amplifies response bytes",
+      "evidence": "A 200 KB matching query across 100 hits generated a roughly 20 MB response because every snippet includes query.length bytes.",
+      "story": "TOOL-002"
     }
   ]
 }
