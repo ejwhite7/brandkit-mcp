@@ -227,3 +227,20 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; callers would return to raw override buckets and partial-override data loss.
 - Commit: Pending at time of entry.
 - Next eligible story: DOCKER-001.
+
+## 2026-08-29 01:30 EDT — DOCKER-001
+
+- Objective: Make the shipped image and Compose service healthy, authenticated, and MCP-capable.
+- Defect reproduced: Compose published and health-checked port 3001 while the image defaulted to stdio, so no HTTP listener or `/health` endpoint existed; default bind mounts also referenced files absent from a fresh checkout.
+- Changes: Build with lockfile-backed `npm ci`; run as the non-root Node user; bundle a Docker-specific Acme config/data set; explicitly start the main Streamable HTTP CLI on port 3001; require runtime bearer auth; publish the host port on loopback; authenticate the health check; remove failing default bind mounts and the unnecessary unauthenticated preview service; add a bounded SDK smoke client and Ubuntu Compose CI job with masked ephemeral credentials and guaranteed cleanup.
+- Files changed: `Dockerfile`, `docker-compose.yml`, `docker/brandkit.config.yaml`, `scripts/docker-smoke.mjs`, `package.json`, `.github/workflows/ci.yml`, `README.md`, and `src/tests/docker-deployment.test.ts`.
+- Tests added: Image/entrypoint/non-root contract; mandatory auth and health contract; wildcard Host allowlist config; CI initialize/tool-call smoke contract.
+- Verification commands: Focused 26-test matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, authenticated and missing-token `docker compose config --quiet`, real built-CLI HTTP health plus SDK smoke, Docker context audit, and `git diff --check`.
+- Verification results: Focused tests pass; full 36 files / 291 tests pass; typecheck, lint, build, Compose config, real initialize/listTools/get_brand_overview, readiness, write-tool hiding, context audit, and diff check pass. Unauthenticated health returns 401 and authenticated health returns `{status:"ready"}`.
+- Environment limitation: The local OrbStack Docker daemon was unresponsive and the bounded probe timed out, so local image build/up was not available. The new Ubuntu CI job performs the missing real container build, health wait, and MCP handshake.
+- Security review: No credential is baked into the image or logged; Compose refuses a missing token; network write tools remain hidden; only the authenticated MCP service is shipped; the unauthenticated preview stays a trusted-local CLI.
+- Compatibility review: The image default intentionally changes from stdio to authenticated HTTP to match its published port; stdio remains available through the documented command override. Custom brands mount their own regular config/data and set `BRANDKIT_CONFIG`.
+- Remaining risks: Dependency reachability and vulnerability cleanup remain in DEP-001/DEP-002.
+- Rollback: Revert this story commit; this restores the prior stdio default and broken Compose health/MCP path.
+- Commit: Pending at time of entry.
+- Next eligible story: DEP-001.

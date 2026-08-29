@@ -144,7 +144,7 @@
       "title": "Make Docker Compose healthy and MCP-capable",
       "dependencies": ["HTTP-002", "SEC-004"],
       "acceptance": ["Compose explicitly runs a supported transport", "health becomes ready", "container MCP handshake passes in CI"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "VERCEL-001",

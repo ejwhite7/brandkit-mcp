@@ -1,28 +1,25 @@
-# Builder stage
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package.json tsconfig.json tsup.config.ts ./
-RUN npm install
+COPY package.json package-lock.json tsconfig.json tsup.config.ts ./
+RUN npm ci
 COPY src ./src
 RUN npm run build
 
-# Runtime stage
 FROM node:20-alpine AS runtime
 WORKDIR /app
-COPY package.json ./
-RUN npm install --omit=dev
+ENV NODE_ENV=production
+ENV BRANDKIT_CONFIG=/app/docker/brandkit.config.yaml
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/preview/templates ./src/preview/templates
 COPY --from=builder /app/src/preview/static ./src/preview/static
-# Bundle the acme-corp example as the default demo brand so the container
-# has a working brand directory out of the box (used by Glama for
-# introspection and by `npx brandkit-mcp serve` demos).
-COPY examples/acme-corp/brand_atomic_system/ ./brand_atomic_system/
-COPY examples/acme-corp/brandkit.config.yaml ./
-ENV NODE_ENV=production
-# Default to stdio transport so the container works out-of-the-box with
-# MCP stdio clients (Claude Desktop, Glama mcp-proxy, etc.). To run as an
-# SSE/HTTP server instead, override CMD, e.g.:
-#   docker run -p 3001:3001 brandkit-mcp \
-#     node dist/cli/index.js serve --transport sse --port 3001
-CMD ["node", "/app/dist/cli/index.js", "serve", "--transport", "stdio"]
+
+RUN mkdir -p /app/docker && chown node:node /app/docker
+COPY --chown=node:node examples/acme-corp/brand_atomic_system/ /app/examples/acme-corp/brand_atomic_system/
+COPY --chown=node:node docker/brandkit.config.yaml /app/docker/brandkit.config.yaml
+
+USER node
+EXPOSE 3001
+CMD ["node", "/app/dist/cli/index.js", "serve", "--transport", "http", "--host", "0.0.0.0", "--port", "3001"]

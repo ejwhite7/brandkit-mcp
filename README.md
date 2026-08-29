@@ -198,6 +198,18 @@ server:
 
 `allowedOrigins` entries are exact HTTP(S) origins, including the port when it is non-default. If the list is empty, requests without an `Origin` header remain valid for MCP clients, while a supplied Origin must use a trusted Host hostname. Configure `allowedOrigins` explicitly when a browser application is hosted on a different origin. IPv6 entries in `allowedHosts` use brackets, for example `[2001:db8::10]`.
 
+### Docker Compose
+
+The default Compose service runs the supported Streamable HTTP transport on `http://127.0.0.1:3001/mcp`. It uses the bundled Acme example, so a fresh checkout does not require host-side brand files. Set a bearer token before starting it:
+
+```bash
+export BRANDKIT_AUTH_TOKEN="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")"
+docker compose up --build --wait --wait-timeout 60
+npm run test:docker-smoke
+```
+
+The token is injected at runtime and is also required by the authenticated health check. Compose refuses to start when it is absent. To use your own brand, mount a regular config file and brand directory, set `BRANDKIT_CONFIG` to the container path of that config, and keep `server.allowedHosts` limited to the hostnames clients actually use. Do not put the token in the image or config file. Compose intentionally exposes only the authenticated MCP service; run the preview CLI separately on a trusted local machine. Existing stdio container integrations can override the image command with `node /app/dist/cli/index.js serve --transport stdio --config <path>` and do not need to publish a port.
+
 ## CLI Reference
 
 ```

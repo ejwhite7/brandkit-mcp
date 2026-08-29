@@ -1,31 +1,15 @@
-version: '3.8'
-
 services:
   brandkit-mcp:
     build: .
+    init: true
     ports:
-      - "3001:3001"
-    volumes:
-      - ./brand_atomic_system:/app/brand_atomic_system:ro
-      - ./brandkit.config.yaml:/app/brandkit.config.yaml:ro
+      - "127.0.0.1:${BRANDKIT_PORT:-3001}:3001"
     environment:
-      - NODE_ENV=production
+      BRANDKIT_AUTH_TOKEN: ${BRANDKIT_AUTH_TOKEN:?Set BRANDKIT_AUTH_TOKEN before starting Compose}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r => process.exit(r.ok ? 0 : 1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  preview:
-    build: .
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./brand_atomic_system:/app/brand_atomic_system:ro
-      - ./brandkit.config.yaml:/app/brandkit.config.yaml:ro
-    environment:
-      - NODE_ENV=production
-    command: ["node", "dist/cli/index.js", "preview", "--port", "3000"]
-    restart: unless-stopped
-
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health',{headers:{Authorization:'Bearer '+process.env.BRANDKIT_AUTH_TOKEN}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s

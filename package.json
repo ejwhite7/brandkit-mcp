@@ -21,6 +21,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:docker-smoke": "node scripts/docker-smoke.mjs",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "preview": "node dist/cli/index.js preview",

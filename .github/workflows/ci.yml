@@ -59,3 +59,32 @@ jobs:
           p.stdin.write(JSON.stringify(req) + '\n');
           setTimeout(() => { console.error('Timed out waiting for initialize response'); p.kill(); process.exit(1); }, 15000);
           "
+
+  smoke-docker:
+    name: Docker Compose MCP smoke test
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build, start, and exercise Compose service
+        shell: bash
+        run: |
+          BRANDKIT_AUTH_TOKEN="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")"
+          echo "::add-mask::$BRANDKIT_AUTH_TOKEN"
+          export BRANDKIT_AUTH_TOKEN
+          cleanup() {
+            docker compose down --volumes --remove-orphans
+          }
+          trap cleanup EXIT
+          docker compose config --quiet
+          docker compose build
+          if ! docker compose up --detach --wait --wait-timeout 60; then
+            docker compose logs --no-color
+            exit 1
+          fi
+          npm run test:docker-smoke
