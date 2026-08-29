@@ -445,3 +445,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores unbounded synchronous ingestion.
 - Commit: Pending at time of entry.
 - Next eligible story: DOCS-001.
+
+## 2026-08-29 03:11 EDT — DOCS-001
+
+- Objective: Make generation of CLAUDE.md, AGENTS.md, SKILLS.md, DESIGN.md, and PRODUCT.md one all-or-nothing operation.
+- Defect reproduced: The CLI committed its first three files before DESIGN.md/PRODUCT.md validation; an unsafe fifth target or malformed delimiter left a partially updated project.
+- Changes: Generalized the shared safe writer into a multi-document transaction; preflight every name, target type/identity, content delimiter, and existing marker topology; stage every output before mutation; retain originals under private same-directory backup names; rollback partial commits in reverse order with bounded transient rename retries; route both five-file CLI generation and two-file brand-doc generation through the same implementation.
+- Files changed: `src/brand-docs/write.ts`, `src/cli/commands/docs.ts`, `src/tests/brand-docs.test.ts`, and `src/tests/docs-command.test.ts`.
+- Tests added: Each of five positions as symlink, hard link, non-regular target, or malformed delimiter; injected staging failure; mid-commit failure; transient rollback failure; exact byte restoration; absence/temp/backup cleanup; human content/permissions/markers; successful byte idempotence.
+- Verification commands: Focused 77-test docs/writer matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, and `git diff --check`.
+- Verification results: Focused tests pass; full 42 files / 371 tests pass; typecheck, lint, build/DTS, transaction/rollback injection, and diff check pass.
+- Security review: All output identities are revalidated before live mutation; symlink/hard-link/special targets and ambiguous markers fail before staging; private backups are never treated as live output.
+- Compatibility review: Generated content, human-content preservation, file permissions, return paths, delimiters, and idempotence remain compatible.
+- Rollback: Revert this story commit; that restores partial five-file writes.
+- Commit: Pending at time of entry.
+- Next eligible story: WATCH-001.

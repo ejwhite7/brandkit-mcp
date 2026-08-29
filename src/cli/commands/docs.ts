@@ -10,10 +10,10 @@
  * block is appended so nothing is lost.
  */
 
-import { join, dirname } from 'path';
+import { dirname } from 'path';
 import { loadConfigWithPath, resolveConfigPaths } from '../../config/loader.js';
 import { buildDesignSystemIndex } from '../../indexer/index.js';
-import { updateFileWithDelimiters, writeBrandDocs } from '../../brand-docs/write.js';
+import { writeDelimitedFilesTransactional } from '../../brand-docs/write.js';
 import { generateBrandDocs } from '../../brand-docs/generate.js';
 import { fillBriefPlaceholders } from '../../brand-docs/brief.js';
 
@@ -75,9 +75,6 @@ Use these tools to query the design system:
 - \`get_context_diff\` -- Diff base vs web vs product
 - \`validate_usage\` -- Validate brand compliance`;
 
-  updateFileWithDelimiters(join(outputDir, 'CLAUDE.md'), claudeBlock);
-  console.log('[OK] Generated CLAUDE.md');
-
   // Generate AGENTS.md
   const agentsBlock = `# ${brandName} -- Agent Guidelines
 
@@ -96,9 +93,6 @@ When generating code or content for ${brandName}:
 - **base**: Default shared assets (agent/visual/)
 - **web**: Web-specific overrides (agent/visual/artifacts/web/)
 - **product**: Product/app-specific overrides (agent/visual/artifacts/product/)`;
-
-  updateFileWithDelimiters(join(outputDir, 'AGENTS.md'), agentsBlock);
-  console.log('[OK] Generated AGENTS.md');
 
   // Generate SKILLS.md
   const skillsBlock = `# ${brandName} -- Skills Reference
@@ -133,15 +127,19 @@ Args: { "context": "base" }
 Tool: get_context_diff
 \`\`\``;
 
-  updateFileWithDelimiters(join(outputDir, 'SKILLS.md'), skillsBlock);
-  console.log('[OK] Generated SKILLS.md');
-
   // DESIGN.md + PRODUCT.md via the shared generator (single source of truth).
   // Empty brief fields render as a placeholder pointing at sync_brand_docs.
   const brief = fillBriefPlaceholders(config.brief);
-  writeBrandDocs(outputDir, generateBrandDocs(index, brief));
-  console.log('[OK] Generated DESIGN.md');
-  console.log('[OK] Generated PRODUCT.md');
+  const brandDocs = generateBrandDocs(index, brief);
+  const names = ['CLAUDE.md', 'AGENTS.md', 'SKILLS.md', 'DESIGN.md', 'PRODUCT.md'];
+  writeDelimitedFilesTransactional(outputDir, [
+    { fileName: names[0], generatedBlock: claudeBlock },
+    { fileName: names[1], generatedBlock: agentsBlock },
+    { fileName: names[2], generatedBlock: skillsBlock },
+    { fileName: names[3], generatedBlock: brandDocs.design },
+    { fileName: names[4], generatedBlock: brandDocs.product },
+  ]);
+  for (const name of names) console.log(`[OK] Generated ${name}`);
 
   console.log('\nAll documentation files generated successfully.');
 }

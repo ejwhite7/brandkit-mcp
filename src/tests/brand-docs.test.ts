@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   symlinkSync,
   writeFileSync,
   existsSync,
@@ -78,6 +79,7 @@ describe('brief helpers', () => {
 import {
   updateFileWithDelimiters,
   writeBrandDocs,
+  writeDelimitedFilesTransactionalWithOperations,
   DELIMITER_START,
   DELIMITER_END,
 } from '../brand-docs/write.js';
@@ -281,6 +283,77 @@ describe('writeBrandDocs', () => {
     expect(readFileSync(designPath, 'utf-8')).toBe(originalDesign);
     expect(readFileSync(productPath, 'utf-8')).toBe(originalProduct);
     expect(readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+  });
+});
+
+describe('generated document transactions', () => {
+  const names = ['CLAUDE.md', 'AGENTS.md', 'SKILLS.md', 'DESIGN.md', 'PRODUCT.md'];
+
+  function seed(dir: string): Map<string, string> {
+    return new Map(names.map((name) => {
+      const content = `human bytes for ${name}   \n\n`;
+      writeFileSync(join(dir, name), content);
+      return [name, content];
+    }));
+  }
+
+  function specs() {
+    return names.map((fileName) => ({ fileName, generatedBlock: `generated ${fileName}` }));
+  }
+
+  function expectOriginals(dir: string, originals: Map<string, string>): void {
+    for (const [name, content] of originals) {
+      expect(readFileSync(join(dir, name), 'utf-8')).toBe(content);
+    }
+    expect(readdirSync(dir).filter((name) => name.endsWith('.tmp') || name.endsWith('.bak')))
+      .toEqual([]);
+  }
+
+  it('restores all five original files after a failure partway through commit', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-transaction-'));
+    const originals = seed(dir);
+    let calls = 0;
+
+    expect(() => writeDelimitedFilesTransactionalWithOperations(dir, specs(), {
+      rename(from, to) {
+        calls += 1;
+        if (calls === 8) throw new Error('injected commit failure');
+        renameSync(from, to);
+      },
+    })).toThrow(/injected commit failure/);
+
+    expectOriginals(dir, originals);
+  });
+
+  it('removes every staged file and preserves originals when staging aborts', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-transaction-'));
+    const originals = seed(dir);
+
+    expect(() => writeDelimitedFilesTransactionalWithOperations(dir, specs(), {
+      rename: renameSync,
+      afterStage(stagedCount) {
+        if (stagedCount === 3) throw new Error('injected staging failure');
+      },
+    })).toThrow(/injected staging failure/);
+
+    expectOriginals(dir, originals);
+  });
+
+  it('retries a transient rollback failure and still restores every original byte', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bk-write-transaction-'));
+    const originals = seed(dir);
+    let calls = 0;
+
+    expect(() => writeDelimitedFilesTransactionalWithOperations(dir, specs(), {
+      rename(from, to) {
+        calls += 1;
+        if (calls === 8) throw new Error('injected commit failure');
+        if (calls === 9) throw new Error('injected rollback failure');
+        renameSync(from, to);
+      },
+    })).toThrow(/injected commit failure/);
+
+    expectOriginals(dir, originals);
   });
 });
 

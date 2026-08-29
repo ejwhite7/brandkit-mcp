@@ -240,7 +240,7 @@
       "title": "Make five-file docs generation transactional",
       "dependencies": ["FS-004"],
       "acceptance": ["all five outputs preflight before any mutation", "one unsafe target preserves every output byte", "successful generation remains idempotent"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "WATCH-001",

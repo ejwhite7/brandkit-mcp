@@ -84,10 +84,11 @@
     {
       "id": "DOCS-001",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "title": "Docs generation can partially update its five-file set",
       "evidence": "docs command writes CLAUDE.md AGENTS.md and SKILLS.md before DESIGN.md and PRODUCT.md preflight can fail.",
-      "story": "DOCS-001"
+      "story": "DOCS-001",
+      "resolution": "All five generated documents now share one complete preflight, staging, commit, backup, and rollback transaction."
     },
     {
       "id": "WATCH-001",

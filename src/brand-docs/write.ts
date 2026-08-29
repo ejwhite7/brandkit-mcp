@@ -49,6 +49,32 @@ interface PreparedWrite {
   tempIdentity: Pick<Stats, 'dev' | 'ino'>;
 }
 
+export interface GeneratedDocumentSpec {
+  fileName: string;
+  generatedBlock: string;
+}
+
+export interface GeneratedWriteOperations {
+  rename: typeof renameSync;
+  afterStage?: (stagedCount: number) => void;
+}
+
+const defaultGeneratedWriteOperations: GeneratedWriteOperations = { rename: renameSync };
+
+interface TransactionPlan {
+  targetPath: string;
+  content: string;
+  existing: Stats | undefined;
+  backupPath: string;
+}
+
+interface TransactionRecord {
+  plan: TransactionPlan;
+  prepared: PreparedWrite;
+  backedUp: boolean;
+  installed: boolean;
+}
+
 function sameFile(
   left: Pick<Stats, 'dev' | 'ino'>,
   right: Pick<Stats, 'dev' | 'ino'>,
@@ -197,12 +223,16 @@ function prepareAtomicWrite(
   }
 }
 
-function commitPreparedWrite(prepared: PreparedWrite): void {
+function assertPreparedWriteUnchanged(prepared: PreparedWrite): void {
   assertDirectoryUnchanged(prepared.directoryPath, prepared.directoryIdentity);
   const tempEntry = lstatSync(prepared.tempPath);
   if (!tempEntry.isFile() || tempEntry.isSymbolicLink() || !sameFile(tempEntry, prepared.tempIdentity)) {
     throw new GeneratedWriteError(`Temporary output for ${basename(prepared.targetPath)} changed before commit`);
   }
+}
+
+function commitPreparedWrite(prepared: PreparedWrite): void {
+  assertPreparedWriteUnchanged(prepared);
   renameSync(prepared.tempPath, prepared.targetPath);
 }
 
@@ -215,6 +245,196 @@ function cleanupPreparedWrite(prepared: PreparedWrite): void {
     }
   }
 }
+
+function inspectOptionalTarget(targetPath: string): Stats | undefined {
+  return inspectTarget(targetPath);
+}
+
+function assertTargetUnchanged(targetPath: string, expected: Stats | undefined): void {
+  const current = inspectOptionalTarget(targetPath);
+  if (!expected) {
+    if (current) {
+      throw new GeneratedWriteError(`Output ${basename(targetPath)} appeared after preflight`);
+    }
+    return;
+  }
+  if (!current || !sameFile(current, expected)) {
+    throw new GeneratedWriteError(`Output ${basename(targetPath)} changed after preflight`);
+  }
+}
+
+function renameForRollback(
+  operations: GeneratedWriteOperations,
+  from: string,
+  to: string,
+): void {
+  let lastError: unknown;
+  // A rename can fail transiently (and tests deliberately inject that case).
+  // Retrying also prevents a one-off rollback failure from stranding the old
+  // document under its private backup name.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      operations.rename(from, to);
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
+function removePrivateFile(path: string): void {
+  try {
+    unlinkSync(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      // Cleanup is best-effort. Private names are never treated as live output.
+    }
+  }
+}
+
+/**
+ * Replace a set of generated delimiter blocks as one transaction.
+ *
+ * Every destination and delimiter topology is inspected before staging. Old
+ * files remain available under same-directory private names until all new
+ * files have committed, allowing any partial commit to be rolled back without
+ * reconstructing user-authored bytes.
+ */
+function writeDelimitedFilesTransaction(
+  outputDir: string,
+  specs: GeneratedDocumentSpec[],
+  operations: GeneratedWriteOperations,
+): string[] {
+  const requestedOutputDir = resolve(outputDir);
+  const directory = inspectOutputDirectory(outputDir);
+  const nonce = `${process.pid}.${randomUUID()}`;
+  const seen = new Set<string>();
+  const plans: TransactionPlan[] = [];
+  const records: TransactionRecord[] = [];
+
+  try {
+    // Complete the whole preflight, including generated and existing marker
+    // validation, before creating a temporary file or mutating a destination.
+    for (const spec of specs) {
+      if (basename(spec.fileName) !== spec.fileName || spec.fileName.length === 0) {
+        throw new GeneratedWriteError('Generated document names must be non-empty base names');
+      }
+      const targetPath = join(directory.path, spec.fileName);
+      if (!isWithin(directory.path, targetPath) || seen.has(targetPath)) {
+        throw new GeneratedWriteError(`Duplicate or unsafe generated output ${spec.fileName}`);
+      }
+      seen.add(targetPath);
+      const existing = inspectTarget(targetPath);
+      const existingText = existing ? readExistingFile(targetPath, existing) : undefined;
+      plans.push({
+        targetPath,
+        content: renderDelimitedFile(existingText, spec.generatedBlock),
+        existing,
+        backupPath: join(directory.path, `.${spec.fileName}.${nonce}.bak`),
+      });
+    }
+
+    for (const plan of plans) {
+      records.push({
+        plan,
+        prepared: prepareAtomicWrite(
+          directory.path,
+          directory.identity,
+          plan.targetPath,
+          plan.content,
+          plan.existing,
+        ),
+        backedUp: false,
+        installed: false,
+      });
+      operations.afterStage?.(records.length);
+    }
+
+    // Revalidate the complete set once more before the first live mutation.
+    assertDirectoryUnchanged(directory.path, directory.identity);
+    for (const { plan } of records) {
+      assertTargetUnchanged(plan.targetPath, plan.existing);
+      if (inspectOptionalTarget(plan.backupPath)) {
+        throw new GeneratedWriteError(`Private backup already exists for ${basename(plan.targetPath)}`);
+      }
+    }
+
+    try {
+      for (const record of records) {
+        const { plan, prepared } = record;
+        assertDirectoryUnchanged(directory.path, directory.identity);
+        assertTargetUnchanged(plan.targetPath, plan.existing);
+        assertPreparedWriteUnchanged(prepared);
+        if (plan.existing) {
+          operations.rename(plan.targetPath, plan.backupPath);
+          record.backedUp = true;
+        }
+        operations.rename(prepared.tempPath, plan.targetPath);
+        record.installed = true;
+      }
+    } catch (commitError) {
+      const rollbackErrors: string[] = [];
+      for (const record of [...records].reverse()) {
+        try {
+          if (record.installed) {
+            renameForRollback(
+              operations,
+              record.plan.targetPath,
+              record.prepared.tempPath,
+            );
+            record.installed = false;
+          }
+          if (record.backedUp) {
+            renameForRollback(
+              operations,
+              record.plan.backupPath,
+              record.plan.targetPath,
+            );
+            record.backedUp = false;
+          }
+        } catch (rollbackError) {
+          rollbackErrors.push((rollbackError as Error).message);
+        }
+      }
+      const suffix = rollbackErrors.length > 0
+        ? `; rollback also failed: ${rollbackErrors.join('; ')}`
+        : '';
+      const outcome = rollbackErrors.length === 0
+        ? 'was rolled back'
+        : 'could not be fully rolled back';
+      throw new GeneratedWriteError(
+        `Generated document transaction failed and ${outcome}: ${(commitError as Error).message}${suffix}`,
+      );
+    }
+
+    for (const record of records) {
+      if (record.backedUp) {
+        removePrivateFile(record.plan.backupPath);
+        record.backedUp = false;
+      }
+    }
+  } finally {
+    for (const record of records) {
+      cleanupPreparedWrite(record.prepared);
+      // Only stale private files can remain here. A backup still needed after
+      // an unrecoverable rollback error is intentionally not deleted.
+      if (!record.backedUp) removePrivateFile(record.plan.backupPath);
+    }
+  }
+
+  return specs.map((spec) => join(requestedOutputDir, spec.fileName));
+}
+
+export function writeDelimitedFilesTransactional(
+  outputDir: string,
+  specs: GeneratedDocumentSpec[],
+): string[] {
+  return writeDelimitedFilesTransaction(outputDir, specs, defaultGeneratedWriteOperations);
+}
+
+/** Internal deterministic fault-injection seam used by transaction regressions. */
+export const writeDelimitedFilesTransactionalWithOperations = writeDelimitedFilesTransaction;
 
 /** Atomically replace a regular file without ever following the final path. */
 export function atomicWriteFile(
@@ -326,62 +546,12 @@ export function writeBrandDocs(
   outputDir: string,
   docs: { design: string; product: string },
 ): { designPath: string; productPath: string } {
-  const requestedOutputDir = resolve(outputDir);
-  const directory = inspectOutputDirectory(outputDir);
-  const specs = [
-    { targetPath: join(directory.path, 'DESIGN.md'), block: docs.design },
-    { targetPath: join(directory.path, 'PRODUCT.md'), block: docs.product },
-  ];
-  const plans: Array<{ targetPath: string; content: string; existing: Stats | undefined }> = [];
-  const prepared: PreparedWrite[] = [];
-  try {
-    // Validate both destinations and both delimiter topologies before staging
-    // either file. A malformed pair therefore leaves no temporary output.
-    for (const spec of specs) {
-      if (!isWithin(directory.path, spec.targetPath)) {
-        throw new GeneratedWriteError('Generated output is outside the output directory');
-      }
-      const existing = inspectTarget(spec.targetPath);
-      const existingText = existing ? readExistingFile(spec.targetPath, existing) : undefined;
-      plans.push({
-        targetPath: spec.targetPath,
-        content: renderDelimitedFile(existingText, spec.block),
-        existing,
-      });
-    }
-
-    for (const plan of plans) {
-      prepared.push(
-        prepareAtomicWrite(
-          directory.path,
-          directory.identity,
-          plan.targetPath,
-          plan.content,
-          plan.existing,
-        ),
-      );
-    }
-
-    let committed = 0;
-    try {
-      for (const item of prepared) {
-        commitPreparedWrite(item);
-        committed += 1;
-      }
-    } catch (err) {
-      throw new GeneratedWriteError(
-        `Brand document commit failed after ${committed} of ${prepared.length} files; ` +
-          `each completed file is intact and any remaining file is unchanged: ${(err as Error).message}`,
-      );
-    }
-  } finally {
-    for (const item of prepared) cleanupPreparedWrite(item);
-  }
-
-  // Preserve the caller-facing path spelling even when a system ancestor
-  // (for example macOS /var) canonicalizes differently internally.
+  const [designPath, productPath] = writeDelimitedFilesTransactional(outputDir, [
+    { fileName: 'DESIGN.md', generatedBlock: docs.design },
+    { fileName: 'PRODUCT.md', generatedBlock: docs.product },
+  ]);
   return {
-    designPath: join(requestedOutputDir, 'DESIGN.md'),
-    productPath: join(requestedOutputDir, 'PRODUCT.md'),
+    designPath,
+    productPath,
   };
 }
