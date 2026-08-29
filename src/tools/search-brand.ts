@@ -13,11 +13,29 @@ export const TOOL_DESCRIPTION =
 
 export const DEFAULT_SEARCH_LIMIT = 20;
 export const MAX_SEARCH_LIMIT = 100;
+/** JSON Schema maxLength counts Unicode code points, not encoded bytes. */
+export const MAX_SEARCH_QUERY_CODE_POINTS = 256;
+/** The runtime additionally caps the UTF-8 representation used on the wire. */
+export const MAX_SEARCH_QUERY_BYTES = 512;
+export const MAX_SEARCH_SNIPPET_BYTES = 512;
+export const MAX_SEARCH_SOURCE_BYTES = 512;
+export const MAX_SEARCH_RESPONSE_BYTES = 256 * 1024;
+
+const INVALID_QUERY_WARNING =
+  `Missing or invalid required "query" argument: expected a non-empty string of at most ` +
+  `${MAX_SEARCH_QUERY_CODE_POINTS} Unicode code points and ${MAX_SEARCH_QUERY_BYTES} UTF-8 bytes`;
 
 export const INPUT_SCHEMA = {
   type: 'object' as const,
   properties: {
-    query: { type: 'string', description: 'Search query (case-insensitive substring)' },
+    query: {
+      type: 'string',
+      minLength: 1,
+      maxLength: MAX_SEARCH_QUERY_CODE_POINTS,
+      description:
+        `Search query (case-insensitive substring; maximum ${MAX_SEARCH_QUERY_CODE_POINTS} Unicode ` +
+        `code points and ${MAX_SEARCH_QUERY_BYTES} UTF-8 bytes)`,
+    },
     limit: {
       type: 'integer',
       minimum: 1,
@@ -48,18 +66,145 @@ function resolveSearchLimit(value: unknown): number {
   return limit;
 }
 
+function isValidSearchQuery(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0) return false;
+
+  // Check bytes first so a very large hostile string is rejected without
+  // materializing an equally large code-point array.
+  if (Buffer.byteLength(value, 'utf8') > MAX_SEARCH_QUERY_BYTES) return false;
+
+  let codePoints = 0;
+  const iterator = value[Symbol.iterator]();
+  for (let next = iterator.next(); !next.done; next = iterator.next()) {
+    const unit = next.value.charCodeAt(0);
+    if (next.value.length === 1 && unit >= 0xd800 && unit <= 0xdfff) return false;
+    codePoints += 1;
+    if (codePoints > MAX_SEARCH_QUERY_CODE_POINTS) return false;
+  }
+  return true;
+}
+
+function takeUtf8Slice(value: string, start: number, maxBytes: number): { text: string; codeUnits: number } {
+  let text = '';
+  let bytes = 0;
+  let codeUnits = 0;
+  let cursor = start;
+
+  while (cursor < value.length) {
+    const codePoint = String.fromCodePoint(value.codePointAt(cursor) as number);
+    const codePointBytes = Buffer.byteLength(codePoint, 'utf8');
+    if (bytes + codePointBytes > maxBytes) break;
+    text += codePoint;
+    bytes += codePointBytes;
+    codeUnits += codePoint.length;
+    cursor += codePoint.length;
+  }
+
+  return { text, codeUnits };
+}
+
+function takeUtf8Prefix(value: string, maxBytes: number): { text: string; codeUnits: number } {
+  return takeUtf8Slice(value, 0, maxBytes);
+}
+
+function boundedUtf8Text(value: string, maxBytes: number): string {
+  const ellipsis = '…';
+  const full = takeUtf8Prefix(value, maxBytes);
+  if (full.codeUnits === value.length) return value;
+  const prefix = takeUtf8Prefix(value, maxBytes - Buffer.byteLength(ellipsis, 'utf8'));
+  return `${prefix.text}${ellipsis}`;
+}
+
+function moveBackCodePoints(value: string, from: number, count: number): number {
+  let cursor = Math.min(Math.max(0, from), value.length);
+  // Never begin a slice between a UTF-16 surrogate pair.
+  if (
+    cursor > 0 &&
+    cursor < value.length &&
+    value.charCodeAt(cursor) >= 0xdc00 &&
+    value.charCodeAt(cursor) <= 0xdfff &&
+    value.charCodeAt(cursor - 1) >= 0xd800 &&
+    value.charCodeAt(cursor - 1) <= 0xdbff
+  ) {
+    cursor -= 1;
+  }
+
+  while (cursor > 0 && count > 0) {
+    cursor -= 1;
+    if (
+      cursor > 0 &&
+      value.charCodeAt(cursor) >= 0xdc00 &&
+      value.charCodeAt(cursor) <= 0xdfff &&
+      value.charCodeAt(cursor - 1) >= 0xd800 &&
+      value.charCodeAt(cursor - 1) <= 0xdbff
+    ) {
+      cursor -= 1;
+    }
+    count -= 1;
+  }
+  return cursor;
+}
+
+function makeSnippet(value: string, matchIndex: number): string {
+  const ellipsis = '…';
+  const ellipsisBytes = Buffer.byteLength(ellipsis, 'utf8');
+  const start = moveBackCodePoints(value, matchIndex, 40);
+  const leading = start > 0 ? ellipsis : '';
+
+  // Reserve a trailing ellipsis. The fixed byte budget deliberately does not
+  // depend on query length, and iteration never splits a surrogate pair.
+  const available = MAX_SEARCH_SNIPPET_BYTES - Buffer.byteLength(leading, 'utf8') - ellipsisBytes;
+  const body = takeUtf8Slice(value, start, available);
+  const trailing = start + body.codeUnits < value.length ? ellipsis : '';
+  return `${leading}${body.text}${trailing}`;
+}
+
+function serializeSearchResponse(query: string, results: SearchHit[], warnings: string[]): string {
+  let retained = results;
+  let responseWarnings = warnings;
+  let serialized = JSON.stringify({ query, results: retained, _warnings: responseWarnings }, null, 2);
+
+  if (Buffer.byteLength(serialized, 'utf8') <= MAX_SEARCH_RESPONSE_BYTES) return serialized;
+
+  responseWarnings = [...warnings, 'Some lower-ranked matches were omitted to keep the response within its byte limit'];
+  let lowerBound = 0;
+  let upperBound = results.length;
+  while (lowerBound < upperBound) {
+    const candidateLength = Math.ceil((lowerBound + upperBound) / 2);
+    const candidate = JSON.stringify(
+      { query, results: results.slice(0, candidateLength), _warnings: responseWarnings },
+      null,
+      2,
+    );
+    if (Buffer.byteLength(candidate, 'utf8') <= MAX_SEARCH_RESPONSE_BYTES) {
+      lowerBound = candidateLength;
+    } else {
+      upperBound = candidateLength - 1;
+    }
+  }
+  retained = results.slice(0, lowerBound);
+  serialized = JSON.stringify({ query, results: retained, _warnings: responseWarnings }, null, 2);
+
+  // Query validation and the fixed warning text make this fallback far below
+  // the ceiling even if a future hit field is accidentally made unbounded.
+  if (Buffer.byteLength(serialized, 'utf8') > MAX_SEARCH_RESPONSE_BYTES) {
+    return JSON.stringify({ query: null, results: [], _warnings: [INVALID_QUERY_WARNING] }, null, 2);
+  }
+  return serialized;
+}
+
 export function handler(
   index: DesignSystemIndex,
   args: { query?: unknown; limit?: unknown },
 ) {
   const limit = resolveSearchLimit(args.limit);
 
-  if (typeof args.query !== 'string' || args.query.length === 0) {
+  if (!isValidSearchQuery(args.query)) {
     return [
       {
         type: 'text' as const,
         text: JSON.stringify(
-          { query: null, results: [], _warnings: ['Missing or invalid required "query" argument'] },
+          { query: null, results: [], _warnings: [INVALID_QUERY_WARNING] },
           null,
           2,
         ),
@@ -75,11 +220,10 @@ export function handler(
     const lc = text.toLowerCase();
     const idx = lc.indexOf(q);
     if (idx === -1) return;
-    const start = Math.max(0, idx - 40);
-    const end = Math.min(text.length, idx + q.length + 40);
     hits.push({
       ...base,
-      snippet: (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : ''),
+      source: base.source === undefined ? undefined : boundedUtf8Text(base.source, MAX_SEARCH_SOURCE_BYTES),
+      snippet: makeSnippet(text, idx),
       score: 1 - idx / Math.max(1, text.length),
     });
 
@@ -138,7 +282,7 @@ export function handler(
   return [
     {
       type: 'text' as const,
-      text: JSON.stringify({ query: args.query, results, _warnings: warnings }, null, 2),
+      text: serializeSearchResponse(args.query, results, warnings),
     },
   ];
 }

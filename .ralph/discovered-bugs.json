@@ -129,10 +129,11 @@
     {
       "id": "TOOL-002",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "title": "search_brand query length amplifies response bytes",
       "evidence": "A 200 KB matching query across 100 hits generated a roughly 20 MB response because every snippet includes query.length bytes.",
-      "story": "TOOL-002"
+      "story": "TOOL-002",
+      "resolution": "Search queries, snippets, sources, and final serialized payloads now have independent Unicode-safe character/UTF-8/byte ceilings."
     }
   ]
 }

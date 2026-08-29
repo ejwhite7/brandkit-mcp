@@ -280,7 +280,7 @@
       "title": "Bound search query and snippet response bytes",
       "dependencies": ["TOOL-001"],
       "acceptance": ["query length is bounded in schema and runtime", "snippet length is independent of hostile query length", "maximum search response remains within a tested byte ceiling"],
-      "passes": false
+      "passes": true
     },
     {
       "id": "RELEASE-001",

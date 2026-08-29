@@ -9,7 +9,13 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { startServer } from '../index.js';
-import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from '../tools/search-brand.js';
+import {
+  DEFAULT_SEARCH_LIMIT,
+  MAX_SEARCH_LIMIT,
+  MAX_SEARCH_QUERY_BYTES,
+  MAX_SEARCH_QUERY_CODE_POINTS,
+  MAX_SEARCH_RESPONSE_BYTES,
+} from '../tools/search-brand.js';
 
 const fixtureRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -92,6 +98,11 @@ describe('stateless Streamable HTTP lifecycle', () => {
       maximum: MAX_SEARCH_LIMIT,
       default: DEFAULT_SEARCH_LIMIT,
     });
+    expect(searchTool?.inputSchema.properties?.query).toMatchObject({
+      type: 'string',
+      minLength: 1,
+      maxLength: MAX_SEARCH_QUERY_CODE_POINTS,
+    });
 
     for (const limit of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '20', 0, MAX_SEARCH_LIMIT + 1, 1e100]) {
       const result = await client.callTool({
@@ -118,6 +129,36 @@ describe('stateless Streamable HTTP lifecycle', () => {
       const payload = JSON.parse(content.text) as { results: unknown[] };
       expect(payload.results.length).toBeLessThanOrEqual(limit ?? DEFAULT_SEARCH_LIMIT);
     }
+
+    for (const query of [undefined, 42, '', '\ud800', 'a'.repeat(MAX_SEARCH_QUERY_CODE_POINTS + 1),
+      '🔎'.repeat(Math.floor(MAX_SEARCH_QUERY_BYTES / 4) + 1), 'q'.repeat(200 * 1024)]) {
+      const result = await client.callTool({
+        name: 'search_brand',
+        arguments: query === undefined ? {} : { query, limit: MAX_SEARCH_LIMIT },
+      }) as { isError?: boolean; content: Array<{ type: string; text?: string }> };
+      expect(result.isError, `query ${typeof query === 'string' ? query.length : String(query)}`).not.toBe(true);
+      const content = result.content.find((item) => item.type === 'text');
+      if (content?.type !== 'text' || typeof content.text !== 'string') {
+        throw new Error('missing invalid-query response');
+      }
+      const payload = JSON.parse(content.text) as { query: unknown; results: unknown[]; _warnings: string[] };
+      expect(payload.query).toBeNull();
+      expect(payload.results).toEqual([]);
+      expect(payload._warnings).toEqual([
+        `Missing or invalid required "query" argument: expected a non-empty string of at most ` +
+        `${MAX_SEARCH_QUERY_CODE_POINTS} Unicode code points and ${MAX_SEARCH_QUERY_BYTES} UTF-8 bytes`,
+      ]);
+      expect(Buffer.byteLength(content.text, 'utf8')).toBeLessThanOrEqual(MAX_SEARCH_RESPONSE_BYTES);
+    }
+
+    const boundaryResult = await client.callTool({
+      name: 'search_brand',
+      arguments: { query: '🔎'.repeat(MAX_SEARCH_QUERY_BYTES / 4), limit: MAX_SEARCH_LIMIT },
+    }) as { isError?: boolean; content: Array<{ type: string; text?: string }> };
+    expect(boundaryResult.isError).not.toBe(true);
+    const boundaryText = boundaryResult.content.find((item) => item.type === 'text')?.text;
+    expect(typeof boundaryText).toBe('string');
+    expect(Buffer.byteLength(boundaryText ?? '', 'utf8')).toBeLessThanOrEqual(MAX_SEARCH_RESPONSE_BYTES);
 
     await client.close();
   });

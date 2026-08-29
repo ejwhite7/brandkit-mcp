@@ -529,3 +529,18 @@ criteria and the global regression gate have objective evidence here.
 - Rollback: Revert this story commit; that restores null-entry startup crashes.
 - Commit: Pending at time of entry.
 - Next eligible story: TOOL-002.
+
+## 2026-08-29 04:25 EDT — TOOL-002
+
+- Objective: Prevent long search queries and fields from multiplying into oversized MCP responses.
+- Defect reproduced: A 200 KiB matching query repeated inside 100 snippets produced a roughly 20 MiB JSON response.
+- Changes: Advertise and enforce a non-empty query of at most 256 Unicode code points and 512 UTF-8 bytes; reject unpaired query surrogates; make snippet size independent of query length; Unicode-safely cap snippets and source labels at 512 UTF-8 bytes; hard-cap pretty-serialized responses at 256 KiB by retaining the largest ranked prefix and warning when lower-ranked hits are omitted.
+- Files changed: `src/tools/search-brand.ts`, `src/tests/search-brand.test.ts`, and `src/tests/streamable-http.test.ts`.
+- Tests added: Missing/wrong/empty/unpaired/over-codepoint/over-byte/200 KiB queries; exact character and byte boundaries; 100 multibyte hits across all contexts with huge fields/paths; maximally JSON-escaped fields; surrogate-safe excerpts; real MCP schema, invalid-query, boundary, and byte-cap behavior.
+- Verification commands: Focused 31-test search/Streamable HTTP matrix, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, production/full audits, and `git diff --check`.
+- Verification results: Focused tests pass; full 45 files / 415 tests pass; typecheck, lint, build/DTS, both audits (0), and diff check pass.
+- Security review: Hostile query bytes are rejected before scanning; per-hit and final output allocations are finite; JSON escaping and multibyte content cannot exceed the final wire ceiling.
+- Compatibility review: Normal case-insensitive ranking and the existing graceful invalid-query shape remain; valid searches may return fewer than requested only when necessary to honor the byte ceiling.
+- Rollback: Revert this story commit; that restores response-byte amplification.
+- Commit: Pending at time of entry.
+- Next eligible story: QA-001 (restart consecutive clean-pass count at zero).
